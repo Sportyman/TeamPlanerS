@@ -180,7 +180,7 @@ export const PairingBoard: React.FC = () => {
         <div>
           <h2 className="text-xl md:text-2xl font-bold text-slate-800">שיבוצי אימון</h2>
           <p className="text-xs md:text-sm text-slate-500 mt-1">
-            גרור משתתף לשנות סדר, או לחץ על {<ArrowRightLeft className="inline w-3 h-3"/>} להחלפה בין זוגות
+            גרור את הידית (⋮⋮) כדי לשנות סדר, או לחץ על {<ArrowRightLeft className="inline w-3 h-3"/>} להחלפה בין זוגות
           </p>
         </div>
         <div className="flex flex-col md:flex-row items-center gap-2 w-full xl:w-auto">
@@ -313,14 +313,6 @@ export const PairingBoard: React.FC = () => {
                                 <div
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                style={{
-                                    ...provided.draggableProps.style,
-                                    transform: snapshot.isDragging 
-                                    ? `${provided.draggableProps.style?.transform} rotate(-2deg) scale(1.05)` 
-                                    : provided.draggableProps.style?.transform,
-                                    touchAction: 'none' // Critical fix for mobile scrolling while dragging
-                                }}
                                 className={`
                                     relative group
                                     p-4 rounded-lg border flex items-center justify-between select-none
@@ -334,7 +326,7 @@ export const PairingBoard: React.FC = () => {
                                     ${swapSource && !isSwappingMe ? 'cursor-pointer hover:bg-brand-50' : ''}
                                 `}
                                 onClick={() => swapSource && handleSwapClick(team.id, index)}
-                                title={`לחץ והחזק לגרירה, או השתמש בכפתור החצים להחלפה. רמה: ${member.rank}`}
+                                title={`רמה: ${member.rank}. גרור את הידית לשינוי סדר, או לחץ להחלפה.`}
                                 >
                                 
                                 <div className="flex-1 flex flex-col px-1">
@@ -354,8 +346,11 @@ export const PairingBoard: React.FC = () => {
                                     )}
                                 </div>
 
-                                {/* Grip Icon (Visual Only now) */}
-                                <div className="p-1 text-slate-300">
+                                {/* Grip Icon - THIS IS THE HANDLE NOW */}
+                                <div 
+                                    {...provided.dragHandleProps}
+                                    className="p-3 text-slate-300 hover:text-brand-600 cursor-grab active:cursor-grabbing touch-none"
+                                >
                                     <GripVertical size={24} />
                                 </div>
 
