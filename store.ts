@@ -14,7 +14,9 @@ const MOCK_PEOPLE: Person[] = [
   { id: '8', name: 'כריס פראט', role: Role.MEMBER, rank: 2 },
 ];
 
-const DEFAULT_INVENTORY: BoatInventory = {
+// Load defaults from localStorage if available
+const savedInventory = localStorage.getItem('paddle_default_inventory');
+const DEFAULT_INVENTORY: BoatInventory = savedInventory ? JSON.parse(savedInventory) : {
   doubles: 4,
   singles: 2,
   privates: 0
@@ -95,14 +97,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     session: { ...state.session, inventory }
   })),
 
-  updateDefaultInventory: (inventory) => set(() => ({
-    defaultInventory: inventory
-  })),
+  updateDefaultInventory: (inventory) => {
+    localStorage.setItem('paddle_default_inventory', JSON.stringify(inventory));
+    set(() => ({ defaultInventory: inventory }));
+  },
 
   runPairing: () => {
     const { people, session } = get();
-    // Save history before overwriting teams
-    set((state) => ({ history: [...state.history, state.session.teams], future: [] }));
+    // Reset history when running a fresh pairing to avoid conflict state
+    set({ history: [], future: [] });
 
     const presentPeople = people.filter(p => session.presentPersonIds.includes(p.id));
     const teams = generateSmartPairings(presentPeople, session.inventory);
@@ -113,8 +116,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   resetSession: () => {
     const { defaultInventory } = get();
-    // Save history before reset
-    set((state) => ({ history: [...state.history, state.session.teams], future: [] }));
+    // No history for reset
+    set({ history: [], future: [] });
     
     set((state) => ({
       session: {

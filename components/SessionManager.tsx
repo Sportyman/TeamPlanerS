@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { BoatInventory, RoleLabel, Role } from '../types';
-import { Ship, Users, CheckCircle2, Circle, ArrowLeft, ArrowRight, CheckSquare, Square, Save, RotateCcw } from 'lucide-react';
+import { BoatInventory, RoleLabel, Role, Person } from '../types';
+import { Ship, Users, CheckCircle2, Circle, ArrowLeft, ArrowRight, CheckSquare, Square, Save, RotateCcw, ArrowDownAZ, ArrowUpNarrowWide, Shield } from 'lucide-react';
 import { PairingBoard } from './PairingBoard';
+
+type SortType = 'ROLE' | 'NAME' | 'RANK';
 
 export const SessionManager: React.FC = () => {
   const { 
     people, 
     session, 
-    defaultInventory,
     toggleAttendance, 
     setBulkAttendance, 
     updateInventory, 
@@ -20,6 +21,9 @@ export const SessionManager: React.FC = () => {
   // Initialize step based on whether teams exist (persistence)
   const [step, setStep] = useState<1 | 2 | 3>(() => session.teams.length > 0 ? 3 : 1);
   
+  // Sort State
+  const [sortBy, setSortBy] = useState<SortType>('ROLE');
+
   // Initialize local inventory from current session or defaults
   const [localInventory, setLocalInventory] = useState<BoatInventory>(session.inventory);
   const [showSavedMsg, setShowSavedMsg] = useState(false);
@@ -58,6 +62,28 @@ export const SessionManager: React.FC = () => {
 
   const clearAll = () => {
     setBulkAttendance([]);
+  };
+
+  // Sorting Logic
+  const getSortedPeople = () => {
+    const sorted = [...people];
+    switch (sortBy) {
+        case 'NAME':
+            return sorted.sort((a, b) => a.name.localeCompare(b.name));
+        case 'RANK':
+            return sorted.sort((a, b) => b.rank - a.rank);
+        case 'ROLE':
+        default:
+            return sorted.sort((a, b) => {
+                // 1. Volunteer, 2. Member, 3. Guest
+                const roleOrder = { [Role.VOLUNTEER]: 0, [Role.MEMBER]: 1, [Role.GUEST]: 2 };
+                if (roleOrder[a.role] !== roleOrder[b.role]) {
+                    return roleOrder[a.role] - roleOrder[b.role];
+                }
+                // Then by Name
+                return a.name.localeCompare(b.name);
+            });
+    }
   };
 
   // Calculate stats for step 1
@@ -200,10 +226,33 @@ export const SessionManager: React.FC = () => {
                     </button>
                 </div>
             </div>
+            
+            {/* Sort Controls */}
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+                <span className="font-medium">מיון לפי:</span>
+                <button 
+                    onClick={() => setSortBy('ROLE')}
+                    className={`px-3 py-1 rounded-full border flex items-center gap-1 transition-colors ${sortBy === 'ROLE' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
+                >
+                    <Shield size={14} /> תפקיד
+                </button>
+                <button 
+                     onClick={() => setSortBy('NAME')}
+                    className={`px-3 py-1 rounded-full border flex items-center gap-1 transition-colors ${sortBy === 'NAME' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
+                >
+                    <ArrowDownAZ size={14} /> שם
+                </button>
+                <button 
+                     onClick={() => setSortBy('RANK')}
+                    className={`px-3 py-1 rounded-full border flex items-center gap-1 transition-colors ${sortBy === 'RANK' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
+                >
+                    <ArrowUpNarrowWide size={14} /> דירוג
+                </button>
+            </div>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {people.map(person => {
+            {getSortedPeople().map(person => {
               const isPresent = session.presentPersonIds.includes(person.id);
               
               return (

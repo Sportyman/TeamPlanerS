@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
 import { Team, Role, RoleLabel, BoatTypeLabel, BoatType } from '../types';
-import { GripVertical, AlertTriangle, ArrowRightLeft, Check, Printer, Share2, Link as LinkIcon, Eye, Send, RotateCcw, RotateCw, Star } from 'lucide-react';
+import { GripVertical, AlertTriangle, ArrowRightLeft, Check, Printer, Share2, Link as LinkIcon, Eye, Send, RotateCcw, RotateCw, Star, Dices } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 export const PairingBoard: React.FC = () => {
-  const { session, reorderSessionMembers, swapMembers, undo, redo, history, future, updateTeamBoatType } = useAppStore();
+  const { session, reorderSessionMembers, swapMembers, undo, redo, history, future, updateTeamBoatType, runPairing } = useAppStore();
   const [showShareMenu, setShowShareMenu] = useState(false);
   
   // Swap Mode State
@@ -40,6 +40,12 @@ export const PairingBoard: React.FC = () => {
     window.print();
   };
 
+  const handleRemix = () => {
+    if (confirm('האם אתה בטוח שברצונך לערבב מחדש? השיבוץ הנוכחי יוחלף.')) {
+        runPairing();
+    }
+  };
+
   const generateShareData = () => {
     // 1. Filter out sensitive data (rank, notes, ids)
     const cleanTeams = session.teams.map(t => ({
@@ -60,9 +66,9 @@ export const PairingBoard: React.FC = () => {
     const jsonString = JSON.stringify(payload);
     const encoded = btoa(unescape(encodeURIComponent(jsonString)));
     
-    // 3. Create URL - Robust hash handling
+    // 3. Create URL - Robust hash handling for Share
     const origin = window.location.origin;
-    // Ensure we construct a valid absolute URL regardless of environment
+    // Construct valid absolute URL for HashRouter
     const shareUrl = `${origin}${window.location.pathname}#/share?data=${encoded}`;
     return shareUrl;
   };
@@ -127,8 +133,16 @@ export const PairingBoard: React.FC = () => {
             </div>
             )}
             
-             {/* Undo/Redo Buttons */}
+             {/* Undo/Redo/Remix Buttons */}
             <div className="flex gap-2 w-full md:w-auto">
+               <button
+                  onClick={handleRemix}
+                  className="p-2 rounded-lg border border-slate-200 text-brand-600 hover:bg-brand-50"
+                  title="ערבב מחדש (צור שיבוצים מחדש)"
+               >
+                 <Dices size={18} />
+               </button>
+               <div className="w-px bg-slate-200 mx-1"></div>
                <button
                   onClick={undo}
                   disabled={history.length === 0}
