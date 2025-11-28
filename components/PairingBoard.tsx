@@ -80,7 +80,7 @@ export const PairingBoard: React.FC = () => {
   const handleShareTelegram = () => {
     const url = generateShareData();
     const text = `היי! הנה שיבוצי האימון להיום:`;
-    window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank');
+    window.open(`https://t.me/share/url?url=${encodeURIComponent(text)}`, '_blank');
     setShowShareMenu(false);
   };
 
@@ -177,7 +177,9 @@ export const PairingBoard: React.FC = () => {
                 <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                     <span className="font-bold text-slate-700 text-sm">{BoatTypeLabel[team.boatType]} x{team.boatCount}</span>
                     {team.warnings && team.warnings.length > 0 && (
-                    <AlertTriangle className="text-amber-500" size={16} title={team.warnings.join(', ')} />
+                    <div title={team.warnings.join(', ')}>
+                      <AlertTriangle className="text-amber-500" size={16} />
+                    </div>
                     )}
                 </div>
 
