@@ -56,13 +56,15 @@ export const PairingBoard: React.FC = () => {
       teams: cleanTeams
     };
 
-    // 2. Encode to Base64 (handling Hebrew unicode)
+    // 2. Encode to Base64 (Handling Unicode characters for Hebrew)
     const jsonString = JSON.stringify(payload);
     const encoded = btoa(unescape(encodeURIComponent(jsonString)));
     
     // 3. Create URL - Robust hash handling
-    const baseUrl = window.location.href.split('#')[0]; 
-    return `${baseUrl}#/share?data=${encoded}`;
+    const origin = window.location.origin;
+    // Ensure we construct a valid absolute URL regardless of environment
+    const shareUrl = `${origin}${window.location.pathname}#/share?data=${encoded}`;
+    return shareUrl;
   };
 
   const handleOpenPublicView = () => {
@@ -204,7 +206,7 @@ export const PairingBoard: React.FC = () => {
                     <select
                         value={team.boatType}
                         onChange={(e) => updateTeamBoatType(team.id, e.target.value as BoatType)}
-                        className="font-bold text-slate-700 text-sm bg-transparent border-none focus:ring-0 cursor-pointer outline-none hover:text-brand-600 transition-colors"
+                        className="font-bold text-slate-800 text-lg bg-transparent border-none focus:ring-0 cursor-pointer outline-none hover:text-brand-600 transition-colors"
                         title="שנה סוג סירה"
                     >
                         {Object.entries(BoatTypeLabel).map(([key, label]) => (
@@ -213,17 +215,21 @@ export const PairingBoard: React.FC = () => {
                     </select>
 
                     {team.warnings && team.warnings.length > 0 && (
-                    <div title={team.warnings.join(', ')} className="cursor-help">
-                      <div>
-                        <AlertTriangle className="text-amber-500" size={16} />
+                    <div className="cursor-help group relative">
+                      <div className="text-amber-500">
+                        <AlertTriangle size={20} />
+                      </div>
+                      {/* Tooltip for warnings */}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-amber-100 text-amber-900 text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                         {team.warnings.join(', ')}
                       </div>
                     </div>
                     )}
                 </div>
 
-                {/* Warnings */}
+                {/* Warnings Text Banner */}
                 {team.warnings && team.warnings.length > 0 && (
-                    <div className="px-3 py-1 bg-amber-100 text-amber-800 text-xs border-b border-amber-200">
+                    <div className="px-3 py-1 bg-amber-100 text-amber-800 text-sm border-b border-amber-200">
                     {team.warnings.join(', ')}
                     </div>
                 )}
@@ -234,7 +240,7 @@ export const PairingBoard: React.FC = () => {
                     <div
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className={`p-3 flex-1 flex flex-col gap-2 min-h-[120px] transition-colors duration-200 ${
+                        className={`p-3 flex-1 flex flex-col gap-2 min-h-[140px] transition-colors duration-200 ${
                         snapshot.isDraggingOver ? 'bg-blue-50/50' : ''
                         }`}
                     >
@@ -257,7 +263,7 @@ export const PairingBoard: React.FC = () => {
                                 }}
                                 className={`
                                     relative group
-                                    p-3 rounded-lg border flex items-center justify-between select-none
+                                    p-4 rounded-lg border flex items-center justify-between select-none
                                     transition-all duration-200
                                     ${snapshot.isDragging 
                                     ? 'shadow-2xl ring-2 ring-brand-500 ring-offset-2 z-50 bg-white opacity-95' 
@@ -271,18 +277,18 @@ export const PairingBoard: React.FC = () => {
                                 title={`לחץ והחזק לגרירה, או השתמש בכפתור החצים להחלפה. רמה: ${member.rank}`}
                                 >
                                 
-                                <div className="flex-1 flex flex-col px-2">
-                                    <span className="font-semibold text-slate-800 text-sm">{member.name}</span>
+                                <div className="flex-1 flex flex-col px-1">
+                                    <span className="font-bold text-slate-900 text-lg">{member.name}</span>
                                     <div className="flex items-center gap-2 mt-1">
-                                      <span className="text-[10px] text-slate-500 uppercase">{RoleLabel[member.role]}</span>
+                                      <span className="text-sm text-slate-500 uppercase font-medium">{RoleLabel[member.role]}</span>
                                       <div className="flex">
                                         {Array.from({ length: member.rank }).map((_, i) => (
-                                          <Star key={i} size={10} className={`fill-current ${getRankColor(member.rank)}`} />
+                                          <Star key={i} size={14} className={`fill-current ${getRankColor(member.rank)}`} />
                                         ))}
                                       </div>
                                     </div>
                                     {member.notes && (
-                                       <div className="text-[10px] text-red-600 truncate mt-0.5 max-w-[120px]" title={member.notes}>
+                                       <div className="text-xs text-red-600 truncate mt-1 max-w-[140px]" title={member.notes}>
                                           {member.notes}
                                        </div>
                                     )}
@@ -290,7 +296,7 @@ export const PairingBoard: React.FC = () => {
 
                                 {/* Grip Icon (Visual Only now) */}
                                 <div className="p-1 text-slate-300">
-                                    <GripVertical size={16} />
+                                    <GripVertical size={24} />
                                 </div>
 
                                 {/* Swap Button */}
@@ -300,7 +306,7 @@ export const PairingBoard: React.FC = () => {
                                     handleSwapClick(team.id, index);
                                     }}
                                     className={`
-                                    p-1.5 rounded-md transition-colors z-10
+                                    p-2 rounded-md transition-colors z-10
                                     ${isSwappingMe 
                                         ? 'bg-brand-500 text-white' 
                                         : 'text-slate-400 hover:bg-white hover:text-brand-600 hover:shadow-sm opacity-0 group-hover:opacity-100 md:opacity-0 opacity-100'
@@ -309,7 +315,7 @@ export const PairingBoard: React.FC = () => {
                                     `}
                                     title={isSwappingMe ? "בטל בחירה" : "החלף משתתף זה"}
                                 >
-                                    {isSwappingMe ? <Check size={14} /> : <ArrowRightLeft size={14} />}
+                                    {isSwappingMe ? <Check size={18} /> : <ArrowRightLeft size={18} />}
                                 </button>
                                 </div>
                             )}
@@ -319,7 +325,7 @@ export const PairingBoard: React.FC = () => {
                         {provided.placeholder}
                         
                         {team.members.length === 0 && !snapshot.isDraggingOver && (
-                        <div className="flex-1 flex items-center justify-center text-slate-400 text-xs italic border-2 border-dashed border-slate-100 rounded-lg min-h-[60px]">
+                        <div className="flex-1 flex items-center justify-center text-slate-400 text-sm italic border-2 border-dashed border-slate-100 rounded-lg min-h-[60px]">
                             גרור לכאן
                         </div>
                         )}
