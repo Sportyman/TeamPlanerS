@@ -4,13 +4,13 @@ import { generateSmartPairings } from './services/pairingLogic';
 
 // Mock Initial Data - Cleaned names for privacy
 const MOCK_PEOPLE: Person[] = [
-  { id: '1', name: 'שרה כהן', role: Role.VOLUNTEER, rank: 5, notes: 'חותרת חזקה' },
-  { id: '2', name: 'מייק לוי', role: Role.VOLUNTEER, rank: 2 },
-  { id: '3', name: 'ג\'סיקה אלמוג', role: Role.MEMBER, rank: 1, notes: 'צריכה עזרה, תמיכה בגב' },
+  { id: '1', name: 'שרה כהן', phone: '050-1234567', role: Role.VOLUNTEER, rank: 5, notes: 'חותרת חזקה' },
+  { id: '2', name: 'מייק לוי', phone: '052-9876543', role: Role.VOLUNTEER, rank: 2 },
+  { id: '3', name: 'ג\'סיקה אלמוג', phone: '054-5555555', role: Role.MEMBER, rank: 1, notes: 'צריכה עזרה, תמיכה בגב' },
   { id: '4', name: 'תום ירושלמי', role: Role.MEMBER, rank: 4 },
-  { id: '5', name: 'אלכס גורן', role: Role.VOLUNTEER, rank: 3 },
+  { id: '5', name: 'אלכס גורן', phone: '050-9998887', role: Role.VOLUNTEER, rank: 3 },
   { id: '6', name: 'אמילי צור', role: Role.MEMBER, rank: 2 },
-  { id: '7', name: 'דוד המלך', role: Role.VOLUNTEER, rank: 5 },
+  { id: '7', name: 'דוד המלך', phone: '052-1112223', role: Role.VOLUNTEER, rank: 5 },
   { id: '8', name: 'כריס פראט', role: Role.MEMBER, rank: 2 },
 ];
 

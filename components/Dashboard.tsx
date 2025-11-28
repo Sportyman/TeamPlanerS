@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
 import { Role, RoleLabel, Person, BoatType, BoatTypeLabel } from '../types';
-import { Trash2, UserPlus, Star, Edit, X, Save, ChevronDown, ChevronUp, Plus, Users } from 'lucide-react';
+import { Trash2, UserPlus, Star, Edit, X, Save, ChevronDown, ChevronUp, Plus, Users, Phone } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
   const { people, addPerson, updatePerson, removePerson } = useAppStore();
@@ -9,6 +9,7 @@ export const Dashboard: React.FC = () => {
   // Add State
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
   const [newRole, setNewRole] = useState<Role>(Role.VOLUNTEER);
   const [newRank, setNewRank] = useState(3);
   const [newNotes, setNewNotes] = useState('');
@@ -25,6 +26,7 @@ export const Dashboard: React.FC = () => {
     addPerson({
       id: Date.now().toString(),
       name: newName,
+      phone: newPhone,
       role: newRole,
       rank: newRank,
       notes: newNotes,
@@ -34,6 +36,7 @@ export const Dashboard: React.FC = () => {
     
     // Reset form
     setNewName('');
+    setNewPhone('');
     setNewNotes('');
     setNewPreferredBoat('');
     setNewPreferredPartners([]);
@@ -91,6 +94,15 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  const getMobileCardColor = (role: Role) => {
+    switch (role) {
+      case Role.VOLUNTEER: return 'bg-orange-50 border-orange-200';
+      case Role.MEMBER: return 'bg-sky-50 border-sky-200';
+      case Role.GUEST: return 'bg-emerald-50 border-emerald-200';
+      default: return 'bg-white border-slate-200';
+    }
+  };
+
   return (
     <div className="space-y-6 pb-20">
       
@@ -119,6 +131,19 @@ export const Dashboard: React.FC = () => {
                     className="w-full px-3 py-3 md:py-2 border rounded-md focus:ring-2 focus:ring-brand-500 outline-none text-base"
                     required
                     title="שם המשתתף המלא"
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">טלפון</label>
+                  <input
+                    type="tel"
+                    value={editingPerson.phone || ''}
+                    onChange={(e) => setEditingPerson({ ...editingPerson, phone: e.target.value })}
+                    className="w-full px-3 py-3 md:py-2 border rounded-md focus:ring-2 focus:ring-brand-500 outline-none text-base"
+                    placeholder="05X-XXXXXXX"
+                    title="מספר טלפון"
+                    dir="ltr"
                   />
                 </div>
 
@@ -283,6 +308,17 @@ export const Dashboard: React.FC = () => {
                       required
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 mb-1">טלפון</label>
+                    <input
+                      type="tel"
+                      value={newPhone}
+                      onChange={(e) => setNewPhone(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-brand-500 outline-none"
+                      placeholder="05X-XXXXXXX"
+                      dir="ltr"
+                    />
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-slate-600 mb-1">תפקיד</label>
@@ -377,56 +413,43 @@ export const Dashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Mobile Card List View */}
-      <div className="md:hidden space-y-3">
+      {/* Mobile Card List View - Redesigned & Compact */}
+      <div className="md:hidden space-y-2">
         {people.map((person) => (
-          <div key={person.id} className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
-             <div className="flex justify-between items-start mb-3">
-               <div>
-                 <h3 className="font-bold text-slate-800 text-lg">{person.name}</h3>
-                 <span className={`inline-block px-2 py-1 rounded-md text-xs font-semibold mt-1 ${getRoleBadgeStyle(person.role)}`}>
-                   {RoleLabel[person.role]}
-                 </span>
+          <div key={person.id} className={`rounded-lg shadow-sm border p-3 ${getMobileCardColor(person.role)}`}>
+             <div className="flex justify-between items-center mb-1">
+               <div className="flex items-center gap-2">
+                 <h3 className="font-bold text-slate-800 text-base">{person.name}</h3>
+                 <span className="text-xs text-slate-500">({RoleLabel[person.role]})</span>
                </div>
-               <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded">
-                  <span className="text-xs text-slate-500 font-medium">רמה {person.rank}</span>
-                  <Star size={14} className={`fill-current ${getRankColor(person.rank)}`} />
+               <div className="flex gap-2">
+                  <button onClick={() => setEditingPerson(person)} className="text-slate-400 hover:text-brand-600 p-1">
+                    <Edit size={16} />
+                  </button>
+                  <button onClick={() => removePerson(person.id)} className="text-slate-400 hover:text-red-600 p-1">
+                    <Trash2 size={16} />
+                  </button>
                </div>
              </div>
 
+             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                <div className="flex items-center gap-1">
+                  <Star size={12} className={`fill-current ${getRankColor(person.rank)}`} />
+                  <span>רמה {person.rank}</span>
+                </div>
+                {person.phone && (
+                  <div className="flex items-center gap-1">
+                    <Phone size={12} />
+                    <span dir="ltr">{person.phone}</span>
+                  </div>
+                )}
+             </div>
+             
              {person.notes && (
-               <div className="text-sm text-slate-500 bg-slate-50 p-2 rounded mb-3">
-                 {person.notes}
-               </div>
+                <div className="mt-2 text-xs bg-white/50 p-1.5 rounded text-slate-600 truncate">
+                  {person.notes}
+                </div>
              )}
-
-             <div className="flex flex-wrap gap-2 text-xs text-slate-500 mb-4">
-                {person.constraints?.preferredBoat && (
-                   <span className="bg-slate-100 px-2 py-1 rounded border border-slate-200">
-                     ⛵ {BoatTypeLabel[person.constraints.preferredBoat]}
-                   </span>
-                )}
-                {person.preferredPartners && person.preferredPartners.length > 0 && (
-                   <span className="bg-slate-100 px-2 py-1 rounded border border-slate-200 flex items-center gap-1">
-                     <Users size={12}/> {person.preferredPartners.length} שותפים
-                   </span>
-                )}
-             </div>
-
-             <div className="flex gap-2 border-t border-slate-100 pt-3">
-                <button
-                  onClick={() => setEditingPerson(person)}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-brand-50 text-brand-700 rounded-lg hover:bg-brand-100 transition-colors font-medium text-sm"
-                >
-                  <Edit size={16} /> עריכה
-                </button>
-                <button
-                  onClick={() => removePerson(person.id)}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors font-medium text-sm"
-                >
-                  <Trash2 size={16} /> מחיקה
-                </button>
-             </div>
           </div>
         ))}
         {people.length === 0 && (
@@ -443,6 +466,7 @@ export const Dashboard: React.FC = () => {
             <tr>
               <th className="px-6 py-3">שם</th>
               <th className="px-6 py-3">תפקיד</th>
+              <th className="px-6 py-3">טלפון</th>
               <th className="px-6 py-3">דירוג</th>
               <th className="px-6 py-3">אילוצים</th>
               <th className="px-6 py-3 text-left">פעולות</th>
@@ -459,6 +483,9 @@ export const Dashboard: React.FC = () => {
                   <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getRoleBadgeStyle(person.role)}`}>
                     {RoleLabel[person.role]}
                   </span>
+                </td>
+                <td className="px-6 py-4 text-sm text-slate-600" dir="ltr">
+                  {person.phone || '-'}
                 </td>
                 <td className="px-6 py-4 flex items-center gap-1">
                   {Array.from({ length: person.rank }).map((_, i) => (
@@ -495,7 +522,7 @@ export const Dashboard: React.FC = () => {
             ))}
             {people.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
+                <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
                   לא נמצאו משתתפים. הוסף למעלה.
                 </td>
               </tr>

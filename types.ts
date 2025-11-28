@@ -31,6 +31,7 @@ export interface PersonConstraints {
 export interface Person {
   id: string;
   name: string;
+  phone?: string;
   role: Role;
   rank: number; // 1 (Novice) to 5 (Expert)
   notes?: string;
