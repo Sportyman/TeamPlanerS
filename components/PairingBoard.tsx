@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
 import { Team, Role, RoleLabel, BoatTypeLabel, BoatType } from '../types';
-import { GripVertical, AlertTriangle, ArrowRightLeft, Check, Printer, Share2, Link as LinkIcon, Eye, Send, RotateCcw, RotateCw, Star, Dices } from 'lucide-react';
+import { GripVertical, AlertTriangle, ArrowRightLeft, Check, Printer, Share2, Link as LinkIcon, Eye, Send, RotateCcw, RotateCw, Star, Dices, X } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 export const PairingBoard: React.FC = () => {
@@ -78,6 +78,35 @@ export const PairingBoard: React.FC = () => {
     window.open(url, '_blank');
   };
 
+  // Improved Share Handler: Tries Native Share first, falls back to Modal
+  const handleMainShareClick = async () => {
+    const url = generateShareData();
+    const shareData = {
+      title: 'שיבוצי אימון PaddleMate',
+      text: `היי! הנה שיבוצי האימון לתאריך ${new Date().toLocaleDateString('he-IL')}:`,
+      url: url
+    };
+
+    // Try Native Share API (Mobile/Supported Browsers)
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        return; // Success! No need to show menu.
+      } catch (err) {
+        console.log('User closed share sheet or error:', err);
+        // If user cancelled, we don't necessarily need to open the menu, 
+        // but if it failed for technical reasons, we might want to.
+        // For now, let's allow manual fallback if they click again or if error wasn't AbortError.
+        if ((err as Error).name !== 'AbortError') {
+             setShowShareMenu(true);
+        }
+      }
+    } else {
+      // Fallback for Desktop/Unsupported browsers
+      setShowShareMenu(true);
+    }
+  };
+
   const handleShareWhatsApp = () => {
     const url = generateShareData();
     const text = `היי! הנה שיבוצי האימון להיום: \n${url}`;
@@ -118,6 +147,34 @@ export const PairingBoard: React.FC = () => {
   return (
     <div className="space-y-6 pb-20"> 
       
+      {/* Share Modal - Centered Overlay (Fallback for Desktop) */}
+      {showShareMenu && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200" onClick={() => setShowShareMenu(false)}>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <h3 className="font-bold text-lg text-slate-800">אפשרויות שיתוף</h3>
+                    <button onClick={() => setShowShareMenu(false)} className="text-slate-400 hover:text-slate-700">
+                        <X size={24} />
+                    </button>
+                </div>
+                <div className="p-2 space-y-1">
+                    <button onClick={handleShareWhatsApp} className="w-full text-right px-4 py-4 hover:bg-slate-50 text-slate-700 font-medium flex items-center gap-3 rounded-lg transition-colors">
+                        <div className="bg-green-100 p-2 rounded-full text-green-600"><Share2 size={20} /></div>
+                        שלח בוואטסאפ
+                    </button>
+                    <button onClick={handleShareTelegram} className="w-full text-right px-4 py-4 hover:bg-slate-50 text-slate-700 font-medium flex items-center gap-3 rounded-lg transition-colors">
+                        <div className="bg-sky-100 p-2 rounded-full text-sky-600"><Send size={20} /></div>
+                        שלח בטלגרם
+                    </button>
+                    <button onClick={handleCopyLink} className="w-full text-right px-4 py-4 hover:bg-slate-50 text-slate-700 font-medium flex items-center gap-3 rounded-lg transition-colors">
+                        <div className="bg-brand-100 p-2 rounded-full text-brand-600"><LinkIcon size={20} /></div>
+                        העתק קישור
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* Screen Header - Hidden on Print */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 print:hidden">
         <div>
@@ -161,7 +218,7 @@ export const PairingBoard: React.FC = () => {
                </button>
             </div>
             
-            <div className="relative flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+            <div className="relative flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
                
                <button 
                   onClick={handleOpenPublicView}
@@ -172,26 +229,12 @@ export const PairingBoard: React.FC = () => {
               </button>
 
                <button 
-                  onClick={() => setShowShareMenu(!showShareMenu)}
+                  onClick={handleMainShareClick}
                   className="flex-1 md:flex-none justify-center flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
                   title="שתף רשימה נקייה (ללא דירוגים)"
               >
                   <Share2 size={16} /> שיתוף
               </button>
-
-              {showShareMenu && (
-                <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-100 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                  <button onClick={handleShareWhatsApp} className="w-full text-right px-4 py-3 hover:bg-slate-50 text-slate-700 text-sm flex items-center gap-2 border-b border-slate-50">
-                    <Share2 size={14} className="text-green-500"/> שלח בוואטסאפ
-                  </button>
-                  <button onClick={handleShareTelegram} className="w-full text-right px-4 py-3 hover:bg-slate-50 text-slate-700 text-sm flex items-center gap-2 border-b border-slate-50">
-                    <Send size={14} className="text-sky-500"/> שלח בטלגרם
-                  </button>
-                  <button onClick={handleCopyLink} className="w-full text-right px-4 py-3 hover:bg-slate-50 text-slate-700 text-sm flex items-center gap-2">
-                    <LinkIcon size={14} className="text-brand-500"/> העתק קישור
-                  </button>
-                </div>
-              )}
 
               <button 
                   onClick={handlePrint}
