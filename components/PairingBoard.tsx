@@ -105,7 +105,7 @@ export const PairingBoard: React.FC = () => {
   const handleMainShareClick = async () => {
     const url = generateShareData();
     const shareData = {
-      title: 'שיבוצי אימון PaddleMate',
+      title: 'שיבוצי אימון',
       text: `היי! הנה שיבוצי האימון לתאריך ${new Date().toLocaleDateString('he-IL')}:`,
       url: url
     };
@@ -441,8 +441,8 @@ export const PairingBoard: React.FC = () => {
             ))}
         </div>
         
-        <div className="mt-8 pt-4 border-t border-slate-400 text-center text-sm text-slate-500">
-            הופק באמצעות PaddleMate
+        <div className="mt-8 pt-4 border-t border-slate-400 text-center text-sm text-slate-500" dir="ltr">
+            Built by Shay Kalimi - @Shay.A.i
         </div>
       </div>
     </div>

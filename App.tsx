@@ -78,11 +78,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </div>
 
             {/* Center: Logo & Club Name */}
-            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center gap-2">
-               {activeClub === ClubID.SAILING ? <Ship className="text-sky-600" size={24} /> : <Waves className="text-brand-600" size={24} />}
-               <span className="font-bold text-lg hidden xs:inline text-slate-800">
-                   {activeClub ? ClubLabel[activeClub] : 'PaddleMate'}
-               </span>
+            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
+               <button 
+                 onClick={() => navigate('/app')}
+                 className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                 title="דף הבית"
+               >
+                 {activeClub === ClubID.SAILING ? <Ship className="text-sky-600" size={24} /> : <Waves className="text-brand-600" size={24} />}
+                 <span className="font-bold text-lg hidden xs:inline text-slate-800">
+                     {activeClub ? ClubLabel[activeClub] : 'TeamPlaner'}
+                 </span>
+               </button>
             </div>
             
             {/* Left: User & Logout */}

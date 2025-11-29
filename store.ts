@@ -5,12 +5,29 @@ import { generateSmartPairings } from './services/pairingLogic';
 
 export const SUPER_ADMIN_EMAIL = 'shaykashay@gmail.com';
 
-// Initial Mock Data (Old structure, will be migrated)
-const OLD_MOCK_PEOPLE_DATA: any[] = [
-  { id: '1', name: 'שרה כהן', phone: '050-1234567', role: Role.VOLUNTEER, rank: 5, notes: 'חותרת חזקה' },
-  { id: '2', name: 'מייק לוי', phone: '052-9876543', role: Role.VOLUNTEER, rank: 2 },
-  { id: '3', name: 'ג\'סיקה אלמוג', phone: '054-5555555', role: Role.MEMBER, rank: 1, notes: 'צריכה עזרה, תמיכה בגב' },
-  { id: '4', name: 'תום ירושלמי', role: Role.MEMBER, rank: 4 },
+// --- MOCK DATA FOR KAYAK CLUB ---
+const MOCK_KAYAK_PEOPLE: Partial<Person>[] = [
+  { id: 'k1', name: 'יוסי כהן', role: Role.VOLUNTEER, rank: 5, notes: 'מדריך ותיק' },
+  { id: 'k2', name: 'רונית שחר', role: Role.VOLUNTEER, rank: 4 },
+  { id: 'k3', name: 'דני לוי', role: Role.VOLUNTEER, rank: 3 },
+  { id: 'k4', name: 'עמית פרידמן', role: Role.VOLUNTEER, rank: 5, notes: 'יכול לחתור בקיאק יחיד' },
+  { id: 'k5', name: 'שרה אהרוני', role: Role.MEMBER, rank: 1, notes: 'צריכה תמיכה בגב' },
+  { id: 'k6', name: 'משה ביטון', role: Role.MEMBER, rank: 2 },
+  { id: 'k7', name: 'נועה ברק', role: Role.MEMBER, rank: 3 },
+  { id: 'k8', name: 'אביב גפן', role: Role.GUEST, rank: 1, notes: 'פעם ראשונה בחוג' },
+  { id: 'k9', name: 'תומר חזן', role: Role.MEMBER, rank: 4 },
+  { id: 'k10', name: 'גלית סופר', role: Role.MEMBER, rank: 2 },
+];
+
+// --- MOCK DATA FOR SAILING CLUB ---
+const MOCK_SAILING_PEOPLE: Partial<Person>[] = [
+  { id: 's1', name: 'אבי גבאי', role: Role.VOLUNTEER, rank: 5, notes: 'סקיפר' },
+  { id: 's2', name: 'מיכל ינאי', role: Role.VOLUNTEER, rank: 4 },
+  { id: 's3', name: 'גיא זוארץ', role: Role.VOLUNTEER, rank: 3 },
+  { id: 's4', name: 'אילנית לוי', role: Role.MEMBER, rank: 2, notes: 'חוששת ממים עמוקים' },
+  { id: 's5', name: 'קובי אוז', role: Role.MEMBER, rank: 3 },
+  { id: 's6', name: 'ריטה יהאן', role: Role.MEMBER, rank: 1, notes: 'להושיב במקום יציב' },
+  { id: 's7', name: 'עידן רייכל', role: Role.GUEST, rank: 1 },
 ];
 
 const DEFAULT_INVENTORY_VALUES: BoatInventory = {
@@ -431,27 +448,30 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'etgarim-storage',
-      version: 2.0, // Major version change for migration
+      version: 3.0, // Major version bump to 3.0 to force reload of new mock data
       migrate: (persistedState: any, version: number) => {
-        // Migration from old single-club app to multi-club
-        if (version < 2.0) {
-            const oldPeople = persistedState.people || OLD_MOCK_PEOPLE_DATA;
-            // Migrate all existing people to KAYAK club
-            const migratedPeople = oldPeople.map((p: any) => ({ ...p, clubId: ClubID.KAYAK }));
+        // If version is older than 3.0, re-initialize people with new mock data
+        if (version < 3.0) {
             
+            // Map mock data to full Person objects
+            const kayakPeople = MOCK_KAYAK_PEOPLE.map(p => ({ ...p, clubId: ClubID.KAYAK } as Person));
+            const sailingPeople = MOCK_SAILING_PEOPLE.map(p => ({ ...p, clubId: ClubID.SAILING } as Person));
+            
+            const allPeople = [...kayakPeople, ...sailingPeople];
+
             return {
                 ...persistedState,
-                people: migratedPeople,
-                activeClub: null, // Reset active club
+                people: allPeople,
+                activeClub: null, // Reset active club to force selection
                 user: null, // Force re-login
                 // Initialize containers
-                permissions: [],
+                permissions: persistedState.permissions || [],
                 sessions: {
                     [ClubID.KAYAK]: { inventory: DEFAULT_INVENTORY_VALUES, presentPersonIds: [], teams: [] },
                     [ClubID.SAILING]: { inventory: DEFAULT_INVENTORY_VALUES, presentPersonIds: [], teams: [] },
                 },
                 defaultInventories: {
-                    [ClubID.KAYAK]: persistedState.defaultInventory || DEFAULT_INVENTORY_VALUES,
+                    [ClubID.KAYAK]: DEFAULT_INVENTORY_VALUES,
                     [ClubID.SAILING]: DEFAULT_INVENTORY_VALUES,
                 },
                 histories: { [ClubID.KAYAK]: [], [ClubID.SAILING]: [] },

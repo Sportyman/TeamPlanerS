@@ -74,7 +74,7 @@ export const PublicPairingView: React.FC = () => {
           <div className="inline-flex items-center justify-center w-12 h-12 bg-brand-100 text-brand-600 rounded-full mb-4 print:hidden">
             <Ship size={24} />
           </div>
-          <h1 className="text-2xl font-bold text-slate-800">שיבוצי אימון PaddleMate</h1>
+          <h1 className="text-2xl font-bold text-slate-800">שיבוצי אימון - אתגרים</h1>
           <div className="flex items-center justify-center gap-2 mt-2 text-slate-500">
             <Calendar size={16} />
             <span>{dateStr}</span>
@@ -121,8 +121,8 @@ export const PublicPairingView: React.FC = () => {
           })}
         </div>
 
-        <div className="text-center text-xs text-slate-400 pt-8 print:hidden">
-          נוצר באמצעות PaddleMate
+        <div className="text-center text-xs text-slate-400 pt-8 print:hidden" dir="ltr">
+          Built by Shay Kalimi - @Shay.A.i
         </div>
 
       </div>
