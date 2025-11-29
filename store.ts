@@ -78,6 +78,9 @@ interface AppState {
   resetSession: () => void;
   
   // Board Actions
+  addManualTeam: () => void;
+  removeTeam: (teamId: string) => void;
+  addGuestToTeam: (teamId: string, name: string) => void;
   moveMemberToTeam: (personId: string, targetTeamId: string) => void;
   reorderSessionMembers: (sourceTeamId: string, sourceIndex: number, destTeamId: string, destIndex: number) => void;
   swapMembers: (teamAId: string, indexA: number, teamBId: string, indexB: number) => void;
@@ -276,6 +279,95 @@ export const useAppStore = create<AppState>()(
               teams: []
             }
           }
+        }));
+      },
+
+      addManualTeam: () => {
+        const { activeClub, sessions } = get();
+        if (!activeClub) return;
+        const currentSession = sessions[activeClub];
+
+        const newTeam: Team = {
+            id: Date.now().toString(),
+            members: [],
+            boatType: BoatType.DOUBLE, // Default
+            boatCount: 1
+        };
+
+        set((state) => ({
+             histories: { 
+                 ...state.histories, 
+                 [activeClub]: [...state.histories[activeClub], currentSession.teams] 
+             },
+             futures: { ...state.futures, [activeClub]: [] },
+             sessions: {
+                 ...state.sessions,
+                 [activeClub]: { ...currentSession, teams: [newTeam, ...currentSession.teams] }
+             }
+        }));
+      },
+
+      removeTeam: (teamId) => {
+        const { activeClub, sessions } = get();
+        if (!activeClub) return;
+        const currentSession = sessions[activeClub];
+
+        set((state) => ({
+            histories: { 
+                 ...state.histories, 
+                 [activeClub]: [...state.histories[activeClub], currentSession.teams] 
+             },
+             futures: { ...state.futures, [activeClub]: [] },
+             sessions: {
+                 ...state.sessions,
+                 [activeClub]: { 
+                     ...currentSession, 
+                     teams: currentSession.teams.filter(t => t.id !== teamId) 
+                 }
+             }
+        }));
+      },
+
+      addGuestToTeam: (teamId, name) => {
+        const { activeClub, sessions, people } = get();
+        if (!activeClub) return;
+        const currentSession = sessions[activeClub];
+
+        const newGuest: Person = {
+            id: 'guest-' + Date.now(),
+            clubId: activeClub,
+            name: name,
+            role: Role.GUEST,
+            rank: 1,
+            notes: 'הוסף ידנית'
+        };
+
+        // 1. Add to people (so they exist in DB)
+        // 2. Add to present list
+        // 3. Add to team
+        
+        const newTeams = currentSession.teams.map(t => {
+            if (t.id === teamId) {
+                return { ...t, members: [...t.members, newGuest] };
+            }
+            return t;
+        });
+
+        set((state) => ({
+             people: [...state.people, newGuest],
+             histories: { 
+                 ...state.histories, 
+                 [activeClub]: [...state.histories[activeClub], currentSession.teams] 
+             },
+             futures: { ...state.futures, [activeClub]: [] },
+             sessions: {
+                 ...state.sessions,
+                 [activeClub]: { 
+                     ...currentSession, 
+                     presentPersonIds: [...currentSession.presentPersonIds, newGuest.id],
+                     teams: newTeams 
+                 }
+             }
         }));
       },
 

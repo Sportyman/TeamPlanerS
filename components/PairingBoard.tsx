@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
 import { Team, Role, RoleLabel, BoatTypeLabel, BoatType, TEAM_COLORS, Person } from '../types';
-import { GripVertical, AlertTriangle, ArrowRightLeft, Check, Printer, Share2, Link as LinkIcon, Eye, Send, RotateCcw, RotateCw, Star, Dices, X } from 'lucide-react';
+import { GripVertical, AlertTriangle, ArrowRightLeft, Check, Printer, Share2, Link as LinkIcon, Eye, Send, RotateCcw, RotateCw, Star, Dices, X, Plus, Trash2 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 // Pairing Board Component - Updated for Multi-Tenancy and Strict TypeScript
@@ -16,7 +16,10 @@ export const PairingBoard: React.FC = () => {
     undo, 
     redo, 
     updateTeamBoatType, 
-    runPairing 
+    runPairing,
+    addManualTeam,
+    removeTeam,
+    addGuestToTeam
   } = useAppStore();
   
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -66,6 +69,22 @@ export const PairingBoard: React.FC = () => {
     if (confirm('האם אתה בטוח שברצונך לערבב מחדש? השיבוץ הנוכחי יוחלף.')) {
         runPairing();
     }
+  };
+
+  const handleAddGuest = (teamId: string) => {
+      const name = window.prompt('הכנס שם אורח/משתתף:');
+      if (name && name.trim()) {
+          addGuestToTeam(teamId, name.trim());
+      }
+  };
+
+  const handleDeleteTeam = (teamId: string, memberCount: number) => {
+      if (memberCount > 0) {
+          if (!confirm(`בסירה זו יש ${memberCount} משתתפים. האם למחוק אותה בכל זאת? המשתתפים יוסרו מהלוח אך יישארו ברשימת הנוכחות.`)) {
+              return;
+          }
+      }
+      removeTeam(teamId);
   };
 
   const generateShareData = () => {
@@ -200,7 +219,16 @@ export const PairingBoard: React.FC = () => {
       {/* Screen Header - Hidden on Print */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 print:hidden">
         <div>
-          <h2 className="text-xl md:text-2xl font-bold text-slate-800">שיבוצי אימון</h2>
+          <div className="flex items-center gap-3">
+             <h2 className="text-xl md:text-2xl font-bold text-slate-800">שיבוצי אימון</h2>
+             <button 
+                onClick={addManualTeam}
+                className="bg-brand-600 hover:bg-brand-500 text-white p-2 rounded-lg flex items-center gap-2 text-sm font-bold shadow-md transition-all active:scale-95"
+                title="הוסף סירה חדשה ריקה"
+             >
+                 <Plus size={18} /> סירה
+             </button>
+          </div>
           <p className="text-xs md:text-sm text-slate-500 mt-1">
             גרור את הידית (⋮⋮) כדי לשנות סדר, או לחץ על {<ArrowRightLeft className="inline w-3 h-3"/>} להחלפה בין זוגות
           </p>
@@ -285,28 +313,36 @@ export const PairingBoard: React.FC = () => {
                 >
                 {/* Header with Boat Selector */}
                 <div className="p-3 border-b border-slate-100/50 bg-white/30 flex justify-between items-center">
-                    <select
-                        value={team.boatType}
-                        onChange={(e) => updateTeamBoatType(team.id, e.target.value as BoatType)}
-                        className="font-bold text-slate-800 text-lg bg-transparent border-none focus:ring-0 cursor-pointer outline-none hover:text-brand-600 transition-colors"
-                        title="שנה סוג סירה"
-                    >
-                        {Object.entries(BoatTypeLabel).map(([key, label]) => (
-                            <option key={key} value={key}>{label}</option>
-                        ))}
-                    </select>
-
-                    {hasWarnings && (
-                    <div className="cursor-help group relative">
-                      <div className="text-amber-500">
-                        <AlertTriangle size={20} />
-                      </div>
-                      {/* Tooltip for warnings */}
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-amber-100 text-amber-900 text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                         {team.warnings?.join(', ')}
-                      </div>
+                    <div className="flex gap-2 items-center">
+                        <select
+                            value={team.boatType}
+                            onChange={(e) => updateTeamBoatType(team.id, e.target.value as BoatType)}
+                            className="font-bold text-slate-800 text-lg bg-transparent border-none focus:ring-0 cursor-pointer outline-none hover:text-brand-600 transition-colors max-w-[130px]"
+                            title="שנה סוג סירה"
+                        >
+                            {Object.entries(BoatTypeLabel).map(([key, label]) => (
+                                <option key={key} value={key}>{label}</option>
+                            ))}
+                        </select>
+                        {hasWarnings && (
+                        <div className="cursor-help group relative">
+                          <div className="text-amber-500">
+                            <AlertTriangle size={20} />
+                          </div>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-amber-100 text-amber-900 text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                             {team.warnings?.join(', ')}
+                          </div>
+                        </div>
+                        )}
                     </div>
-                    )}
+
+                    <button 
+                        onClick={() => handleDeleteTeam(team.id, team.members.length)}
+                        className="text-slate-400 hover:text-red-500 p-1 rounded-full hover:bg-white/50 transition-colors"
+                        title="מחק סירה זו"
+                    >
+                        <Trash2 size={16} />
+                    </button>
                 </div>
 
                 {/* Warnings Text Banner */}
@@ -403,11 +439,15 @@ export const PairingBoard: React.FC = () => {
                         })}
                         {provided.placeholder}
                         
-                        {team.members.length === 0 && !snapshot.isDraggingOver && (
-                        <div className="flex-1 flex items-center justify-center text-slate-400 text-sm italic border-2 border-dashed border-slate-300/50 rounded-lg min-h-[60px]">
-                            גרור לכאן
-                        </div>
-                        )}
+                        {/* Quick Add Guest Button */}
+                        <button
+                             onClick={() => handleAddGuest(team.id)}
+                             className="w-full py-2 mt-auto border-2 border-dashed border-slate-300 rounded-lg text-slate-400 hover:text-brand-600 hover:border-brand-300 hover:bg-white/50 transition-colors flex items-center justify-center gap-1 text-sm font-medium"
+                             title="הוסף משתתף ידני לסירה זו"
+                        >
+                            <Plus size={16} /> הוסף שייט
+                        </button>
+
                     </div>
                     )}
                 </Droppable>
