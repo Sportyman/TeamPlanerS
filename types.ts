@@ -49,7 +49,7 @@ export interface UserPermission {
   allowedClubs: ClubID[];
 }
 
-export const APP_VERSION = '2.1.0'; // Minor version bump for new features
+export const APP_VERSION = '2.2.0'; // Minor version bump for tags and dashboard
 
 // High contrast palette
 export const TEAM_COLORS = [
@@ -83,7 +83,8 @@ export interface Person {
   id: string;
   clubId: ClubID; // Association to specific club
   name: string;
-  gender: Gender; // Added Gender
+  gender: Gender;
+  tags?: string[]; // Custom tags for logic (e.g. "Skipper", "Crane")
   phone?: string;
   role: Role;
   rank: number; // 1 (Novice) to 5 (Expert)

@@ -8,32 +8,32 @@ export const SUPER_ADMIN_EMAIL = 'shaykashay@gmail.com';
 
 // --- MOCK DATA FOR KAYAK CLUB ---
 const MOCK_KAYAK_PEOPLE: Partial<Person>[] = [
-  { id: 'k1', name: 'דורון שמעוני', gender: Gender.MALE, role: Role.VOLUNTEER, rank: 5, notes: 'מדריך ראשי' },
-  { id: 'k2', name: 'ענת לביא', gender: Gender.FEMALE, role: Role.VOLUNTEER, rank: 4 },
-  { id: 'k3', name: 'אורן בר', gender: Gender.MALE, role: Role.VOLUNTEER, rank: 3 },
-  { id: 'k4', name: 'יעל גולן', gender: Gender.FEMALE, role: Role.VOLUNTEER, rank: 5, notes: 'יכולה לחתור בקיאק יחיד' },
-  { id: 'k5', name: 'רוני ספקטור', gender: Gender.MALE, role: Role.VOLUNTEER, rank: 4 },
-  { id: 'k6', name: 'דניאל אברהמי', gender: Gender.MALE, role: Role.MEMBER, rank: 1, notes: 'צריך תמיכה בגב' },
-  { id: 'k7', name: 'שירה כהן', gender: Gender.FEMALE, role: Role.MEMBER, rank: 2 },
-  { id: 'k8', name: 'איתי לוי', gender: Gender.MALE, role: Role.MEMBER, rank: 3 },
-  { id: 'k9', name: 'נועם פרי', gender: Gender.MALE, role: Role.GUEST, rank: 1, notes: 'פעם ראשונה בחוג' },
-  { id: 'k10', name: 'מאיה שדה', gender: Gender.FEMALE, role: Role.MEMBER, rank: 4 },
-  { id: 'k11', name: 'יונתן הראל', gender: Gender.MALE, role: Role.MEMBER, rank: 2 },
-  { id: 'k12', name: 'אביבית צור', gender: Gender.FEMALE, role: Role.MEMBER, rank: 1 },
+  { id: 'k1', name: 'דורון שמעוני', gender: Gender.MALE, role: Role.VOLUNTEER, rank: 5, notes: 'מדריך ראשי', tags: ['מדריך'] },
+  { id: 'k2', name: 'ענת לביא', gender: Gender.FEMALE, role: Role.VOLUNTEER, rank: 4, tags: [] },
+  { id: 'k3', name: 'אורן בר', gender: Gender.MALE, role: Role.VOLUNTEER, rank: 3, tags: [] },
+  { id: 'k4', name: 'יעל גולן', gender: Gender.FEMALE, role: Role.VOLUNTEER, rank: 5, notes: 'יכולה לחתור בקיאק יחיד', tags: ['קיאק יחיד'] },
+  { id: 'k5', name: 'רוני ספקטור', gender: Gender.MALE, role: Role.VOLUNTEER, rank: 4, tags: [] },
+  { id: 'k6', name: 'דניאל אברהמי', gender: Gender.MALE, role: Role.MEMBER, rank: 1, notes: 'צריך תמיכה בגב', tags: ['מנוף'] },
+  { id: 'k7', name: 'שירה כהן', gender: Gender.FEMALE, role: Role.MEMBER, rank: 2, tags: [] },
+  { id: 'k8', name: 'איתי לוי', gender: Gender.MALE, role: Role.MEMBER, rank: 3, tags: [] },
+  { id: 'k9', name: 'נועם פרי', gender: Gender.MALE, role: Role.GUEST, rank: 1, notes: 'פעם ראשונה בחוג', tags: [] },
+  { id: 'k10', name: 'מאיה שדה', gender: Gender.FEMALE, role: Role.MEMBER, rank: 4, tags: [] },
+  { id: 'k11', name: 'יונתן הראל', gender: Gender.MALE, role: Role.MEMBER, rank: 2, tags: [] },
+  { id: 'k12', name: 'אביבית צור', gender: Gender.FEMALE, role: Role.MEMBER, rank: 1, tags: ['מנוף'] },
 ];
 
 // --- MOCK DATA FOR SAILING CLUB ---
 const MOCK_SAILING_PEOPLE: Partial<Person>[] = [
-  { id: 's1', name: 'גיורא איילנד', gender: Gender.MALE, role: Role.VOLUNTEER, rank: 5, notes: 'סקיפר מנוסה' },
-  { id: 's2', name: 'תמר זיו', gender: Gender.FEMALE, role: Role.VOLUNTEER, rank: 4 },
-  { id: 's3', name: 'אמיר גלבוע', gender: Gender.MALE, role: Role.VOLUNTEER, rank: 3 },
-  { id: 's4', name: 'רמי קליין', gender: Gender.MALE, role: Role.VOLUNTEER, rank: 5 },
-  { id: 's5', name: 'נורית פלד', gender: Gender.FEMALE, role: Role.MEMBER, rank: 2, notes: 'חוששת ממים עמוקים' },
-  { id: 's6', name: 'יוסי בניון', gender: Gender.MALE, role: Role.MEMBER, rank: 3 },
-  { id: 's7', name: 'גילה אלמגור', gender: Gender.FEMALE, role: Role.MEMBER, rank: 1, notes: 'להושיב במקום יציב' },
-  { id: 's8', name: 'ארז טל', gender: Gender.MALE, role: Role.GUEST, rank: 1 },
-  { id: 's9', name: 'מירי מסיקה', gender: Gender.FEMALE, role: Role.MEMBER, rank: 2 },
-  { id: 's10', name: 'שלמה ארצי', gender: Gender.MALE, role: Role.MEMBER, rank: 4 },
+  { id: 's1', name: 'גיורא איילנד', gender: Gender.MALE, role: Role.VOLUNTEER, rank: 5, notes: 'סקיפר מנוסה', tags: ['סקיפר'] },
+  { id: 's2', name: 'תמר זיו', gender: Gender.FEMALE, role: Role.VOLUNTEER, rank: 4, tags: ['עוזר סקיפר'] },
+  { id: 's3', name: 'אמיר גלבוע', gender: Gender.MALE, role: Role.VOLUNTEER, rank: 3, tags: [] },
+  { id: 's4', name: 'רמי קליין', gender: Gender.MALE, role: Role.VOLUNTEER, rank: 5, tags: ['סקיפר'] },
+  { id: 's5', name: 'נורית פלד', gender: Gender.FEMALE, role: Role.MEMBER, rank: 2, notes: 'חוששת ממים עמוקים', tags: [] },
+  { id: 's6', name: 'יוסי בניון', gender: Gender.MALE, role: Role.MEMBER, rank: 3, tags: [] },
+  { id: 's7', name: 'גילה אלמגור', gender: Gender.FEMALE, role: Role.MEMBER, rank: 1, notes: 'להושיב במקום יציב', tags: ['מנוף'] },
+  { id: 's8', name: 'ארז טל', gender: Gender.MALE, role: Role.GUEST, rank: 1, tags: [] },
+  { id: 's9', name: 'מירי מסיקה', gender: Gender.FEMALE, role: Role.MEMBER, rank: 2, tags: [] },
+  { id: 's10', name: 'שלמה ארצי', gender: Gender.MALE, role: Role.MEMBER, rank: 4, tags: [] },
 ];
 
 const DEFAULT_INVENTORY_VALUES: BoatInventory = {
@@ -242,9 +242,6 @@ export const useAppStore = create<AppState>()(
         const { activeClub } = state;
         if (!activeClub) return state;
         
-        // Also update current session to match default if needed, 
-        // but typically we just update the default for future resets.
-        // Let's just update the default store.
         return {
           defaultInventories: {
             ...state.defaultInventories,
@@ -355,14 +352,11 @@ export const useAppStore = create<AppState>()(
             name: name,
             role: Role.GUEST,
             rank: 1,
-            gender: Gender.MALE, // Default for quick guest, editable later
+            gender: Gender.MALE,
+            tags: [],
             notes: 'הוסף ידנית'
         };
 
-        // 1. Add to people (so they exist in DB)
-        // 2. Add to present list
-        // 3. Add to team
-        
         const newTeams = currentSession.teams.map(t => {
             if (t.id === teamId) {
                 return { ...t, members: [...t.members, newGuest] };
@@ -394,7 +388,6 @@ export const useAppStore = create<AppState>()(
         
         const currentSession = sessions[activeClub];
 
-        // Save History
         set((state) => ({
            histories: { 
              ...state.histories, 
@@ -562,10 +555,9 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'etgarim-storage',
-      version: 5.2, // Bumped to 5.2 to force data reload with gender
+      version: 5.3, // Bumped to 5.3 to add tags
       migrate: (persistedState: any, version: number) => {
-        if (version < 5.2) {
-            // Force re-population of people on version update to include gender
+        if (version < 5.3) {
             const kayakPeople = MOCK_KAYAK_PEOPLE.map(p => ({ ...p, clubId: ClubID.KAYAK } as Person));
             const sailingPeople = MOCK_SAILING_PEOPLE.map(p => ({ ...p, clubId: ClubID.SAILING } as Person));
             const allPeople = [...kayakPeople, ...sailingPeople];
@@ -573,7 +565,6 @@ export const useAppStore = create<AppState>()(
             return {
                 ...persistedState,
                 people: allPeople,
-                // Ensure maps exist
                 sessions: persistedState.sessions || {
                     [ClubID.KAYAK]: { inventory: DEFAULT_INVENTORY_VALUES, presentPersonIds: [], teams: [] },
                     [ClubID.SAILING]: { inventory: DEFAULT_INVENTORY_VALUES, presentPersonIds: [], teams: [] },
@@ -582,8 +573,6 @@ export const useAppStore = create<AppState>()(
                     [ClubID.KAYAK]: DEFAULT_INVENTORY_VALUES,
                     [ClubID.SAILING]: DEFAULT_INVENTORY_VALUES,
                 },
-                histories: persistedState.histories || { [ClubID.KAYAK]: [], [ClubID.SAILING]: [] },
-                futures: persistedState.futures || { [ClubID.KAYAK]: [], [ClubID.SAILING]: [] }
             } as AppState;
         }
         return persistedState as AppState;
