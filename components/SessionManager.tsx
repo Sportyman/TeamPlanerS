@@ -187,6 +187,11 @@ export const SessionManager: React.FC = () => {
                 <button key={person.id} onClick={() => toggleAttendance(person.id)} className={getCardStyle(person.role, isPresent)}>
                   <div>
                     <div className={`font-bold ${isPresent ? '' : 'text-slate-800'}`}>{person.name}</div>
+                    {person.phone && (
+                        <div className={`text-xs mt-0.5 text-left ${isPresent ? 'text-slate-600' : 'text-slate-400'}`} dir="ltr">
+                            {person.phone}
+                        </div>
+                    )}
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${person.role === Role.VOLUNTEER ? 'bg-orange-100 text-orange-700' : 'bg-sky-100 text-sky-700'}`}>{RoleLabel[person.role]}</span>
                     </div>
