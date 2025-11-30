@@ -213,11 +213,8 @@ export const PairingBoard: React.FC = () => {
   };
 
   // --- Logic for Add Member Modal ---
-  // 1. Get ALL people in the club.
-  // 2. Determine who is already assigned to a team.
   const allClubPeople = people.filter(p => p.clubId === activeClub);
   
-  // Create a map of personId -> teamIndex (or Boat Label)
   const assignments = new Map<string, string>();
   session.teams.forEach((t, teamIdx) => {
       t.members.forEach(m => {
@@ -458,6 +455,7 @@ export const PairingBoard: React.FC = () => {
                         <select
                             value={team.boatType || ''}
                             onChange={(e) => updateTeamBoatType(team.id, e.target.value as BoatType)}
+                            onMouseDown={(e) => e.stopPropagation()}
                             className="font-bold text-slate-800 text-lg bg-transparent border-none focus:ring-0 cursor-pointer outline-none hover:text-brand-600 transition-colors max-w-[130px]"
                         >
                             {boatDefinitions.map(def => (
@@ -472,19 +470,33 @@ export const PairingBoard: React.FC = () => {
                           <div className="text-amber-500">
                             <AlertTriangle size={20} />
                           </div>
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-amber-100 text-amber-900 text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                          <div className="absolute top-full right-0 mt-2 w-48 p-2 bg-amber-100 text-amber-900 text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                              {team.warnings?.join(', ')}
                           </div>
                         </div>
                         )}
                     </div>
 
-                    <button 
-                        onClick={() => handleDeleteTeam(team.id, team.members.length)}
-                        className="text-slate-400 hover:text-red-500 p-1 rounded-full hover:bg-white/50 transition-colors"
-                    >
-                        <Trash2 size={16} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => openAddMemberModal(team.id)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            className="text-slate-400 hover:text-brand-600 p-1.5 rounded-full hover:bg-white/50 transition-colors"
+                            title="הוסף שייט"
+                        >
+                            <UserPlus size={16} />
+                        </button>
+                        <button 
+                            onClick={() => handleDeleteTeam(team.id, team.members.length)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            className="text-slate-400 hover:text-red-500 p-1.5 rounded-full hover:bg-white/50 transition-colors"
+                            title="מחק סירה"
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Warnings Text Banner */}
@@ -562,6 +574,8 @@ export const PairingBoard: React.FC = () => {
                                             handleRemoveMember(team.id, member.id);
                                         }
                                     }}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onTouchStart={(e) => e.stopPropagation()}
                                     className="absolute top-1 left-1 p-1 text-slate-400 hover:text-red-500 rounded-full hover:bg-white/80 opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                                     title="הסר מהסירה"
                                 >
@@ -574,6 +588,8 @@ export const PairingBoard: React.FC = () => {
                                     e.stopPropagation(); // Prevent Drag Start
                                     handleSwapClick(team.id, index);
                                     }}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onTouchStart={(e) => e.stopPropagation()}
                                     className={`
                                     p-2 rounded-md transition-colors z-10
                                     ${isSwappingMe 
@@ -591,14 +607,6 @@ export const PairingBoard: React.FC = () => {
                         );
                         })}
                         {provided.placeholder}
-                        
-                        <button
-                             onClick={() => openAddMemberModal(team.id)}
-                             className="w-full py-2 mt-auto border-2 border-dashed border-slate-300 rounded-lg text-slate-400 hover:text-brand-600 hover:border-brand-300 hover:bg-white/50 transition-colors flex items-center justify-center gap-1 text-sm font-medium"
-                        >
-                            <Plus size={16} /> הוסף שייט
-                        </button>
-
                     </div>
                     )}
                 </Droppable>

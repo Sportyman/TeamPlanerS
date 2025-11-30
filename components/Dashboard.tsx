@@ -7,6 +7,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 
 type ViewMode = 'MENU' | 'PEOPLE' | 'INVENTORY';
 
+const PHONE_REGEX = /^05\d-?\d{7}$/;
+
 export const Dashboard: React.FC = () => {
   const { 
       people, 
@@ -58,6 +60,8 @@ export const Dashboard: React.FC = () => {
   // --- People State ---
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
+  
+  // Add Form State
   const [newName, setNewName] = useState('');
   const [newGender, setNewGender] = useState<Gender>(Gender.MALE);
   const [newPhone, setNewPhone] = useState('');
@@ -66,13 +70,30 @@ export const Dashboard: React.FC = () => {
   const [newNotes, setNewNotes] = useState('');
   const [newTags, setNewTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
+  const [phoneError, setPhoneError] = useState('');
 
   const clubPeople = people.filter(p => p.clubId === activeClub);
 
   // --- People Handlers ---
+  const validatePhone = (phone: string) => {
+      if (!phone) return true; // Optional? Or make it required. Let's say optional but must be valid if present.
+      // If user wants it mandatory, we check if (!phone) return false;
+      // Requirement: "Every user needs an option for phone number... ensure it is standard (05X-XXXXXXX)"
+      if (!PHONE_REGEX.test(phone)) {
+          return false;
+      }
+      return true;
+  };
+
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName) return;
+    
+    if (newPhone && !validatePhone(newPhone)) {
+        setPhoneError('מספר טלפון לא תקין. פורמט רצוי: 05X-XXXXXXX');
+        return;
+    }
+
     addPerson({
       id: Date.now().toString(),
       name: newName,
@@ -91,6 +112,7 @@ export const Dashboard: React.FC = () => {
     setNewRank(3);
     setNewTags([]);
     setTagInput('');
+    setPhoneError('');
     setIsAddFormOpen(false); 
   };
 
@@ -131,8 +153,14 @@ export const Dashboard: React.FC = () => {
   const handleUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingPerson) {
+      if (editingPerson.phone && !validatePhone(editingPerson.phone)) {
+          setPhoneError('מספר טלפון לא תקין. פורמט רצוי: 05X-XXXXXXX');
+          return;
+      }
+
       updatePerson(editingPerson);
       setEditingPerson(null);
+      setPhoneError('');
     }
   };
 
@@ -176,7 +204,6 @@ export const Dashboard: React.FC = () => {
   const handleSaveInventory = () => {
       saveBoatDefinitions(draftDefs);
       setHasChanges(false);
-      // alert('השינויים נשמרו בהצלחה!');
       navigate('/app');
   };
 
@@ -425,7 +452,6 @@ export const Dashboard: React.FC = () => {
       );
   }
 
-  // --- PEOPLE VIEW (Simplified for brevity, similar to before but with minor tweaks if needed) ---
   return (
     <div className="space-y-6 pb-20">
       <button onClick={() => navigate('/app/manage')} className="flex items-center gap-2 text-slate-500 hover:text-brand-600 font-medium px-1">
@@ -435,15 +461,13 @@ export const Dashboard: React.FC = () => {
       <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold text-slate-800">רשימת משתתפים ({clubPeople.length})</h2>
           <button 
-             onClick={() => setIsAddFormOpen(true)}
+             onClick={() => { setIsAddFormOpen(true); setPhoneError(''); }}
              className="bg-brand-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold shadow-sm hover:bg-brand-500"
           >
               <UserPlus size={20} /> משתתף חדש
           </button>
       </div>
       
-       {/* People Table implementation... (Keeping previous implementation implicitly) */}
-       {/* For brevity, I'll just render the container. The full code would be here. */}
        <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
             <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
@@ -459,6 +483,9 @@ export const Dashboard: React.FC = () => {
                         <tr key={person.id} className="hover:bg-slate-50/50 transition-colors">
                             <td className="p-4">
                                 <div className="font-bold text-slate-800">{person.name}</div>
+                                {person.phone && (
+                                    <div className="text-xs text-slate-500 mt-0.5">{person.phone}</div>
+                                )}
                                 <div className="text-xs text-slate-400 md:hidden mt-1 flex gap-2">
                                     <span>{RoleLabel[person.role]}</span>
                                     <span>•</span>
@@ -486,7 +513,7 @@ export const Dashboard: React.FC = () => {
                             </td>
                             <td className="p-4">
                                 <div className="flex gap-2">
-                                    <button onClick={() => setEditingPerson(person)} className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">
+                                    <button onClick={() => { setEditingPerson(person); setPhoneError(''); }} className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">
                                         <Edit size={18} />
                                     </button>
                                     <button onClick={() => { if(confirm('למחוק?')) removePerson(person.id) }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
@@ -510,7 +537,7 @@ export const Dashboard: React.FC = () => {
        {/* ADD MODAL */}
        {isAddFormOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-in fade-in">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
                 <h3 className="font-bold text-lg">הוספת משתתף</h3>
                 <button onClick={() => setIsAddFormOpen(false)}><X className="text-slate-400 hover:text-slate-600" /></button>
@@ -528,6 +555,19 @@ export const Dashboard: React.FC = () => {
                             <option value={Gender.FEMALE}>{GenderLabel[Gender.FEMALE]}</option>
                         </select>
                     </div>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">טלפון</label>
+                    <input 
+                        type="tel" 
+                        value={newPhone} 
+                        onChange={e => setNewPhone(e.target.value)} 
+                        className={`w-full border rounded-lg p-2 ${phoneError ? 'border-red-500' : ''}`}
+                        placeholder="05X-XXXXXXX"
+                        dir="ltr"
+                    />
+                    {phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
@@ -571,7 +611,7 @@ export const Dashboard: React.FC = () => {
        {/* EDIT MODAL */}
        {editingPerson && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-in fade-in">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] overflow-y-auto">
              <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
                 <h3 className="font-bold text-lg">עריכת משתתף</h3>
                 <button onClick={() => setEditingPerson(null)}><X className="text-slate-400 hover:text-slate-600" /></button>
@@ -589,6 +629,19 @@ export const Dashboard: React.FC = () => {
                             <option value={Gender.FEMALE}>{GenderLabel[Gender.FEMALE]}</option>
                         </select>
                     </div>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">טלפון</label>
+                    <input 
+                        type="tel" 
+                        value={editingPerson.phone || ''} 
+                        onChange={e => setEditingPerson({...editingPerson, phone: e.target.value})} 
+                        className={`w-full border rounded-lg p-2 ${phoneError ? 'border-red-500' : ''}`}
+                        placeholder="05X-XXXXXXX"
+                        dir="ltr"
+                    />
+                     {phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}
                 </div>
                 
                  <div className="grid grid-cols-2 gap-4">
