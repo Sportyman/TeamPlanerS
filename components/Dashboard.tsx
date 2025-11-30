@@ -17,9 +17,7 @@ export const Dashboard: React.FC = () => {
       removePerson, 
       restoreDemoData,
       clubSettings,
-      addBoatDefinition,
-      updateBoatDefinition,
-      removeBoatDefinition
+      saveBoatDefinitions // Use the new Bulk Action
     } = useAppStore();
   
   const navigate = useNavigate();
@@ -40,13 +38,24 @@ export const Dashboard: React.FC = () => {
 
   const currentClubLabel = clubs.find(c => c.id === activeClub)?.label || '';
   const currentSettings = clubSettings[activeClub] ? clubSettings[activeClub] : { boatDefinitions: [] };
+
+  // --- Inventory State (Draft Mode) ---
+  const [draftDefs, setDraftDefs] = useState<BoatDefinition[]>([]);
+  const [hasChanges, setHasChanges] = useState(false);
   
+  useEffect(() => {
+      // Load initial state into draft
+      setDraftDefs(currentSettings.boatDefinitions);
+      setHasChanges(false);
+  }, [currentSettings.boatDefinitions, activeClub]);
+
   const [isAddingBoat, setIsAddingBoat] = useState(false);
   const [newBoatName, setNewBoatName] = useState('');
   const [newBoatCount, setNewBoatCount] = useState(1);
-  const [newBoatCapacity, setNewBoatCapacity] = useState(2); // Default capacity
+  const [newBoatCapacity, setNewBoatCapacity] = useState(2); 
   const [newBoatStable, setNewBoatStable] = useState(true);
 
+  // --- People State ---
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
   const [newName, setNewName] = useState('');
@@ -60,6 +69,7 @@ export const Dashboard: React.FC = () => {
 
   const clubPeople = people.filter(p => p.clubId === activeClub);
 
+  // --- People Handlers ---
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName) return;
@@ -126,7 +136,9 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  const handleAddBoat = (e: React.FormEvent) => {
+  // --- Inventory Draft Handlers ---
+
+  const handleAddBoatDraft = (e: React.FormEvent) => {
       e.preventDefault();
       if (!newBoatName) return;
       
@@ -138,7 +150,10 @@ export const Dashboard: React.FC = () => {
           capacity: newBoatCapacity
       };
       
-      addBoatDefinition(newBoat);
+      setDraftDefs([...draftDefs, newBoat]);
+      setHasChanges(true);
+
+      // Reset form
       setNewBoatName('');
       setNewBoatCount(1);
       setNewBoatCapacity(2);
@@ -146,14 +161,31 @@ export const Dashboard: React.FC = () => {
       setIsAddingBoat(false);
   };
 
-  const handleDeleteBoat = (id: string) => {
-      if (confirm('האם למחוק כלי שיט זה?')) {
-          removeBoatDefinition(id);
+  const handleDeleteBoatDraft = (id: string) => {
+      if (confirm('האם למחוק כלי שיט זה? (לחץ על "שמור שינויים" בסיום לאישור סופי)')) {
+          setDraftDefs(draftDefs.filter(d => d.id !== id));
+          setHasChanges(true);
       }
   };
 
-  const handleUpdateBoat = (def: BoatDefinition, field: keyof BoatDefinition, value: any) => {
-      updateBoatDefinition({ ...def, [field]: value });
+  const handleUpdateBoatDraft = (id: string, field: keyof BoatDefinition, value: any) => {
+      setDraftDefs(draftDefs.map(d => d.id === id ? { ...d, [field]: value } : d));
+      setHasChanges(true);
+  };
+
+  const handleSaveInventory = () => {
+      saveBoatDefinitions(draftDefs);
+      setHasChanges(false);
+      // alert('השינויים נשמרו בהצלחה!');
+      navigate('/app');
+  };
+
+  const handleCancelInventory = () => {
+      if(hasChanges && !confirm('יש שינויים שלא נשמרו. האם לבטל ולחזור למצב האחרון?')) {
+          return;
+      }
+      setDraftDefs(currentSettings.boatDefinitions);
+      setHasChanges(false);
   };
 
   const getRankColor = (rank: number) => {
@@ -177,6 +209,8 @@ export const Dashboard: React.FC = () => {
         setTimeout(() => window.location.reload(), 500);
     }
   };
+
+  // --- Render Views ---
 
   if (view === 'MENU') {
       return (
@@ -238,7 +272,7 @@ export const Dashboard: React.FC = () => {
 
   if (view === 'INVENTORY') {
       return (
-          <div className="max-w-2xl mx-auto py-6 px-4">
+          <div className="max-w-2xl mx-auto py-6 px-4 pb-24">
               <button onClick={() => navigate('/app/manage')} className="flex items-center gap-2 text-slate-500 hover:text-brand-600 mb-6 font-medium">
                   <ArrowRight size={20} /> חזרה לתפריט
               </button>
@@ -258,7 +292,7 @@ export const Dashboard: React.FC = () => {
                 </div>
 
                 {isAddingBoat && (
-                    <form onSubmit={handleAddBoat} className="bg-brand-50 p-4 rounded-lg border border-brand-100 mb-6 animate-in fade-in slide-in-from-top-2">
+                    <form onSubmit={handleAddBoatDraft} className="bg-brand-50 p-4 rounded-lg border border-brand-100 mb-6 animate-in fade-in slide-in-from-top-2">
                         <h3 className="font-bold text-brand-800 mb-3">כלי שיט חדש</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                             <div>
@@ -273,7 +307,7 @@ export const Dashboard: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-brand-600 mb-1">כמות התחלתית</label>
+                                <label className="block text-xs font-bold text-brand-600 mb-1">כמות ברירת מחדל</label>
                                 <input 
                                     type="number" 
                                     value={newBoatCount} 
@@ -306,25 +340,25 @@ export const Dashboard: React.FC = () => {
                             </label>
                         </div>
                         <div className="flex gap-2">
-                            <button type="submit" className="bg-brand-600 text-white px-4 py-2 rounded font-bold text-sm">שמור</button>
+                            <button type="submit" className="bg-brand-600 text-white px-4 py-2 rounded font-bold text-sm">הוסף לרשימה</button>
                             <button type="button" onClick={() => setIsAddingBoat(false)} className="bg-white border text-slate-600 px-4 py-2 rounded font-bold text-sm">ביטול</button>
                         </div>
                     </form>
                 )}
                 
                 <div className="space-y-4">
-                    {currentSettings.boatDefinitions.length === 0 && (
+                    {draftDefs.length === 0 && (
                         <p className="text-center text-slate-500 py-8">לא הוגדרו כלי שיט.</p>
                     )}
                     
-                    {currentSettings.boatDefinitions.map(def => (
+                    {draftDefs.map(def => (
                         <div key={def.id} className="bg-slate-50 p-4 rounded-lg border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
                              <div className="flex-1">
                                  <div className="flex items-center gap-2 mb-1">
                                     <input 
                                         type="text" 
                                         value={def.label}
-                                        onChange={e => handleUpdateBoat(def, 'label', e.target.value)}
+                                        onChange={e => handleUpdateBoatDraft(def.id, 'label', e.target.value)}
                                         className="font-bold text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-brand-500 focus:outline-none"
                                     />
                                  </div>
@@ -340,7 +374,7 @@ export const Dashboard: React.FC = () => {
                                             type="number" 
                                             min="1"
                                             value={def.capacity}
-                                            onChange={e => handleUpdateBoat(def, 'capacity', Number(e.target.value))}
+                                            onChange={e => handleUpdateBoatDraft(def.id, 'capacity', Number(e.target.value))}
                                             className="w-10 bg-transparent border-b border-dashed border-slate-300 text-center font-bold focus:outline-none"
                                          />
                                      </span>
@@ -354,26 +388,38 @@ export const Dashboard: React.FC = () => {
                                         type="number" 
                                         min="0"
                                         value={def.defaultCount}
-                                        onChange={e => handleUpdateBoat(def, 'defaultCount', Number(e.target.value))}
+                                        onChange={e => handleUpdateBoatDraft(def.id, 'defaultCount', Number(e.target.value))}
                                         className="w-16 text-center py-1 border rounded bg-white font-bold"
                                     />
                                 </div>
-                                <button onClick={() => handleDeleteBoat(def.id)} className="text-slate-400 hover:text-red-500 p-2 hover:bg-white rounded-full transition-colors">
+                                <button onClick={() => handleDeleteBoatDraft(def.id)} className="text-slate-400 hover:text-red-500 p-2 hover:bg-white rounded-full transition-colors">
                                     <Trash2 size={18}/>
                                 </button>
                              </div>
                         </div>
                     ))}
                 </div>
+              </div>
 
-                <div className="mt-8 flex justify-end">
-                    <button 
-                        onClick={() => navigate('/app')}
-                        className="bg-brand-600 hover:bg-brand-500 text-white px-8 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm"
-                    >
-                        <Save size={18} /> חזרה לאימון
-                    </button>
-                </div>
+              {/* FLOATING ACTION BAR FOR SAVE/CANCEL */}
+              <div className={`fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] transition-transform duration-300 ${hasChanges ? 'translate-y-0' : 'translate-y-full'}`}>
+                 <div className="max-w-4xl mx-auto flex items-center justify-between">
+                     <span className="text-sm font-bold text-slate-500">יש שינויים שלא נשמרו</span>
+                     <div className="flex gap-4">
+                         <button 
+                             onClick={handleCancelInventory}
+                             className="text-slate-500 hover:text-slate-800 font-medium px-4 py-2"
+                         >
+                             בטל שינויים
+                         </button>
+                         <button 
+                             onClick={handleSaveInventory}
+                             className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm"
+                         >
+                             <Save size={18} /> שמור שינויים
+                         </button>
+                     </div>
+                 </div>
               </div>
           </div>
       );
@@ -386,9 +432,6 @@ export const Dashboard: React.FC = () => {
            <ArrowRight size={20} /> חזרה לתפריט
       </button>
 
-      {/* ... Existing People View Logic ... */}
-      {/* Keeping previous People view logic roughly same, just updating props usage */}
-      
       <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold text-slate-800">רשימת משתתפים ({clubPeople.length})</h2>
           <button 
@@ -398,15 +441,193 @@ export const Dashboard: React.FC = () => {
               <UserPlus size={20} /> משתתף חדש
           </button>
       </div>
-
-       {/* Include Edit/Add modals from previous implementation if needed, mostly UI */}
-       {/* ... Reusing previous UI code ... */}
-       {/* To save tokens, assuming People View code remains largely identical to v2.4 */}
-       
-       <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-8 text-center text-slate-500">
-           {/* Placeholder for people list to keep file short - assume full table exists */}
-           טבלת המשתתפים מוצגת כאן (מלאה בקוד המקורי)
+      
+       {/* People Table implementation... (Keeping previous implementation implicitly) */}
+       {/* For brevity, I'll just render the container. The full code would be here. */}
+       <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+            <table className="w-full">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                        <th className="text-right p-4 text-sm font-bold text-slate-600">שם מלא</th>
+                        <th className="text-right p-4 text-sm font-bold text-slate-600 hidden md:table-cell">תפקיד</th>
+                        <th className="text-right p-4 text-sm font-bold text-slate-600 hidden md:table-cell">דירוג</th>
+                        <th className="text-right p-4 text-sm font-bold text-slate-600">פעולות</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                    {clubPeople.map(person => (
+                        <tr key={person.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="p-4">
+                                <div className="font-bold text-slate-800">{person.name}</div>
+                                <div className="text-xs text-slate-400 md:hidden mt-1 flex gap-2">
+                                    <span>{RoleLabel[person.role]}</span>
+                                    <span>•</span>
+                                    <span>רמה {person.rank}</span>
+                                </div>
+                                <div className="flex gap-1 mt-1 flex-wrap">
+                                    {person.tags?.map(tag => (
+                                        <span key={tag} className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200 flex items-center gap-1">
+                                            <Tag size={8} /> {tag}
+                                        </span>
+                                    ))}
+                                </div>
+                            </td>
+                            <td className="p-4 hidden md:table-cell">
+                                <span className={`text-xs px-2 py-1 rounded-full font-bold ${getRoleBadgeStyle(person.role)}`}>
+                                    {RoleLabel[person.role]}
+                                </span>
+                            </td>
+                            <td className="p-4 hidden md:table-cell">
+                                <div className="flex">
+                                    {Array.from({ length: person.rank }).map((_, i) => (
+                                        <Star key={i} size={14} className={`fill-current ${getRankColor(person.rank)}`} />
+                                    ))}
+                                </div>
+                            </td>
+                            <td className="p-4">
+                                <div className="flex gap-2">
+                                    <button onClick={() => setEditingPerson(person)} className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">
+                                        <Edit size={18} />
+                                    </button>
+                                    <button onClick={() => { if(confirm('למחוק?')) removePerson(person.id) }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    ))}
+                    {clubPeople.length === 0 && (
+                        <tr>
+                            <td colSpan={4} className="p-8 text-center text-slate-400">
+                                רשימת המשתתפים ריקה.
+                            </td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
        </div>
+
+       {/* ADD MODAL */}
+       {isAddFormOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-in fade-in">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
+                <h3 className="font-bold text-lg">הוספת משתתף</h3>
+                <button onClick={() => setIsAddFormOpen(false)}><X className="text-slate-400 hover:text-slate-600" /></button>
+            </div>
+            <form onSubmit={handleAdd} className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">שם מלא</label>
+                        <input required type="text" value={newName} onChange={e => setNewName(e.target.value)} className="w-full border rounded-lg p-2" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">מין</label>
+                        <select value={newGender} onChange={e => setNewGender(e.target.value as Gender)} className="w-full border rounded-lg p-2">
+                            <option value={Gender.MALE}>{GenderLabel[Gender.MALE]}</option>
+                            <option value={Gender.FEMALE}>{GenderLabel[Gender.FEMALE]}</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                     <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">תפקיד</label>
+                        <select value={newRole} onChange={e => setNewRole(e.target.value as Role)} className="w-full border rounded-lg p-2">
+                            {Object.values(Role).map(r => <option key={r} value={r}>{RoleLabel[r]}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">דירוג (1-5)</label>
+                        <input type="number" min="1" max="5" value={newRank} onChange={e => setNewRank(Number(e.target.value))} className="w-full border rounded-lg p-2" />
+                    </div>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">תגיות (לחץ Enter להוספה)</label>
+                    <div className="border rounded-lg p-2 flex flex-wrap gap-2 min-h-[42px]">
+                        {newTags.map(tag => (
+                            <span key={tag} className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs flex items-center gap-1">
+                                {tag} <button type="button" onClick={() => removeTag(tag)} className="hover:text-red-500"><X size={12}/></button>
+                            </span>
+                        ))}
+                        <input 
+                            type="text" 
+                            value={tagInput}
+                            onChange={e => setTagInput(e.target.value)}
+                            onKeyDown={handleAddTag}
+                            className="flex-1 outline-none text-sm min-w-[100px]"
+                            placeholder="הקלד תגית..."
+                        />
+                    </div>
+                </div>
+
+                <button type="submit" className="w-full bg-brand-600 text-white py-3 rounded-lg font-bold hover:bg-brand-700">שמור משתתף</button>
+            </form>
+          </div>
+        </div>
+       )}
+
+       {/* EDIT MODAL */}
+       {editingPerson && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-in fade-in">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+             <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
+                <h3 className="font-bold text-lg">עריכת משתתף</h3>
+                <button onClick={() => setEditingPerson(null)}><X className="text-slate-400 hover:text-slate-600" /></button>
+            </div>
+            <form onSubmit={handleUpdate} className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">שם מלא</label>
+                        <input required type="text" value={editingPerson.name} onChange={e => setEditingPerson({...editingPerson, name: e.target.value})} className="w-full border rounded-lg p-2" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">מין</label>
+                        <select value={editingPerson.gender} onChange={e => setEditingPerson({...editingPerson, gender: e.target.value as Gender})} className="w-full border rounded-lg p-2">
+                            <option value={Gender.MALE}>{GenderLabel[Gender.MALE]}</option>
+                            <option value={Gender.FEMALE}>{GenderLabel[Gender.FEMALE]}</option>
+                        </select>
+                    </div>
+                </div>
+                
+                 <div className="grid grid-cols-2 gap-4">
+                     <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">תפקיד</label>
+                        <select value={editingPerson.role} onChange={e => setEditingPerson({...editingPerson, role: e.target.value as Role})} className="w-full border rounded-lg p-2">
+                            {Object.values(Role).map(r => <option key={r} value={r}>{RoleLabel[r]}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">דירוג (1-5)</label>
+                        <input type="number" min="1" max="5" value={editingPerson.rank} onChange={e => setEditingPerson({...editingPerson, rank: Number(e.target.value)})} className="w-full border rounded-lg p-2" />
+                    </div>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">תגיות (לחץ Enter להוספה)</label>
+                    <div className="border rounded-lg p-2 flex flex-wrap gap-2 min-h-[42px]">
+                        {editingPerson.tags?.map(tag => (
+                            <span key={tag} className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs flex items-center gap-1">
+                                {tag} <button type="button" onClick={() => removeTagEdit(tag)} className="hover:text-red-500"><X size={12}/></button>
+                            </span>
+                        ))}
+                        <input 
+                            type="text" 
+                            value={tagInput}
+                            onChange={e => setTagInput(e.target.value)}
+                            onKeyDown={handleAddTagEdit}
+                            className="flex-1 outline-none text-sm min-w-[100px]"
+                            placeholder="הקלד תגית..."
+                        />
+                    </div>
+                </div>
+                
+                <button type="submit" className="w-full bg-brand-600 text-white py-3 rounded-lg font-bold hover:bg-brand-700">עדכן פרטים</button>
+            </form>
+          </div>
+        </div>
+       )}
     </div>
   );
 };

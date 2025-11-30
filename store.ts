@@ -86,6 +86,7 @@ interface AppState {
   addBoatDefinition: (def: BoatDefinition) => void;
   updateBoatDefinition: (def: BoatDefinition) => void;
   removeBoatDefinition: (boatId: string) => void;
+  saveBoatDefinitions: (defs: BoatDefinition[]) => void; // BULK SAVE
 
   // Pairing Logic
   runPairing: () => void;
@@ -321,6 +322,30 @@ export const useAppStore = create<AppState>()(
 
           return {
               clubSettings: { ...state.clubSettings, [activeClub]: { ...currentSettings, boatDefinitions: newDefs } },
+              sessions: { ...state.sessions, [activeClub]: { ...currentSession, inventory: newInventory } }
+          };
+      }),
+
+      saveBoatDefinitions: (defs) => set((state) => {
+          const { activeClub } = state;
+          if (!activeClub) return state;
+          
+          const currentSettings = state.clubSettings[activeClub];
+          const currentSession = state.sessions[activeClub];
+          
+          // Rebuild inventory mapping
+          // Keep existing values if ID exists, else use defaultCount
+          const newInventory: BoatInventory = {};
+          defs.forEach(d => {
+              if (currentSession.inventory[d.id] !== undefined) {
+                  newInventory[d.id] = currentSession.inventory[d.id];
+              } else {
+                  newInventory[d.id] = d.defaultCount;
+              }
+          });
+
+          return {
+              clubSettings: { ...state.clubSettings, [activeClub]: { ...currentSettings, boatDefinitions: defs } },
               sessions: { ...state.sessions, [activeClub]: { ...currentSession, inventory: newInventory } }
           };
       }),
@@ -606,7 +631,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'etgarim-storage',
-      version: 10.0,
+      version: 11.0, // Incremented to trigger migration if needed, though no logic change
       migrate: (persistedState: any, version: number) => {
         const safeClubs = persistedState.clubs && persistedState.clubs.length > 0
             ? persistedState.clubs
