@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
 import { Team, Role, RoleLabel, BoatType, TEAM_COLORS, Person } from '../types';
-import { GripVertical, AlertTriangle, ArrowRightLeft, Check, Printer, Share2, Link as LinkIcon, Eye, Send, RotateCcw, RotateCw, Star, Dices, X, Plus, Trash2, Search, UserPlus } from 'lucide-react';
+import { GripVertical, AlertTriangle, ArrowRightLeft, Check, Printer, Share2, Link as LinkIcon, Eye, Send, RotateCcw, RotateCw, Star, Dices, X, Plus, Trash2, Search, UserPlus, Lock } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 // Pairing Board Component
@@ -23,6 +23,7 @@ export const PairingBoard: React.FC = () => {
     removeTeam,
     addGuestToTeam,
     assignMemberToTeam,
+    removeMemberFromTeam,
     clubSettings
   } = useAppStore();
   
@@ -118,8 +119,11 @@ export const PairingBoard: React.FC = () => {
       removeTeam(teamId);
   };
 
+  const handleRemoveMember = (teamId: string, personId: string) => {
+      removeMemberFromTeam(teamId, personId);
+  };
+
   const generateShareData = () => {
-    // 1. Filter out sensitive data (rank, notes, ids)
     const cleanTeams = session.teams.map((t: Team) => ({
       id: t.id,
       boatType: t.boatType,
@@ -131,15 +135,13 @@ export const PairingBoard: React.FC = () => {
 
     const payload = {
       date: new Date().toLocaleDateString('he-IL'),
-      labels: boatLabels, // Include Custom Labels based on current definitions
+      labels: boatLabels,
       teams: cleanTeams
     };
 
-    // 2. Encode to Base64 (Handling Unicode characters for Hebrew)
     const jsonString = JSON.stringify(payload);
     const encoded = btoa(unescape(encodeURIComponent(jsonString)));
     
-    // 3. Create URL
     const origin = window.location.origin;
     const shareUrl = `${origin}${window.location.pathname}#/share?data=${encoded}`;
     return shareUrl;
@@ -210,12 +212,20 @@ export const PairingBoard: React.FC = () => {
     return 'text-green-500';
   };
 
-  // Filter available people for the modal
-  const availablePeople = people.filter(p => 
-      p.clubId === activeClub && 
-      !session.presentPersonIds.includes(p.id) &&
-      p.name.includes(memberSearch)
-  );
+  // --- Logic for Add Member Modal ---
+  // 1. Get ALL people in the club.
+  // 2. Determine who is already assigned to a team.
+  const allClubPeople = people.filter(p => p.clubId === activeClub);
+  
+  // Create a map of personId -> teamIndex (or Boat Label)
+  const assignments = new Map<string, string>();
+  session.teams.forEach((t, teamIdx) => {
+      t.members.forEach(m => {
+          assignments.set(m.id, `סירה ${teamIdx + 1}`);
+      });
+  });
+
+  const filteredPeople = allClubPeople.filter(p => p.name.includes(memberSearch));
 
   return (
     <div className="space-y-6 pb-20"> 
@@ -288,25 +298,41 @@ export const PairingBoard: React.FC = () => {
                                   />
                                </div>
                                <div className="space-y-2">
-                                  {availablePeople.length > 0 ? (
-                                      availablePeople.map(p => (
-                                          <button 
-                                              key={p.id}
-                                              onClick={() => handleAssignExisting(p.id)}
-                                              className="w-full text-right p-3 hover:bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-between group transition-colors"
-                                          >
-                                              <div>
-                                                  <div className="font-bold text-slate-800">{p.name}</div>
-                                                  <div className="text-xs text-slate-500">{RoleLabel[p.role]}</div>
-                                              </div>
-                                              <Plus size={18} className="text-slate-300 group-hover:text-brand-600" />
-                                          </button>
-                                      ))
+                                  {filteredPeople.length > 0 ? (
+                                      filteredPeople.map(p => {
+                                          const assignedTo = assignments.get(p.id);
+                                          const isAssigned = !!assignedTo;
+                                          return (
+                                              <button 
+                                                  key={p.id}
+                                                  onClick={() => !isAssigned && handleAssignExisting(p.id)}
+                                                  disabled={isAssigned}
+                                                  className={`w-full text-right p-3 border rounded-lg flex items-center justify-between group transition-colors ${
+                                                      isAssigned 
+                                                        ? 'bg-slate-50 border-slate-100 cursor-not-allowed opacity-60' 
+                                                        : 'hover:bg-slate-50 border-slate-100'
+                                                  }`}
+                                              >
+                                                  <div>
+                                                      <div className="font-bold text-slate-800">{p.name}</div>
+                                                      <div className="flex gap-2">
+                                                          <span className="text-xs text-slate-500">{RoleLabel[p.role]}</span>
+                                                          {isAssigned && (
+                                                              <span className="text-xs font-bold text-brand-600 flex items-center gap-1">
+                                                                  <Lock size={10} /> {assignedTo}
+                                                              </span>
+                                                          )}
+                                                      </div>
+                                                  </div>
+                                                  {!isAssigned && (
+                                                      <Plus size={18} className="text-slate-300 group-hover:text-brand-600" />
+                                                  )}
+                                              </button>
+                                          );
+                                      })
                                   ) : (
                                       <div className="text-center py-8 text-slate-400 text-sm">
-                                          לא נמצאו חברים פנויים.
-                                          <br/>
-                                          (אולי הם כבר משובצים?)
+                                          לא נמצאו תוצאות.
                                       </div>
                                   )}
                                </div>
@@ -527,6 +553,20 @@ export const PairingBoard: React.FC = () => {
                                        </div>
                                     )}
                                 </div>
+
+                                {/* Remove Button (X) - Top Left */}
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if(confirm(`האם להסיר את ${member.name} מהסירה?`)) {
+                                            handleRemoveMember(team.id, member.id);
+                                        }
+                                    }}
+                                    className="absolute top-1 left-1 p-1 text-slate-400 hover:text-red-500 rounded-full hover:bg-white/80 opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                                    title="הסר מהסירה"
+                                >
+                                    <X size={14} />
+                                </button>
 
                                 {/* Swap Button */}
                                 <button 

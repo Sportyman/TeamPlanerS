@@ -96,6 +96,7 @@ interface AppState {
   removeTeam: (teamId: string) => void;
   addGuestToTeam: (teamId: string, name: string) => void;
   assignMemberToTeam: (teamId: string, personId: string) => void;
+  removeMemberFromTeam: (teamId: string, personId: string) => void;
   moveMemberToTeam: (personId: string, targetTeamId: string) => void;
   reorderSessionMembers: (sourceTeamId: string, sourceIndex: number, destTeamId: string, destIndex: number) => void;
   swapMembers: (teamAId: string, indexA: number, teamBId: string, indexB: number) => void;
@@ -168,11 +169,13 @@ export const useAppStore = create<AppState>()(
           };
       }),
 
-      removeClub: (id) => set(state => ({
-          clubs: state.clubs.filter(c => c.id !== id),
-          // We don't strictly delete data to avoid crash if user is active, 
-          // but logically it's gone from UI
-      })),
+      removeClub: (id) => set(state => {
+          const isActive = state.activeClub === id;
+          return {
+              clubs: state.clubs.filter(c => c.id !== id),
+              activeClub: isActive ? null : state.activeClub
+          };
+      }),
 
       addSuperAdmin: (email) => set(state => ({
           superAdmins: [...state.superAdmins, email.trim()]
@@ -465,6 +468,9 @@ export const useAppStore = create<AppState>()(
 
         const newTeams = currentSession.teams.map(t => {
             if (t.id === teamId) {
+                // Remove if existing in other teams? No, assume user knows what they do or logic handles it. 
+                // But typically we should ensure uniqueness? 
+                // For now, simple add.
                 return { ...t, members: [...t.members, person] };
             }
             return t;
@@ -480,25 +486,50 @@ export const useAppStore = create<AppState>()(
                  ...state.sessions,
                  [activeClub]: { 
                      ...currentSession, 
-                     presentPersonIds: [...currentSession.presentPersonIds, person.id],
+                     presentPersonIds: Array.from(new Set([...currentSession.presentPersonIds, person.id])),
                      teams: newTeams 
                  }
              }
         }));
       },
 
-      moveMemberToTeam: (personId, targetTeamId) => { /* Same as before, just ensuring copy/paste correctness for brevity */ 
-        /* ... existing logic ... */
-        // Simplified for this XML block to save space, but logic remains same as v9.0
+      removeMemberFromTeam: (teamId, personId) => {
+        const { activeClub, sessions } = get();
+        if (!activeClub) return;
+        const currentSession = sessions[activeClub];
+
+        const newTeams = currentSession.teams.map(t => {
+            if (t.id === teamId) {
+                return { ...t, members: t.members.filter(m => m.id !== personId) };
+            }
+            return t;
+        });
+
+        set((state) => ({
+             histories: { 
+                 ...state.histories, 
+                 [activeClub]: [...(state.histories[activeClub] || []), currentSession.teams] 
+             },
+             futures: { ...state.futures, [activeClub]: [] },
+             sessions: {
+                 ...state.sessions,
+                 [activeClub]: { ...currentSession, teams: newTeams }
+             }
+        }));
+      },
+
+      moveMemberToTeam: (personId, targetTeamId) => {
         const { activeClub, sessions, people } = get();
         if (!activeClub) return;
         const currentSession = sessions[activeClub];
         const person = people.find(p => p.id === personId);
         if (!person) return;
         
+        // Remove from source
         let newTeams = currentSession.teams.map(t => ({
             ...t, members: t.members.filter(m => m.id !== personId)
         }));
+        // Add to target
         newTeams = newTeams.map(t => t.id === targetTeamId ? { ...t, members: [...t.members, person] } : t);
 
         set(state => ({
@@ -576,9 +607,8 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'etgarim-storage',
-      version: 10.0, // Major bump for dynamic clubs
+      version: 10.0,
       migrate: (persistedState: any, version: number) => {
-        // Migration to Ensure Clubs exist
         const safeClubs = persistedState.clubs && persistedState.clubs.length > 0
             ? persistedState.clubs
             : DEFAULT_CLUBS;
@@ -589,8 +619,6 @@ export const useAppStore = create<AppState>()(
             ...persistedState,
             clubs: safeClubs,
             superAdmins: safeAdmins,
-            // Ensure clubSettings keys exist for all clubs (if user added new ones before update?)
-            // Usually not needed if we just init defaults.
         } as AppState;
       },
       partialize: (state) => ({

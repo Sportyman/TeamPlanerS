@@ -80,7 +80,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </div>
             </div>
 
-            {/* Center: Logo & Club Name - Added z-index to ensure clickability */}
+            {/* Center: Logo & Club Name - ALWAYS VISIBLE */}
             <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30">
                <button 
                  onClick={() => navigate('/app')}
@@ -88,7 +88,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                  title="דף הבית"
                >
                  {activeClub === 'SAILING' ? <Ship className="text-sky-600" size={24} /> : <Waves className="text-brand-600" size={24} />}
-                 <span className="font-bold text-lg hidden xs:inline text-slate-800">
+                 <span className="font-bold text-lg text-slate-800 whitespace-nowrap">
                      {currentClub ? currentClub.label : 'TeamPlaner'}
                  </span>
                </button>
@@ -180,9 +180,10 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div className="min-h-screen bg-slate-100">
              <nav className="bg-slate-800 text-white p-4 shadow-md">
                  <div className="max-w-7xl mx-auto flex justify-between items-center">
-                     <div className="font-bold text-xl">אתגרים: ניהול על</div>
+                     <div className="font-bold text-xl hidden sm:block">אתגרים: ניהול על</div>
+                     <div className="font-bold text-xl sm:hidden">ניהול על</div>
                      <div className="flex gap-4 items-center">
-                         <span className="text-sm opacity-70">{user?.email}</span>
+                         <span className="text-sm opacity-70 hidden sm:inline">{user?.email}</span>
                          <button onClick={() => { logout(); navigate('/'); }} className="hover:text-red-300"><LogOut size={18} /></button>
                      </div>
                  </div>
