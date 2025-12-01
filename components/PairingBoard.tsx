@@ -645,15 +645,20 @@ export const PairingBoard: React.FC = () => {
                                 <div
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
+                                {...provided.dragHandleProps}
                                 style={{ 
                                     ...provided.draggableProps.style, 
                                     ...memberStyle,
+                                    // Add Rotation when Dragging
+                                    transform: snapshot.isDragging && provided.draggableProps.style?.transform 
+                                        ? `${provided.draggableProps.style.transform} rotate(3deg)` 
+                                        : provided.draggableProps.style?.transform,
                                     transition: isMemberDeleting ? 'all 0.3s ease-out' : provided.draggableProps.style?.transition
                                 }}
                                 className={`
                                     relative group
                                     p-3 rounded-lg border flex items-center justify-between select-none
-                                    transition-all duration-200
+                                    transition-all duration-200 cursor-grab active:cursor-grabbing
                                     ${snapshot.isDragging 
                                     ? 'shadow-2xl ring-4 ring-brand-500/30 z-50 bg-white opacity-100 scale-105' 
                                     : 'shadow-sm hover:shadow-md'
@@ -668,9 +673,7 @@ export const PairingBoard: React.FC = () => {
                                 >
 
                                 <div 
-                                    {...provided.dragHandleProps}
-                                    style={{ touchAction: 'none' }}
-                                    className="p-4 -mr-2 ml-2 text-slate-400 hover:text-brand-600 bg-slate-100/50 hover:bg-slate-200/50 rounded-md cursor-grab active:cursor-grabbing flex items-center justify-center shrink-0 self-stretch"
+                                    className="p-4 -mr-2 ml-2 text-slate-400 hover:text-brand-600 bg-slate-100/50 hover:bg-slate-200/50 rounded-md flex items-center justify-center shrink-0 self-stretch"
                                 >
                                     <GripVertical size={24} />
                                 </div>
