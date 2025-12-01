@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
 import { BoatInventory, RoleLabel, Role } from '../types';
-import { Ship, Users, CheckCircle2, Circle, ArrowLeft, ArrowRight, CheckSquare, Square, RotateCcw, Shield, ArrowDownAZ, ArrowUpNarrowWide, Settings, Wind, Anchor } from 'lucide-react';
+import { Ship, Users, CheckCircle2, Circle, ArrowLeft, ArrowRight, CheckSquare, Square, RotateCcw, Shield, ArrowDownAZ, ArrowUpNarrowWide, Settings, Wind, Anchor, AlertTriangle } from 'lucide-react';
 import { PairingBoard } from './PairingBoard';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 
@@ -19,7 +19,8 @@ export const SessionManager: React.FC = () => {
     updateInventory, 
     runPairing,
     resetSession,
-    clubSettings
+    clubSettings,
+    pairingDirty
   } = useAppStore();
 
   const navigate = useNavigate();
@@ -154,6 +155,26 @@ export const SessionManager: React.FC = () => {
   if (step === 3) {
     return (
       <div className="space-y-4">
+        {pairingDirty && (
+            <div className="bg-amber-100 border border-amber-300 text-amber-800 p-3 rounded-lg flex justify-between items-center animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-center gap-2">
+                    <AlertTriangle size={20} />
+                    <span className="font-bold">בוצעו שינויים בנתוני המשתתפים.</span>
+                    <span className="text-sm hidden md:inline">מומלץ לבצע שיבוץ מחדש כדי להתחשב בשינויים.</span>
+                </div>
+                <button 
+                    onClick={() => {
+                        if(confirm('האם לבצע שיבוץ מחדש? הנתונים הקיימים יימחקו.')) {
+                            setStep(2); // Go back to inventory/pairing trigger
+                        }
+                    }} 
+                    className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-md text-sm font-bold shadow-sm"
+                >
+                    ערבב מחדש
+                </button>
+            </div>
+        )}
+
         <div className="flex justify-between items-center print:hidden">
           <button onClick={() => setStep(2)} className="text-sm text-brand-600 hover:underline flex items-center gap-1"><ArrowRight size={16} /> חזרה להגדרות</button>
           <button onClick={handleReset} className="text-sm text-red-500 hover:bg-red-50 px-3 py-1 rounded flex items-center gap-1 transition-colors"><RotateCcw size={14} /> איפוס אימון</button>

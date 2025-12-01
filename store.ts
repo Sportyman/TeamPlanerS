@@ -62,6 +62,7 @@ const INITIAL_PEOPLE: Person[] = [
 interface AppState {
   user: { email: string; isAdmin: boolean } | null;
   activeClub: ClubID | null;
+  pairingDirty: boolean; // Flag to indicate if data changed since last pairing
   
   // System Configuration
   clubs: Club[];
@@ -132,6 +133,7 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       user: null,
       activeClub: null,
+      pairingDirty: false,
       
       clubs: DEFAULT_CLUBS,
       superAdmins: [ROOT_ADMIN_EMAIL],
@@ -234,15 +236,20 @@ export const useAppStore = create<AppState>()(
       addPerson: (personData) => set((state) => {
         if (!state.activeClub) return state;
         const newPerson: Person = { ...personData, clubId: state.activeClub };
-        return { people: [...state.people, newPerson] };
+        return { 
+          people: [...state.people, newPerson],
+          pairingDirty: true 
+        };
       }),
       
       updatePerson: (updatedPerson) => set((state) => ({
-        people: state.people.map(p => p.id === updatedPerson.id ? updatedPerson : p)
+        people: state.people.map(p => p.id === updatedPerson.id ? updatedPerson : p),
+        pairingDirty: true
       })),
 
       removePerson: (id) => set((state) => ({ 
-        people: state.people.filter(p => p.id !== id) 
+        people: state.people.filter(p => p.id !== id),
+        pairingDirty: true
       })),
 
       restoreDemoData: () => set(() => {
@@ -256,7 +263,8 @@ export const useAppStore = create<AppState>()(
           sessions: {
             'KAYAK': { ...EMPTY_SESSION, inventory: createInventoryFromDefs(KAYAK_DEFINITIONS) },
             'SAILING': { ...EMPTY_SESSION, inventory: createInventoryFromDefs(SAILING_DEFINITIONS) },
-          }
+          },
+          pairingDirty: false
         };
       }),
 
@@ -311,7 +319,8 @@ export const useAppStore = create<AppState>()(
 
           return {
               clubSettings: { ...state.clubSettings, [activeClub]: { ...currentSettings, boatDefinitions: newDefs } },
-              sessions: { ...state.sessions, [activeClub]: { ...currentSession, inventory: newInventory } }
+              sessions: { ...state.sessions, [activeClub]: { ...currentSession, inventory: newInventory } },
+              pairingDirty: true
           };
       }),
 
@@ -322,7 +331,8 @@ export const useAppStore = create<AppState>()(
           const newDefs = currentSettings.boatDefinitions.map(d => d.id === def.id ? def : d);
           
           return {
-              clubSettings: { ...state.clubSettings, [activeClub]: { ...currentSettings, boatDefinitions: newDefs } }
+              clubSettings: { ...state.clubSettings, [activeClub]: { ...currentSettings, boatDefinitions: newDefs } },
+              pairingDirty: true
           };
       }),
 
@@ -338,7 +348,8 @@ export const useAppStore = create<AppState>()(
 
           return {
               clubSettings: { ...state.clubSettings, [activeClub]: { ...currentSettings, boatDefinitions: newDefs } },
-              sessions: { ...state.sessions, [activeClub]: { ...currentSession, inventory: newInventory } }
+              sessions: { ...state.sessions, [activeClub]: { ...currentSession, inventory: newInventory } },
+              pairingDirty: true
           };
       }),
 
@@ -360,7 +371,8 @@ export const useAppStore = create<AppState>()(
 
           return {
               clubSettings: { ...state.clubSettings, [activeClub]: { ...currentSettings, boatDefinitions: defs } },
-              sessions: { ...state.sessions, [activeClub]: { ...currentSession, inventory: newInventory } }
+              sessions: { ...state.sessions, [activeClub]: { ...currentSession, inventory: newInventory } },
+              pairingDirty: true
           };
       }),
 
@@ -387,7 +399,8 @@ export const useAppStore = create<AppState>()(
           sessions: {
             ...state.sessions,
             [activeClub]: { ...state.sessions[activeClub], teams }
-          }
+          },
+          pairingDirty: false
         }));
       },
 
@@ -407,7 +420,8 @@ export const useAppStore = create<AppState>()(
               presentPersonIds: [],
               teams: []
             }
-          }
+          },
+          pairingDirty: false
         }));
       },
 
@@ -570,7 +584,7 @@ export const useAppStore = create<AppState>()(
 
         set(state => ({
             histories: { ...state.histories, [activeClub]: [...(state.histories[activeClub]||[]), currentSession.teams]},
-            sessions: { ...state.sessions, [activeClub]: { ...currentSession, teams: newTeams } }
+            sessions: { ...state.sessions, [activeClub]: { ...currentSession, teams: newTeams }}
         }));
       },
       reorderSessionMembers: (sId, sIdx, dId, dIdx) => {
@@ -643,11 +657,11 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'etgarim-storage',
-      version: 16.0, // Bump to force reload of mock data with new structure
+      version: 17.0, // Bump for new ConstraintStrength Enum
       migrate: (persistedState: any, version: number) => {
         let state = persistedState as AppState;
-        if (version < 16) {
-             state.people = INITIAL_PEOPLE; 
+        if (version < 17) {
+             state.pairingDirty = false;
         }
         return state;
       },
@@ -658,7 +672,8 @@ export const useAppStore = create<AppState>()(
         clubSettings: state.clubSettings,
         permissions: state.permissions,
         clubs: state.clubs,
-        superAdmins: state.superAdmins
+        superAdmins: state.superAdmins,
+        pairingDirty: state.pairingDirty
       })
     }
   )

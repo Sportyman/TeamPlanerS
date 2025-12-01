@@ -23,7 +23,7 @@ export const GenderLabel: Record<Gender, string> = {
 
 // Gender Preference Definitions
 export type GenderPrefType = 'NONE' | 'MALE' | 'FEMALE';
-export type ConstraintStrength = 'MUST' | 'PREFER';
+export type ConstraintStrength = 'NONE' | 'MUST' | 'PREFER';
 
 export interface GenderConstraint {
     type: GenderPrefType;
@@ -81,7 +81,7 @@ export interface UserPermission {
   allowedClubs: ClubID[];
 }
 
-export const APP_VERSION = '2.8.5';
+export const APP_VERSION = '2.9.0';
 
 export const TEAM_COLORS = [
   'bg-blue-50 border-blue-200',      

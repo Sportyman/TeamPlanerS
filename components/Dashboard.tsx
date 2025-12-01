@@ -9,6 +9,151 @@ type ViewMode = 'MENU' | 'PEOPLE' | 'INVENTORY';
 
 const PHONE_REGEX = /^05\d-?\d{7}$/;
 
+// Extracted Component to prevent scroll jumping
+const RelationshipManager = ({ 
+    currentId, 
+    must, 
+    prefer, 
+    cannot, 
+    people,
+    onToggle, 
+    onClear 
+}: { 
+    currentId?: string, 
+    must: string[], 
+    prefer: string[], 
+    cannot: string[], 
+    people: Person[],
+    onToggle: (id: string, type: 'MUST' | 'PREFER' | 'CANNOT') => void,
+    onClear: (id: string) => void
+}) => {
+    const [search, setSearch] = useState('');
+    const candidates = people.filter(p => p.id !== currentId && p.name.includes(search));
+
+    const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+        // Scroll slightly to ensure keyboard doesn't hide input on mobile
+        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    return (
+        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+             <div className="flex items-center justify-between mb-2">
+                 <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                     <Users2 size={16} className="text-brand-600"/> מנהל קשרים והעדפות
+                 </div>
+                 <input 
+                    type="text" 
+                    placeholder="חפש חבר..." 
+                    className="text-xs border rounded px-2 py-1 w-32 focus:ring-2 focus:ring-brand-500 outline-none"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    onFocus={handleFocus}
+                 />
+             </div>
+             
+             {/* Grid Header for Icons - Aligned with list items */}
+             <div className="grid grid-cols-[1fr_32px_32px_32px] gap-1 px-2 mb-1 text-[10px] text-slate-500 font-bold items-center">
+                 <div></div>
+                 <div className="text-center text-yellow-600">עדיף</div>
+                 <div className="text-center text-green-600">חובה</div>
+                 <div className="text-center text-red-600">אסור</div>
+             </div>
+
+             <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                 {candidates.map(p => {
+                     const isMust = must.includes(p.id);
+                     const isPrefer = prefer.includes(p.id);
+                     const isCannot = cannot.includes(p.id);
+
+                     return (
+                         <div key={p.id} className="bg-white p-2 rounded border grid grid-cols-[1fr_32px_32px_32px] gap-1 items-center shadow-sm">
+                             <div className="flex flex-col overflow-hidden">
+                                 <span className="text-xs font-bold text-slate-700 truncate">{p.name}</span>
+                                 <span className="text-[10px] text-slate-400 truncate">{RoleLabel[p.role]}</span>
+                             </div>
+                             
+                             <button 
+                                type="button" 
+                                onClick={() => isPrefer ? onClear(p.id) : onToggle(p.id, 'PREFER')}
+                                className={`h-8 w-8 flex items-center justify-center rounded transition-colors ${isPrefer ? 'bg-yellow-100 text-yellow-600 ring-1 ring-yellow-400' : 'bg-slate-100 text-slate-300 hover:bg-slate-200'}`}
+                             >
+                                 <Heart size={14} className={isPrefer ? "fill-current" : ""}/>
+                             </button>
+                             <button 
+                                type="button" 
+                                onClick={() => isMust ? onClear(p.id) : onToggle(p.id, 'MUST')}
+                                className={`h-8 w-8 flex items-center justify-center rounded transition-colors ${isMust ? 'bg-green-100 text-green-600 ring-1 ring-green-400' : 'bg-slate-100 text-slate-300 hover:bg-slate-200'}`}
+                             >
+                                 <Shield size={14} />
+                             </button>
+                             <button 
+                                type="button" 
+                                onClick={() => isCannot ? onClear(p.id) : onToggle(p.id, 'CANNOT')}
+                                className={`h-8 w-8 flex items-center justify-center rounded transition-colors ${isCannot ? 'bg-red-100 text-red-600 ring-1 ring-red-400' : 'bg-slate-100 text-slate-300 hover:bg-slate-200'}`}
+                             >
+                                 <Ban size={14} />
+                             </button>
+                         </div>
+                     )
+                 })}
+                 {candidates.length === 0 && <div className="text-center text-xs text-slate-400 py-4">לא נמצאו תוצאות</div>}
+             </div>
+        </div>
+    );
+};
+
+// Smart Input for Numbers (Handles empty string vs 0)
+const SmartNumberInput = ({ 
+    value, 
+    onChange, 
+    min = 0, 
+    className 
+}: { 
+    value: number, 
+    onChange: (val: number) => void, 
+    min?: number, 
+    className?: string 
+}) => {
+    const [displayVal, setDisplayVal] = useState<string>(value.toString());
+
+    useEffect(() => {
+        setDisplayVal(value.toString());
+    }, [value]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        if (val === '') {
+            setDisplayVal('');
+            onChange(0); // Underlying value is 0
+        } else {
+            const num = Number(val);
+            if (!isNaN(num)) {
+                setDisplayVal(val);
+                onChange(num);
+            }
+        }
+    };
+
+    const handleBlur = () => {
+        if (displayVal === '') {
+            setDisplayVal('0');
+            onChange(0);
+        }
+    };
+
+    return (
+        <input 
+            type="number"
+            min={min}
+            value={displayVal}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            className={className}
+        />
+    );
+};
+
+
 export const Dashboard: React.FC = () => {
   const { 
       people, 
@@ -326,98 +471,6 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  // --- Sub-Components for Forms ---
-
-  const RelationshipManager = ({ 
-      currentId, 
-      must, 
-      prefer, 
-      cannot, 
-      onToggle, 
-      onClear 
-  }: { 
-      currentId?: string, 
-      must: string[], 
-      prefer: string[], 
-      cannot: string[], 
-      onToggle: (id: string, type: 'MUST' | 'PREFER' | 'CANNOT') => void,
-      onClear: (id: string) => void
-  }) => {
-      const [search, setSearch] = useState('');
-      const candidates = clubPeople.filter(p => p.id !== currentId && p.name.includes(search));
-
-      return (
-          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-               <div className="flex items-center justify-between mb-2">
-                   <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                       <Users2 size={16} className="text-brand-600"/> מנהל קשרים והעדפות
-                   </div>
-                   <input 
-                      type="text" 
-                      placeholder="חפש חבר..." 
-                      className="text-xs border rounded px-2 py-1 w-32"
-                      value={search}
-                      onChange={e => setSearch(e.target.value)}
-                   />
-               </div>
-               
-               {/* Headers for Icons */}
-               <div className="flex justify-between items-center px-2 mb-1 text-[10px] text-slate-500 font-bold">
-                   <div className="flex-1"></div>
-                   <div className="flex gap-1">
-                       <span className="w-8 text-center text-yellow-600">עדיף</span>
-                       <span className="w-8 text-center text-green-600">חובה</span>
-                       <span className="w-8 text-center text-red-600">אסור</span>
-                   </div>
-               </div>
-
-               <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                   {candidates.map(p => {
-                       const isMust = must.includes(p.id);
-                       const isPrefer = prefer.includes(p.id);
-                       const isCannot = cannot.includes(p.id);
-
-                       return (
-                           <div key={p.id} className="bg-white p-2 rounded border flex items-center justify-between shadow-sm">
-                               <div className="flex flex-col">
-                                   <span className="text-xs font-bold text-slate-700">{p.name}</span>
-                                   <span className="text-[10px] text-slate-400">{RoleLabel[p.role]}</span>
-                               </div>
-                               <div className="flex gap-1">
-                                   <button 
-                                      type="button" 
-                                      onClick={() => isPrefer ? onClear(p.id) : onToggle(p.id, 'PREFER')}
-                                      className={`p-1.5 w-8 flex justify-center rounded transition-colors ${isPrefer ? 'bg-yellow-100 text-yellow-600 ring-1 ring-yellow-400' : 'bg-slate-100 text-slate-300 hover:bg-slate-200'}`}
-                                      title="מעדיף להיות עם"
-                                   >
-                                       <Heart size={14} className={isPrefer ? "fill-current" : ""}/>
-                                   </button>
-                                   <button 
-                                      type="button" 
-                                      onClick={() => isMust ? onClear(p.id) : onToggle(p.id, 'MUST')}
-                                      className={`p-1.5 w-8 flex justify-center rounded transition-colors ${isMust ? 'bg-green-100 text-green-600 ring-1 ring-green-400' : 'bg-slate-100 text-slate-300 hover:bg-slate-200'}`}
-                                      title="חייב להיות עם"
-                                   >
-                                       <Shield size={14} />
-                                   </button>
-                                   <button 
-                                      type="button" 
-                                      onClick={() => isCannot ? onClear(p.id) : onToggle(p.id, 'CANNOT')}
-                                      className={`p-1.5 w-8 flex justify-center rounded transition-colors ${isCannot ? 'bg-red-100 text-red-600 ring-1 ring-red-400' : 'bg-slate-100 text-slate-300 hover:bg-slate-200'}`}
-                                      title="לא יכול להיות עם"
-                                   >
-                                       <Ban size={14} />
-                                   </button>
-                               </div>
-                           </div>
-                       )
-                   })}
-                   {candidates.length === 0 && <div className="text-center text-xs text-slate-400 py-4">לא נמצאו תוצאות</div>}
-               </div>
-          </div>
-      );
-  };
-
   if (view === 'MENU') {
       return (
           <div className="max-w-4xl mx-auto py-8 px-4">
@@ -514,22 +567,19 @@ export const Dashboard: React.FC = () => {
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-brand-600 mb-1">כמות ברירת מחדל</label>
-                                <input 
-                                    type="number" 
+                                <SmartNumberInput 
                                     value={newBoatCount} 
-                                    onChange={e => setNewBoatCount(Number(e.target.value))} 
-                                    className="w-full px-3 py-2 border rounded-md" 
-                                    min="0"
+                                    onChange={setNewBoatCount} 
+                                    className="w-full px-3 py-2 border rounded-md"
                                 />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-brand-600 mb-1">קיבולת נוסעים</label>
-                                <input 
-                                    type="number" 
+                                <SmartNumberInput 
                                     value={newBoatCapacity} 
-                                    onChange={e => setNewBoatCapacity(Number(e.target.value))} 
+                                    onChange={setNewBoatCapacity} 
                                     className="w-full px-3 py-2 border rounded-md" 
-                                    min="1"
+                                    min={1}
                                 />
                             </div>
                         </div>
@@ -572,27 +622,35 @@ export const Dashboard: React.FC = () => {
                                      <span className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-full border border-slate-200">
                                          <Users2 size={12}/>
                                          קיבולת: 
-                                         <input 
-                                            type="number" 
-                                            min="1"
+                                         <SmartNumberInput 
+                                            min={1}
                                             value={def.capacity}
-                                            onChange={e => handleUpdateBoatDraft(def.id, 'capacity', Number(e.target.value))}
+                                            onChange={val => handleUpdateBoatDraft(def.id, 'capacity', val)}
                                             className="w-10 bg-transparent border-b border-dashed border-slate-300 text-center font-bold focus:outline-none"
                                          />
                                      </span>
                                  </div>
                              </div>
 
-                             <div className="flex items-center gap-4">
-                                <div className="flex flex-col items-center">
-                                    <label className="text-[10px] text-slate-400 font-bold uppercase">ברירת מחדל</label>
-                                    <input 
-                                        type="number" 
-                                        min="0"
-                                        value={def.defaultCount}
-                                        onChange={e => handleUpdateBoatDraft(def.id, 'defaultCount', Number(e.target.value))}
-                                        className="w-16 text-center py-1 border rounded bg-white font-bold"
-                                    />
+                             <div className="flex items-center gap-4 w-full md:w-auto">
+                                <div className="flex flex-col items-center flex-1 md:flex-none">
+                                    <label className="text-[10px] text-slate-400 font-bold uppercase mb-1">ברירת מחדל</label>
+                                    <div className="flex items-center gap-2 w-full md:w-auto">
+                                        <input 
+                                            type="range"
+                                            min="0"
+                                            max="30"
+                                            value={def.defaultCount}
+                                            onChange={e => handleUpdateBoatDraft(def.id, 'defaultCount', Number(e.target.value))}
+                                            className="w-24 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-600 hidden md:block"
+                                        />
+                                        <SmartNumberInput 
+                                            min={0}
+                                            value={def.defaultCount}
+                                            onChange={val => handleUpdateBoatDraft(def.id, 'defaultCount', val)}
+                                            className="w-16 text-center py-1 border rounded bg-white font-bold"
+                                        />
+                                    </div>
                                 </div>
                                 <button onClick={() => handleDeleteBoatDraft(def.id)} className="text-slate-400 hover:text-red-500 p-2 hover:bg-white rounded-full transition-colors">
                                     <Trash2 size={18}/>
@@ -799,6 +857,7 @@ export const Dashboard: React.FC = () => {
                                         onChange={e => setNewGenderPrefStrength(e.target.value as ConstraintStrength)}
                                         className="w-full border rounded p-1.5 text-xs"
                                     >
+                                        <option value="NONE">ללא (לא רלוונטי)</option>
                                         <option value="PREFER">העדפה בלבד</option>
                                         <option value="MUST">חובה קריטית</option>
                                     </select>
@@ -808,6 +867,7 @@ export const Dashboard: React.FC = () => {
 
                          {/* Relationship Manager */}
                          <RelationshipManager 
+                             people={clubPeople}
                              must={newMustPair}
                              prefer={newPreferPair}
                              cannot={newCannotPair}
@@ -938,10 +998,11 @@ export const Dashboard: React.FC = () => {
                                  <div>
                                     <label className="block text-xs font-bold text-slate-700 mb-1">רמת חשיבות</label>
                                     <select 
-                                        value={editingPerson.genderConstraint?.strength || 'PREFER'}
+                                        value={editingPerson.genderConstraint?.strength || 'NONE'}
                                         onChange={e => setEditingPerson({...editingPerson, genderConstraint: { ...(editingPerson.genderConstraint || { type: 'NONE' }), strength: e.target.value as ConstraintStrength }})}
                                         className="w-full border rounded p-1.5 text-xs"
                                     >
+                                        <option value="NONE">ללא (לא רלוונטי)</option>
                                         <option value="PREFER">העדפה בלבד</option>
                                         <option value="MUST">חובה קריטית</option>
                                     </select>
@@ -951,6 +1012,7 @@ export const Dashboard: React.FC = () => {
 
                          {/* Relationship Manager */}
                          <RelationshipManager 
+                             people={clubPeople}
                              must={editingPerson.mustPairWith || []}
                              prefer={editingPerson.preferPairWith || []}
                              cannot={editingPerson.cannotPairWith || []}
