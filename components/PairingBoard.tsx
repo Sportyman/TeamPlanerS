@@ -637,10 +637,9 @@ export const PairingBoard: React.FC = () => {
                         return (
                             <Draggable key={member.id} draggableId={member.id} index={index}>
                             {(provided, snapshot) => {
-                                // CRITICAL: Do NOT modify the transform property directly here.
-                                // The library manages positioning. We only pass the props to the outer div.
-                                // Rotation and styling happen on the INNER div.
-                                
+                                // Separating the Draggable container (positioning)
+                                // from the Visual container (styling & rotation)
+                                // fixes coordinate issues with transforms.
                                 return (
                                 <div
                                 ref={provided.innerRef}
@@ -659,7 +658,7 @@ export const PairingBoard: React.FC = () => {
                                 title={`רמה: ${member.rank}`}
                                 >
 
-                                {/* INNER DIV: Handles Visuals and Rotation */}
+                                {/* VISUAL INNER CONTAINER */}
                                 <div className={`
                                     p-3 rounded-lg border flex items-center justify-between select-none
                                     transition-all duration-200

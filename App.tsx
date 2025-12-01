@@ -67,13 +67,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const currentClub = clubs.find(c => c.id === activeClub);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col opacity-0 animate-[fade-in_0.5s_ease-out_forwards]">
-      <style>{`
-        @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-      `}</style>
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative flex justify-between h-16 items-center">
@@ -216,13 +210,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const navigate = useNavigate();
 
     return (
-        <div className="min-h-screen bg-slate-100 flex flex-col opacity-0 animate-[fade-in_0.5s_ease-out_forwards]">
-            <style>{`
-                @keyframes fade-in {
-                from { opacity: 0; }
-                to { opacity: 1; }
-                }
-            `}</style>
+        <div className="min-h-screen bg-slate-100 flex flex-col">
              <nav className="bg-slate-800 text-white p-4 shadow-md">
                  <div className="max-w-7xl mx-auto flex justify-between items-center">
                      <div className="font-bold text-xl hidden sm:block">אתגרים: ניהול על</div>
