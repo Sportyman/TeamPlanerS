@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
 import { BoatInventory, RoleLabel, Role } from '../types';
 import { Ship, Users, CheckCircle2, Circle, ArrowLeft, ArrowRight, CheckSquare, Square, RotateCcw, Shield, ArrowDownAZ, ArrowUpNarrowWide, Settings, Wind, Anchor } from 'lucide-react';
@@ -60,6 +60,28 @@ export const SessionManager: React.FC = () => {
         }
     }
   }, [searchParams, currentSession.teams.length]);
+
+  // SMART AUTO ADVANCE LOGIC
+  const prevPresentCount = useRef(currentSession.presentPersonIds.length);
+
+  useEffect(() => {
+    const currentCount = currentSession.presentPersonIds.length;
+    // Only trigger if we added people (not removed, and not just navigation)
+    const increased = currentCount > prevPresentCount.current;
+    prevPresentCount.current = currentCount;
+
+    if (step === 1 && increased && clubPeople.length > 0) {
+        // Check if everyone is present
+        const allPresent = clubPeople.every(p => currentSession.presentPersonIds.includes(p.id));
+        
+        if (allPresent) {
+            const timer = setTimeout(() => {
+                setStep(2);
+            }, 500); // 0.5s delay for visual feedback
+            return () => clearTimeout(timer);
+        }
+    }
+  }, [currentSession.presentPersonIds, clubPeople, step]);
   
   const [sortBy, setSortBy] = useState<SortType>('ROLE');
   const [localInventory, setLocalInventory] = useState<BoatInventory>(currentSession.inventory);
