@@ -70,8 +70,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <div className="min-h-screen bg-slate-50 flex flex-col opacity-0 animate-[fade-in_0.5s_ease-out_forwards]">
       <style>{`
         @keyframes fade-in {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
       `}</style>
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
@@ -219,8 +219,8 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div className="min-h-screen bg-slate-100 flex flex-col opacity-0 animate-[fade-in_0.5s_ease-out_forwards]">
             <style>{`
                 @keyframes fade-in {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
+                from { opacity: 0; }
+                to { opacity: 1; }
                 }
             `}</style>
              <nav className="bg-slate-800 text-white p-4 shadow-md">

@@ -637,118 +637,122 @@ export const PairingBoard: React.FC = () => {
                         return (
                             <Draggable key={member.id} draggableId={member.id} index={index}>
                             {(provided, snapshot) => {
-                                // IMPORTANT: Fix transform to prevent jumping, and add rotation
-                                const transform = provided.draggableProps.style?.transform;
-                                const style = { 
-                                    ...provided.draggableProps.style, 
-                                    ...memberStyle,
-                                    transform: snapshot.isDragging && transform 
-                                        ? `${transform} rotate(3deg)` 
-                                        : transform,
-                                    transition: isMemberDeleting ? 'all 0.3s ease-out' : provided.draggableProps.style?.transition
-                                };
-
+                                // CRITICAL: Do NOT modify the transform property directly here.
+                                // The library manages positioning. We only pass the props to the outer div.
+                                // Rotation and styling happen on the INNER div.
+                                
                                 return (
                                 <div
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
-                                style={style}
+                                style={{
+                                    ...provided.draggableProps.style,
+                                    ...memberStyle,
+                                    // Handle deleting animation transition
+                                    transition: isMemberDeleting ? 'all 0.3s ease-out' : provided.draggableProps.style?.transition
+                                }}
                                 className={`
                                     relative group
-                                    p-3 rounded-lg border flex items-center justify-between select-none
-                                    transition-all duration-200
-                                    ${snapshot.isDragging 
-                                    ? 'shadow-2xl ring-4 ring-brand-500/30 z-50 bg-white opacity-100 scale-105' 
-                                    : 'shadow-sm hover:shadow-md'
-                                    }
-                                    ${getMemberStyle(member.role)}
-                                    ${isSwappingMe ? 'ring-2 ring-brand-500 ring-offset-1' : ''}
-                                    ${swapSource && !isSwappingMe ? 'cursor-pointer hover:bg-brand-50' : ''}
                                     ${isMemberDeleting ? 'pointer-events-none' : ''}
                                 `}
                                 onClick={() => swapSource && handleSwapClick(team.id, index)}
                                 title={`רמה: ${member.rank}`}
                                 >
 
-                                <div 
-                                    {...provided.dragHandleProps}
-                                    className="p-4 -mr-2 ml-2 text-slate-400 hover:text-brand-600 bg-slate-100/50 hover:bg-slate-200/50 rounded-md flex items-center justify-center shrink-0 self-stretch cursor-grab active:cursor-grabbing touch-none"
-                                    // CRITICAL FOR MOBILE: Prevents scrolling when touching the handle
-                                    style={{ touchAction: 'none' }}
-                                >
-                                    <GripVertical size={24} />
-                                </div>
-                                
-                                <div className="flex-1 flex flex-col px-1">
-                                    <span className="font-bold text-slate-900 text-lg leading-tight">{member.name}</span>
-                                    
-                                    <div className="flex items-center gap-2 mt-1">
-                                      <span className="text-sm text-slate-500 uppercase font-medium">{getRoleLabel(member.role, member.gender)}</span>
-                                      <div className="flex">
-                                        {Array.from({ length: member.rank }).map((_, i) => (
-                                          <Star key={i} size={14} className={`fill-current ${getRankColor(member.rank)}`} />
-                                        ))}
-                                      </div>
-                                    </div>
+                                {/* INNER DIV: Handles Visuals and Rotation */}
+                                <div className={`
+                                    p-3 rounded-lg border flex items-center justify-between select-none
+                                    transition-all duration-200
+                                    ${snapshot.isDragging 
+                                    ? 'shadow-2xl ring-4 ring-brand-500/30 bg-white opacity-100 scale-105 rotate-3 z-50' 
+                                    : 'shadow-sm hover:shadow-md'
+                                    }
+                                    ${getMemberStyle(member.role)}
+                                    ${isSwappingMe ? 'ring-2 ring-brand-500 ring-offset-1' : ''}
+                                    ${swapSource && !isSwappingMe ? 'cursor-pointer hover:bg-brand-50' : ''}
+                                `}>
 
-                                    {constraints.length > 0 && (
-                                        <div className="flex flex-wrap gap-1 mt-1">
-                                            {constraints.map((c, i) => (
-                                                <span 
-                                                    key={i} 
-                                                    title={c.title}
-                                                    className={`text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 border cursor-help ${
-                                                    c.type === 'SUCCESS' ? 'bg-green-100 text-green-700 border-green-200' :
-                                                    c.type === 'DANGER' ? 'bg-red-100 text-red-700 border-red-200' :
-                                                    c.type === 'INFO' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
-                                                    'bg-blue-100 text-blue-700 border-blue-200'
-                                                }`}>
-                                                    {c.icon} {c.label}
-                                                </span>
+                                    <div 
+                                        {...provided.dragHandleProps}
+                                        className="p-4 -mr-2 ml-2 text-slate-400 hover:text-brand-600 bg-slate-100/50 hover:bg-slate-200/50 rounded-md flex items-center justify-center shrink-0 self-stretch cursor-grab active:cursor-grabbing touch-none"
+                                        // CRITICAL FOR MOBILE: Prevents scrolling when touching the handle
+                                        style={{ touchAction: 'none' }}
+                                    >
+                                        <GripVertical size={24} />
+                                    </div>
+                                    
+                                    <div className="flex-1 flex flex-col px-1">
+                                        <span className="font-bold text-slate-900 text-lg leading-tight">{member.name}</span>
+                                        
+                                        <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-sm text-slate-500 uppercase font-medium">{getRoleLabel(member.role, member.gender)}</span>
+                                        <div className="flex">
+                                            {Array.from({ length: member.rank }).map((_, i) => (
+                                            <Star key={i} size={14} className={`fill-current ${getRankColor(member.rank)}`} />
                                             ))}
                                         </div>
-                                    )}
+                                        </div>
 
-                                    {member.notes && (
-                                       <div className="text-xs text-red-600 truncate mt-1 max-w-[140px]" title={member.notes}>
-                                          {member.notes}
-                                       </div>
-                                    )}
-                                </div>
+                                        {constraints.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                {constraints.map((c, i) => (
+                                                    <span 
+                                                        key={i} 
+                                                        title={c.title}
+                                                        className={`text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 border cursor-help ${
+                                                        c.type === 'SUCCESS' ? 'bg-green-100 text-green-700 border-green-200' :
+                                                        c.type === 'DANGER' ? 'bg-red-100 text-red-700 border-red-200' :
+                                                        c.type === 'INFO' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+                                                        'bg-blue-100 text-blue-700 border-blue-200'
+                                                    }`}>
+                                                        {c.icon} {c.label}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
 
-                                <button 
-                                    onClick={(e) => {
+                                        {member.notes && (
+                                        <div className="text-xs text-red-600 truncate mt-1 max-w-[140px]" title={member.notes}>
+                                            {member.notes}
+                                        </div>
+                                        )}
+                                    </div>
+
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if(confirm(`האם להסיר את ${member.name} מהסירה?`)) {
+                                                handleRemoveMember(team.id, member.id);
+                                            }
+                                        }}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onTouchStart={(e) => e.stopPropagation()}
+                                        className="absolute top-1 left-1 p-1 text-slate-400 hover:text-red-500 rounded-full hover:bg-white/80 opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                                        title="הסר מהסירה"
+                                    >
+                                        <X size={14} />
+                                    </button>
+
+                                    <button 
+                                        onClick={(e) => {
                                         e.stopPropagation();
-                                        if(confirm(`האם להסיר את ${member.name} מהסירה?`)) {
-                                            handleRemoveMember(team.id, member.id);
+                                        handleSwapClick(team.id, index);
+                                        }}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onTouchStart={(e) => e.stopPropagation()}
+                                        className={`
+                                        p-2 rounded-md transition-colors z-10
+                                        ${isSwappingMe 
+                                            ? 'bg-brand-500 text-white' 
+                                            : 'text-slate-400 hover:bg-white hover:text-brand-600 hover:shadow-sm opacity-0 group-hover:opacity-100 md:opacity-0 opacity-100'
                                         }
-                                    }}
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                    onTouchStart={(e) => e.stopPropagation()}
-                                    className="absolute top-1 left-1 p-1 text-slate-400 hover:text-red-500 rounded-full hover:bg-white/80 opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
-                                    title="הסר מהסירה"
-                                >
-                                    <X size={14} />
-                                </button>
-
-                                <button 
-                                    onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSwapClick(team.id, index);
-                                    }}
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                    onTouchStart={(e) => e.stopPropagation()}
-                                    className={`
-                                    p-2 rounded-md transition-colors z-10
-                                    ${isSwappingMe 
-                                        ? 'bg-brand-500 text-white' 
-                                        : 'text-slate-400 hover:bg-white hover:text-brand-600 hover:shadow-sm opacity-0 group-hover:opacity-100 md:opacity-0 opacity-100'
-                                    }
-                                    ${swapSource ? 'opacity-100' : ''}
-                                    `}
-                                >
-                                    {isSwappingMe ? <Check size={18} /> : <ArrowRightLeft size={18} />}
-                                </button>
+                                        ${swapSource ? 'opacity-100' : ''}
+                                        `}
+                                    >
+                                        {isSwappingMe ? <Check size={18} /> : <ArrowRightLeft size={18} />}
+                                    </button>
+                                </div> 
+                                
                                 </div>
                             )}}
                             </Draggable>
