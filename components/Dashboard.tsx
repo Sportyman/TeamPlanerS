@@ -856,7 +856,7 @@ export const Dashboard: React.FC = () => {
                         className="w-5 h-5 text-blue-600 rounded"
                     />
                     <label htmlFor="newIsSkipper" className="text-sm font-bold text-blue-800 flex items-center gap-2">
-                         <ShipWheel size={18} /> מוסמך כסקיפר?
+                         <ShipWheel size={18} /> {newGender === Gender.MALE ? 'מוסמך כסקיפר?' : 'מוסמכת כסקיפר?'}
                     </label>
                 </div>
 
@@ -1014,7 +1014,7 @@ export const Dashboard: React.FC = () => {
                         className="w-5 h-5 text-blue-600 rounded"
                     />
                     <label htmlFor="editIsSkipper" className="text-sm font-bold text-blue-800 flex items-center gap-2">
-                         <ShipWheel size={18} /> מוסמך כסקיפר?
+                         <ShipWheel size={18} /> {editingPerson.gender === Gender.MALE ? 'מוסמך כסקיפר?' : 'מוסמכת כסקיפר?'}
                     </label>
                 </div>
 
