@@ -137,7 +137,7 @@ export const Login: React.FC = () => {
             className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium py-3 px-4 rounded-lg transition-colors"
         >
             <Zap size={16} className="text-yellow-400" />
-            כניסה מהירה (Dev Root)
+            כניסה ללא סיסמה (Dev Root)
         </button>
 
       </div>
