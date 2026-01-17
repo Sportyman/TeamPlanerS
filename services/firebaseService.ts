@@ -7,15 +7,14 @@ import {
   getDocs, 
   onSnapshot, 
   deleteDoc, 
-  query,
-  Firestore 
+  query 
 } from "firebase/firestore";
 import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword 
+  signInWithPopup, 
+  GoogleAuthProvider 
 } from "firebase/auth";
 import { db, auth } from "../lib/firebase";
-import { Person, BoatInventory, ClubID } from "../types";
+import { Person, BoatInventory } from "../types";
 
 /**
  * Multi-tenant structure in Firestore:
@@ -26,28 +25,22 @@ import { Person, BoatInventory, ClubID } from "../types";
 
 // --- Auth & User Management ---
 
-export const loginWithEmail = async (email: string) => {
-  const normalizedEmail = email.toLowerCase().trim();
-  const password = "password123456"; // Fixed password for demo/test purposes as requested
-
+export const loginWithGoogle = async () => {
   try {
-    // 1. Try to sign in
-    try {
-      await signInWithEmailAndPassword(auth, normalizedEmail, password);
-    } catch (authError: any) {
-      // 2. If user doesn't exist, create them
-      if (authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-credential') {
-        await createUserWithEmailAndPassword(auth, normalizedEmail, password);
-      } else {
-        throw authError;
-      }
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+    const user = result.user;
+
+    if (!user.email) {
+      throw new Error("No email returned from Google account.");
     }
 
-    // 3. Check/Create User Document in Firestore
+    const normalizedEmail = user.email.toLowerCase().trim();
     const userDocRef = doc(db, "users", normalizedEmail);
     const userDoc = await getDoc(userDocRef);
 
     if (!userDoc.exists()) {
+      // TODO: In the future, restrict this to a pre-approved list of users for security.
       const userData = {
         email: normalizedEmail,
         isAdmin: normalizedEmail === 'shaykashay@gmail.com', // Root admin logic
@@ -58,7 +51,7 @@ export const loginWithEmail = async (email: string) => {
 
     return userDoc.data() as { email: string; isAdmin: boolean };
   } catch (error) {
-    console.error("Firebase Login Error:", error);
+    console.error("Firebase Google Login Error:", error);
     throw error;
   }
 };

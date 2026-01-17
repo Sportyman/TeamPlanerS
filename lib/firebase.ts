@@ -1,5 +1,5 @@
-// Fix: Re-import initializeApp from firebase/app to ensure named exports are correctly recognized by the TypeScript compiler
-import { initializeApp } from 'firebase/app';
+// Standard modular initialization for Firebase v9+
+import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { 
   initializeFirestore, 
@@ -19,7 +19,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// האתחול החדש שכולל תמיכה באופליין (Persistence) בצורה מודרנית
+// Initializing Firestore with offline persistence support
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager()

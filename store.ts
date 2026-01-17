@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import { Person, Role, SessionState, Team, BoatInventory, BoatType, ClubID, UserPermission, Gender, DefaultBoatTypes, ClubSettings, BoatDefinition, Club } from './types';
 import { generateSmartPairings } from './services/pairingLogic';
@@ -35,7 +36,7 @@ interface AppState {
   unsubscribers: (() => void)[];
   
   // Actions
-  login: (email: string) => Promise<boolean>;
+  login: () => Promise<boolean>;
   logout: () => void;
   setActiveClub: (clubId: ClubID) => void;
   
@@ -109,9 +110,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   histories: { 'KAYAK': [], 'SAILING': [] },
   futures: { 'KAYAK': [], 'SAILING': [] },
 
-  login: async (email) => {
+  login: async () => {
     try {
-      const userData = await firebaseService.loginWithEmail(email);
+      const userData = await firebaseService.loginWithGoogle();
       set({ user: userData });
 
       // If admin, check if we need to seed initial data

@@ -1,5 +1,5 @@
 import { Person, Role, BoatInventory, Team, BoatDefinition, GenderPrefType } from '../types';
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 
 // --- Internal Helper for local algorithm (Fallback) ---
 interface Cluster {
@@ -333,12 +333,12 @@ export const generateSmartPairings = async (
   inventory: BoatInventory,
   boatDefinitions: BoatDefinition[]
 ): Promise<Team[]> => {
-  // Always initialize AI instance locally to use latest env key
+  // Always initialize AI instance locally right before making an API call to use latest env key
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
-    const prompt = `
-      As a professional boat pairing assistant, create optimal boat assignments for the following session.
+    // Separate system context for better instruction following
+    const systemInstruction = `As a professional boat pairing assistant, create optimal boat assignments for the following session.
       
       RULES:
       1. Capacity: Never exceed boat capacity.
@@ -349,8 +349,9 @@ export const generateSmartPairings = async (
          - cannotPairWith: IDs of people who MUST NOT be in the same boat.
          - genderConstraint: Strictly follow if strength is 'MUST'.
          - preferredBoatType: Try to honor if possible.
-      5. Rank: Lower rank (1-2) members need more experienced partners.
-      
+      5. Rank: Lower rank (1-2) members need more experienced partners.`;
+
+    const userPrompt = `
       DATA:
       - Participants: ${JSON.stringify(people.map(p => ({
           id: p.id,
@@ -370,10 +371,13 @@ export const generateSmartPairings = async (
       Return a JSON array of boat assignments.
     `;
 
-    const response = await ai.models.generateContent({
+    // Utilize generateContent with gemini-3-pro-preview and thinking budget for complex reasoning
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: prompt,
+      contents: userPrompt,
       config: {
+        systemInstruction: systemInstruction,
+        thinkingConfig: { thinkingBudget: 16384 },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -390,7 +394,13 @@ export const generateSmartPairings = async (
       }
     });
 
-    const parsedResults = JSON.parse(response.text || '[]');
+    const text = response.text;
+    if (!text) {
+        throw new Error("AI returned an empty response.");
+    }
+    
+    // Using trim() on text property before parsing as per guidelines
+    const parsedResults = JSON.parse(text.trim());
     
     // Map IDs back to full Person objects and generate final Team array
     return parsedResults.map((res: any) => ({

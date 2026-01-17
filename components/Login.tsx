@@ -1,159 +1,135 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAppStore, ROOT_ADMIN_EMAIL } from '../store';
-import { ShieldCheck, Mail, Zap, AlertTriangle, ArrowRight, Loader2 } from 'lucide-react';
+import { useAppStore } from '../store';
+import { ShieldCheck, AlertTriangle, ArrowRight, Loader2 } from 'lucide-react';
 import { APP_VERSION } from '../types';
 
 export const Login: React.FC = () => {
   const { login, user, activeClub, clubs } = useAppStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [emailInput, setEmailInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   const isAdminLogin = searchParams.get('admin') === 'true';
   const currentClubLabel = activeClub ? clubs.find(c => c.id === activeClub)?.label : '';
 
-  // Watch for changes in user state and redirect
+  // ניתוב אוטומטי לאחר התחברות מוצלחת
   useEffect(() => {
     if (user) {
-      // Small delay to allow the "Success" spinner to be seen and prevent flickering
       const timer = setTimeout(() => {
           if (isAdminLogin && user.isAdmin) {
               navigate('/super-admin');
           } else {
               navigate('/app');
           }
-      }, 500);
+      }, 600);
       return () => clearTimeout(timer);
     }
   }, [user, navigate, isAdminLogin]);
 
-  // Fix: handleLogin must be async to correctly handle the Promise returned by store.login
-  const handleLogin = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setIsRedirecting(true);
+  const handleGoogleLogin = async () => {
+      if (isLoading) return;
+      
+      setIsLoading(true);
       setErrorMsg('');
       
       try {
-        const success = await login(emailInput.trim());
+        const success = await login();
         
         if (!success) {
             setErrorMsg(isAdminLogin 
-              ? 'אימייל זה אינו מורשה כמנהל על.'
-              : 'אימייל זה אינו מורשה לניהול חוג זה.');
-            setIsRedirecting(false);
+              ? 'גישת מנהל נדחתה. ודא שאתה משתמש באימייל המורשה.'
+              : 'אין לך הרשאות ניהול לחוג זה.');
+            setIsLoading(false);
         }
       } catch (error) {
         console.error("Login attempt failed:", error);
-        setErrorMsg("שגיאה בתהליך ההתחברות. נסה שוב מאוחר יותר.");
-        setIsRedirecting(false);
+        setErrorMsg("ההתחברות נכשלה. ודא שחלונות קופצים מאושרים בדפדפן ונסה שוב.");
+        setIsLoading(false);
       }
   };
 
-  // Allow Super Admin shortcut for demo
-  const handleDevLogin = async () => {
-    setIsRedirecting(true);
-    await login(ROOT_ADMIN_EMAIL);
-  };
-
-  if (isRedirecting) {
-      return (
-          <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-              <div className="bg-white p-8 rounded-2xl shadow-xl flex flex-col items-center animate-in fade-in zoom-in duration-300">
-                  <Loader2 size={48} className="text-brand-600 animate-spin mb-4" />
-                  <h2 className="text-xl font-bold text-slate-800">מתחבר למערכת...</h2>
-                  <p className="text-slate-500 text-sm mt-2">אנא המתן</p>
-              </div>
-          </div>
-      );
-  }
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4 animate-in fade-in duration-500">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 space-y-6">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 md:p-10 space-y-8 border border-slate-100">
         
-        {/* Header */}
+        {/* Header Section */}
         <div className="text-center relative">
           <button 
              onClick={() => navigate('/')} 
-             className="absolute right-0 top-0 text-slate-400 hover:text-slate-600"
+             className="absolute -right-2 -top-2 p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-full transition-all"
              title="חזרה לדף הראשי"
           >
-              <ArrowRight size={20} />
+              <ArrowRight size={24} />
           </button>
           
-          <div className="w-16 h-16 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <ShieldCheck size={32} />
+          <div className="w-20 h-20 bg-brand-50 text-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-6 transform -rotate-3 shadow-inner">
+            <ShieldCheck size={40} />
           </div>
           
-          <h1 className="text-2xl font-bold text-slate-800">
-              {isAdminLogin ? 'ניהול מערכת (Super Admin)' : `כניסה - ${currentClubLabel}`}
+          <h1 className="text-3xl font-black text-slate-800 tracking-tight">
+              {isAdminLogin ? 'ניהול מערכת' : 'כניסת מנהל חוג'}
           </h1>
-          <p className="text-slate-500 mt-2 text-sm">
-              הזן את כתובת האימייל המורשית שלך
+          <p className="text-slate-500 mt-3 text-base">
+              {isAdminLogin 
+                ? 'גישה להגדרות הליבה של האפליקציה' 
+                : `ניהול שיבוצים עבור ${currentClubLabel}`}
           </p>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">אימייל</label>
-                <div className="relative">
-                    <Mail className="absolute right-3 top-3 text-slate-400" size={20} />
-                    <input 
-                        type="email" 
-                        required
-                        className="w-full pr-10 pl-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
-                        placeholder="your@email.com"
-                        value={emailInput}
-                        onChange={e => setEmailInput(e.target.value)}
-                        dir="ltr"
-                    />
-                </div>
+        {/* Error Feedback */}
+        {errorMsg && (
+            <div className="flex items-center gap-3 text-red-600 bg-red-50 p-4 rounded-xl text-sm font-medium border border-red-100 animate-in shake duration-300">
+                <AlertTriangle size={20} className="shrink-0" />
+                {errorMsg}
             </div>
+        )}
 
-            {errorMsg && (
-                <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-lg text-sm">
-                    <AlertTriangle size={16} />
-                    {errorMsg}
-                </div>
-            )}
-
+        {/* Primary Action */}
+        <div className="space-y-4">
             <button
-                type="submit"
-                className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-lg transition-colors"
+                onClick={handleGoogleLogin}
+                disabled={isLoading}
+                className={`
+                    w-full flex items-center justify-center gap-4 py-4 px-6 rounded-2xl font-bold text-lg
+                    transition-all duration-300 transform active:scale-[0.98] shadow-md
+                    ${isLoading 
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                        : 'bg-white border-2 border-slate-200 text-slate-700 hover:border-brand-500 hover:bg-slate-50 hover:shadow-lg'}
+                `}
             >
-                התחבר
+                {isLoading ? (
+                    <Loader2 size={24} className="animate-spin" />
+                ) : (
+                    <img 
+                        src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
+                        className="w-6 h-6" 
+                        alt="Google" 
+                    />
+                )}
+                <span>{isLoading ? 'מתחבר...' : 'התחבר עם Google'}</span>
             </button>
-        </form>
+            
+            <p className="text-center text-xs text-slate-400 font-medium">
+                המערכת תשתמש בחשבון ה-Google שלך כדי לאמת את זהותך
+            </p>
+        </div>
 
-        {/* Dev Mode Shortcut */}
-        <div className="relative pt-4">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-slate-400">אפשרויות פיתוח</span>
+        {/* Footer info */}
+        <div className="pt-6 border-t border-slate-100 text-center">
+            <div className="inline-flex items-center gap-2 text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                Authorized Access Only
             </div>
         </div>
 
-        <button
-            onClick={handleDevLogin}
-            className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium py-3 px-4 rounded-lg transition-colors"
-        >
-            <Zap size={16} className="text-yellow-400" />
-            כניסה ללא סיסמה (Dev Root)
-        </button>
-
       </div>
       
-      {/* Credits Footer */}
-      <div className="mt-8 text-center text-xs text-slate-400" dir="ltr">
-         <p>Version {APP_VERSION}</p>
-         <p className="mt-1">Built by Shay Kalimi - @Shay.A.i</p>
+      {/* Credits / Metadata */}
+      <div className="mt-10 text-center space-y-1">
+         <p className="text-slate-400 text-xs font-mono">Build v{APP_VERSION}</p>
+         <p className="text-slate-300 text-[10px]">Architecture by @Shay.A.i</p>
       </div>
     </div>
   );
