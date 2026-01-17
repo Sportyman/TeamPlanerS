@@ -118,7 +118,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <div className="flex items-center gap-3 z-20">
               <div className="hidden sm:flex flex-col items-end">
                   <span className="text-xs md:text-sm text-slate-500">{user?.email}</span>
-                  <span className="text-[10px] text-slate-300">v{APP_VERSION}</span>
               </div>
               <button onClick={handleLogout} className="text-slate-400 hover:text-red-500 p-2" title="התנתק ויציאה">
                 <LogOut size={20} />
@@ -161,38 +160,18 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {children}
       </main>
 
-      <footer className="py-6 text-center text-xs text-slate-400 print:hidden border-t border-slate-100 mt-auto" dir="ltr">
-         Built by Shay Kalimi - @Shay.A.i
+      <footer className="py-8 text-center border-t border-slate-100 mt-auto bg-white/50" dir="ltr">
+         <div className="text-xs text-slate-400 opacity-70">Built by Shay Kalimi - @Shay.A.i</div>
+         <div className="text-[10px] font-bold text-slate-300 mt-1.5 uppercase tracking-[0.2em]">v{APP_VERSION}</div>
       </footer>
     </div>
   );
 };
 
-const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { logout, user } = useAppStore();
-    const navigate = useNavigate();
-    return (
-        <div className="min-h-screen bg-slate-100 flex flex-col">
-             <nav className="bg-slate-800 text-white p-4 shadow-md">
-                 <div className="max-w-7xl mx-auto flex justify-between items-center">
-                     <div className="font-bold text-xl hidden sm:block">אתגרים: ניהול על</div>
-                     <div className="font-bold text-xl sm:hidden">ניהול על</div>
-                     <div className="flex gap-4 items-center">
-                         <span className="text-sm opacity-70 hidden sm:inline">{user?.email}</span>
-                         <button onClick={() => { logout(); navigate('/'); }} className="hover:text-red-300"><LogOut size={18} /></button>
-                     </div>
-                 </div>
-             </nav>
-             <main className="p-4 flex-1 max-w-7xl mx-auto w-full">
-                 {children}
-             </main>
-             <footer className="py-6 text-center text-xs text-slate-400 border-t border-slate-200" dir="ltr">
-                Built by Shay Kalimi - @Shay.A.i
-             </footer>
-        </div>
-    );
-};
-
+/**
+ * Main App Component
+ * Handles routing for the entire application.
+ */
 const App: React.FC = () => {
   return (
     <Router>
@@ -200,9 +179,25 @@ const App: React.FC = () => {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/share" element={<PublicPairingView />} />
-        <Route path="/app" element={<ProtectedAppRoute><Layout><SessionManager /></Layout></ProtectedAppRoute>} />
-        <Route path="/app/manage" element={<ProtectedAppRoute><Layout><Dashboard /></Layout></ProtectedAppRoute>} />
-        <Route path="/super-admin" element={<SuperAdminRoute><AdminLayout><SuperAdminDashboard /></AdminLayout></SuperAdminRoute>} />
+        <Route path="/super-admin" element={
+          <SuperAdminRoute>
+            <SuperAdminDashboard />
+          </SuperAdminRoute>
+        } />
+        <Route path="/app" element={
+          <ProtectedAppRoute>
+            <Layout>
+              <SessionManager />
+            </Layout>
+          </ProtectedAppRoute>
+        } />
+        <Route path="/app/manage" element={
+          <ProtectedAppRoute>
+            <Layout>
+              <Dashboard />
+            </Layout>
+          </ProtectedAppRoute>
+        } />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>

@@ -20,31 +20,23 @@ export const SAILING_DEFINITIONS: BoatDefinition[] = [
   { id: 'zodiac', label: 'סירת ליווי', isStable: false, capacity: 3, defaultCount: 1, minSkippers: 1 },
 ];
 
-// --- INITIAL PEOPLE (DUMMY DATA) ---
-export const INITIAL_PEOPLE: Person[] = [
-    // Kayak - Volunteers & Instructors
-    { id: 'k1', clubId: 'KAYAK', name: 'דורון שמעוני', gender: Gender.MALE, role: Role.INSTRUCTOR, rank: 5, phone: '050-1111111', notes: 'מדריך ראשי', tags: ['מדריך', 'סמכות מקצועית'], isSkipper: true },
-    { id: 'k2', clubId: 'KAYAK', name: 'ענת לביא', gender: Gender.FEMALE, role: Role.VOLUNTEER, rank: 4, phone: '050-2222222', tags: [] },
-    { id: 'k3', clubId: 'KAYAK', name: 'יואב גל', gender: Gender.MALE, role: Role.INSTRUCTOR, rank: 5, phone: '050-3333333', tags: ['חובש', 'מדריך'], isSkipper: true },
-    { id: 'k4', clubId: 'KAYAK', name: 'מיכל אהרוני', gender: Gender.FEMALE, role: Role.VOLUNTEER, rank: 3, phone: '050-4444444', tags: [] },
-    // Kayak - Members
-    { id: 'k5', clubId: 'KAYAK', name: 'דניאל אברהמי', gender: Gender.MALE, role: Role.MEMBER, rank: 1, phone: '052-5555555', notes: 'צריך תמיכה בגב', tags: ['מנוף'] },
-    { id: 'k6', clubId: 'KAYAK', name: 'רונית כהן', gender: Gender.FEMALE, role: Role.MEMBER, rank: 2, phone: '052-6666666', tags: [] },
-    { id: 'k7', clubId: 'KAYAK', name: 'אבי לוי', gender: Gender.MALE, role: Role.MEMBER, rank: 3, phone: '052-7777777', tags: [], preferPairWith: ['k9'] },
-    { id: 'k8', clubId: 'KAYAK', name: 'שרה נתניהו', gender: Gender.FEMALE, role: Role.MEMBER, rank: 1, phone: '052-8888888', tags: ['מנוף', 'שומרת נגיעה'], genderConstraint: { type: 'FEMALE', strength: 'MUST' } },
-    { id: 'k9', clubId: 'KAYAK', name: 'יוסי בניון', gender: Gender.MALE, role: Role.MEMBER, rank: 4, phone: '052-9999999', tags: ['חותר עצמאי'] },
-    { id: 'k10', clubId: 'KAYAK', name: 'נועה קירל', gender: Gender.FEMALE, role: Role.MEMBER, rank: 2, phone: '053-1234567', tags: [] },
+const SAMPLE_TAG = 'קבוצה לדוגמה';
 
-    // Sailing - Volunteers
-    { id: 's1', clubId: 'SAILING', name: 'גיורא איילנד', gender: Gender.MALE, role: Role.INSTRUCTOR, rank: 5, phone: '054-1111111', tags: ['סקיפר'], isSkipper: true },
-    { id: 's2', clubId: 'SAILING', name: 'תמר זנדברג', gender: Gender.FEMALE, role: Role.VOLUNTEER, rank: 4, phone: '054-2222222', tags: ['סקיפר'], isSkipper: true },
-    { id: 's3', clubId: 'SAILING', name: 'עופר שלח', gender: Gender.MALE, role: Role.VOLUNTEER, rank: 3, phone: '054-3333333', tags: ['איש צוות'] },
-    { id: 's4', clubId: 'SAILING', name: 'מרב מיכאלי', gender: Gender.FEMALE, role: Role.VOLUNTEER, rank: 5, phone: '054-4444444', tags: ['סקיפר'], isSkipper: true, genderConstraint: { type: 'FEMALE', strength: 'PREFER' } },
-    // Sailing - Members
-    { id: 's5', clubId: 'SAILING', name: 'נורית פלד', gender: Gender.FEMALE, role: Role.MEMBER, rank: 2, phone: '055-5555555', tags: [] },
-    { id: 's6', clubId: 'SAILING', name: 'אמיר חצרוני', gender: Gender.MALE, role: Role.MEMBER, rank: 3, phone: '055-6666666', tags: [], cannotPairWith: ['s8'] },
-    { id: 's7', clubId: 'SAILING', name: 'גלית גוטמן', gender: Gender.FEMALE, role: Role.MEMBER, rank: 1, phone: '055-7777777', tags: ['כסא גלגלים'] },
-    { id: 's8', clubId: 'SAILING', name: 'אייל ברקוביץ', gender: Gender.MALE, role: Role.MEMBER, rank: 4, phone: '055-8888888', tags: ['חותר חזק'] },
-    { id: 's9', clubId: 'SAILING', name: 'אופירה אסייג', gender: Gender.FEMALE, role: Role.MEMBER, rank: 2, phone: '055-9999999', tags: [] },
-    { id: 's10', clubId: 'SAILING', name: 'רני רהב', gender: Gender.MALE, role: Role.MEMBER, rank: 1, phone: '058-1234567', tags: [] },
+// --- INITIAL PEOPLE (SUPERHEROES DATA) ---
+export const INITIAL_PEOPLE: Person[] = [
+    // --- KAYAK ---
+    { id: 'k1', clubId: 'KAYAK', name: 'ברוס ויין (באטמן)', gender: Gender.MALE, role: Role.INSTRUCTOR, rank: 5, phone: '050-9999999', notes: 'בעל סירה פרטית', tags: [SAMPLE_TAG, 'סקיפר'], isSkipper: true },
+    { id: 'k2', clubId: 'KAYAK', name: 'קלארק קנט (סופרמן)', gender: Gender.MALE, role: Role.VOLUNTEER, rank: 5, phone: '050-8888888', tags: [SAMPLE_TAG, 'חזק מאוד'] },
+    { id: 'k3', clubId: 'KAYAK', name: 'דיאנה פרינס (וונדר וומן)', gender: Gender.FEMALE, role: Role.INSTRUCTOR, rank: 5, phone: '050-7777777', tags: [SAMPLE_TAG, 'סקיפר'], isSkipper: true },
+    { id: 'k4', clubId: 'KAYAK', name: 'בארי אלן (פלאש)', gender: Gender.MALE, role: Role.MEMBER, rank: 2, phone: '052-1111111', tags: [SAMPLE_TAG], notes: 'חותר מהיר במיוחד' },
+    { id: 'k5', clubId: 'KAYAK', name: 'ארתור קורי (אקוומן)', gender: Gender.MALE, role: Role.MEMBER, rank: 4, phone: '052-2222222', tags: [SAMPLE_TAG], notes: 'מרגיש בבית במים' },
+    { id: 'k6', clubId: 'KAYAK', name: 'פיטר פארקר (ספיידרמן)', gender: Gender.MALE, role: Role.GUEST, rank: 3, phone: '053-3333333', tags: [SAMPLE_TAG], notes: 'אורח מהעיר הגדולה' },
+
+    // --- SAILING ---
+    { id: 's1', clubId: 'SAILING', name: 'טוני סטארק (איירון מן)', gender: Gender.MALE, role: Role.INSTRUCTOR, rank: 5, phone: '054-9999999', tags: [SAMPLE_TAG, 'טכנולוגי'], isSkipper: true },
+    { id: 's2', clubId: 'SAILING', name: "סטיב רוג'רס (קפטן אמריקה)", gender: Gender.MALE, role: Role.VOLUNTEER, rank: 5, phone: '054-8888888', tags: [SAMPLE_TAG, 'מנהיג'] },
+    { id: 's3', clubId: 'SAILING', name: 'נטשה רומנוף (האלמנה השחורה)', gender: Gender.FEMALE, role: Role.INSTRUCTOR, rank: 5, phone: '054-7777777', tags: [SAMPLE_TAG, 'סקיפר'], isSkipper: true },
+    { id: 's4', clubId: 'SAILING', name: "וונדה מקסימוף (סקרלט וויץ')", gender: Gender.FEMALE, role: Role.MEMBER, rank: 2, phone: '055-1111111', tags: [SAMPLE_TAG] },
+    { id: 's5', clubId: 'SAILING', name: 'תור (אל הרעם)', gender: Gender.MALE, role: Role.MEMBER, rank: 4, phone: '055-2222222', tags: [SAMPLE_TAG], notes: 'צריך משוט כבד' },
+    { id: 's6', clubId: 'SAILING', name: 'לוקי', gender: Gender.MALE, role: Role.GUEST, rank: 1, phone: '058-3333333', tags: [SAMPLE_TAG], notes: 'אורח שובב' },
 ];

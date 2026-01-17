@@ -34,9 +34,6 @@ export const LandingPage: React.FC = () => {
                 אתגרים - מערכת שיבוץ
               </h1>
               <p className="text-lg md:text-xl text-slate-500 font-light">בחר חוג לכניסה</p>
-              <div className="inline-block bg-white/50 backdrop-blur px-3 py-1 rounded-full border border-slate-200 text-[10px] font-bold text-slate-400">
-                v{APP_VERSION}
-              </div>
             </div>
 
             {/* Dynamic Club Selection - Centered Flex Layout */}
@@ -71,9 +68,12 @@ export const LandingPage: React.FC = () => {
           </div>
       </div>
       
-      {/* Credits Footer */}
-      <footer className="w-full py-4 text-center text-xs text-slate-400 opacity-60" dir="ltr">
-         Built by Shay Kalimi - @Shay.A.i
+      {/* Credits Footer with Version */}
+      <footer className="w-full py-8 text-center" dir="ltr">
+         <div className="text-xs text-slate-400 opacity-70">Built by Shay Kalimi - @Shay.A.i</div>
+         <div className="text-[10px] font-bold text-slate-300 mt-1.5 uppercase tracking-[0.2em]">
+            v{APP_VERSION}
+         </div>
       </footer>
     </div>
   );
