@@ -1,8 +1,9 @@
+
+// Fix: Use standard modular imports for Firebase v9+ to resolve 'initializeApp' export issue
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, enableMultiTabIndexedDbPersistence } from "firebase/firestore";
 
-// Firebase configuration for the "etgarim-database" project
 const firebaseConfig = {
   apiKey: "AIzaSyCYGI1blVRY6ZIZSDTfST66aL_FQeBgvUk",
   authDomain: "etgarim-database.firebaseapp.com",
@@ -12,7 +13,16 @@ const firebaseConfig = {
   appId: "1:969970671528:web:7541abb86fc80a3bdc879d"
 };
 
-// Initialize Firebase
+// Initialize Firebase instance
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// Enable Offline Persistence for robust use in field conditions
+enableMultiTabIndexedDbPersistence(db).catch((err) => {
+  if (err.code === 'failed-precondition') {
+      console.warn('Persistence failed: Multiple tabs open');
+  } else if (err.code === 'unimplemented') {
+      console.warn('Persistence not supported by browser');
+  }
+});

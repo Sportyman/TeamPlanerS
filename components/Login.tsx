@@ -31,24 +31,32 @@ export const Login: React.FC = () => {
     }
   }, [user, navigate, isAdminLogin]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Fix: handleLogin must be async to correctly handle the Promise returned by store.login
+  const handleLogin = async (e: React.FormEvent) => {
       e.preventDefault();
-      const success = login(emailInput.trim());
+      setIsRedirecting(true);
+      setErrorMsg('');
       
-      if (success) {
-          setIsRedirecting(true); // Trigger loading view
-      } else {
-          setErrorMsg(isAdminLogin 
-            ? 'אימייל זה אינו מורשה כמנהל על.'
-            : 'אימייל זה אינו מורשה לניהול חוג זה.');
+      try {
+        const success = await login(emailInput.trim());
+        
+        if (!success) {
+            setErrorMsg(isAdminLogin 
+              ? 'אימייל זה אינו מורשה כמנהל על.'
+              : 'אימייל זה אינו מורשה לניהול חוג זה.');
             setIsRedirecting(false);
+        }
+      } catch (error) {
+        console.error("Login attempt failed:", error);
+        setErrorMsg("שגיאה בתהליך ההתחברות. נסה שוב מאוחר יותר.");
+        setIsRedirecting(false);
       }
   };
 
   // Allow Super Admin shortcut for demo
-  const handleDevLogin = () => {
-    const success = login(ROOT_ADMIN_EMAIL);
-    if (success) setIsRedirecting(true);
+  const handleDevLogin = async () => {
+    setIsRedirecting(true);
+    await login(ROOT_ADMIN_EMAIL);
   };
 
   if (isRedirecting) {
