@@ -8,7 +8,7 @@ import {
 import { generateSmartPairings } from './services/pairingLogic';
 import { DEFAULT_CLUBS, INITIAL_PEOPLE, KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from './mockData';
 import { auth, googleProvider } from './firebase';
-import { signInWithPopup, signOut, User } from 'firebase/auth';
+import { signInWithPopup, signOut } from 'firebase/auth';
 
 export const ROOT_ADMIN_EMAIL = 'shaykashay@gmail.com';
 
@@ -82,7 +82,7 @@ interface AppState {
   removeMemberFromTeam: (teamId: string, personId: string) => void;
   moveMemberToTeam: (personId: string, targetTeamId: string) => void;
   reorderSessionMembers: (sourceTeamId: string, sourceIndex: number, destTeamId: string, destIndex: number) => void;
-  swapMembers: (teamAId: string, indexA: number, teamBId: number, indexB: number) => void;
+  swapMembers: (teamAId: string, indexA: number, teamBId: string, indexB: number) => void;
   updateTeamBoatType: (teamId: string, boatType: BoatType) => void;
   
   undo: () => void;
