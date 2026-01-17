@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
 import { Team, Role, getRoleLabel, BoatType, TEAM_COLORS, Person } from '../types';
-import { GripVertical, AlertTriangle, ArrowRightLeft, Check, Printer, Share2, Link as LinkIcon, Eye, Send, RotateCcw, RotateCw, Star, Shuffle, X, Plus, Trash2, Search, UserPlus, Lock, ShieldCheck, Heart, UserX, Shield, ShipWheel } from 'lucide-react';
+import { GripVertical, AlertTriangle, ArrowRightLeft, Check, Printer, Share2, Link as LinkIcon, Eye, Send, RotateCcw, RotateCw, Star, Shuffle, X, Plus, Trash2, Search, UserPlus, Lock, ShieldCheck, Heart, UserX, Shield, ShipWheel, Loader2 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 // Pairing Board Component
@@ -29,6 +28,7 @@ export const PairingBoard: React.FC = () => {
   
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [swapSource, setSwapSource] = useState<{ teamId: string, index: number } | null>(null);
+  const [isRemixing, setIsRemixing] = useState(false);
 
   // Modal State for Adding Members
   const [addMemberModal, setAddMemberModal] = useState<{ isOpen: boolean, teamId: string | null }>({ isOpen: false, teamId: null });
@@ -85,9 +85,14 @@ export const PairingBoard: React.FC = () => {
     window.print();
   };
 
-  const handleRemix = () => {
+  const handleRemix = async () => {
     if (confirm('האם אתה בטוח שברצונך לערבב מחדש? השיבוץ הנוכחי יוחלף.')) {
-        runPairing();
+        setIsRemixing(true);
+        try {
+          await runPairing();
+        } finally {
+          setIsRemixing(false);
+        }
     }
   };
 
@@ -308,8 +313,16 @@ export const PairingBoard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-20"> 
+    <div className="space-y-6 pb-20 relative"> 
       
+      {isRemixing && (
+         <div className="fixed inset-0 z-[110] bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-300">
+            <Loader2 size={64} className="text-brand-600 animate-spin mb-4" />
+            <h3 className="text-2xl font-bold text-slate-800">ה-AI בונה שיבוץ חדש...</h3>
+            <p className="text-slate-500 mt-2">אנא המתינו לסיום העיבוד</p>
+         </div>
+      )}
+
       {/* Share Modal */}
       {showShareMenu && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200" onClick={() => setShowShareMenu(false)}>
@@ -489,8 +502,9 @@ export const PairingBoard: React.FC = () => {
             
             <div className="flex gap-2 w-full md:w-auto">
                <button
+                  disabled={isRemixing}
                   onClick={handleRemix}
-                  className="p-2 rounded-lg border border-slate-200 text-brand-600 hover:bg-brand-50"
+                  className="p-2 rounded-lg border border-slate-200 text-brand-600 hover:bg-brand-50 disabled:opacity-50"
                   title="ערבב מחדש"
                >
                  <Shuffle size={18} />
@@ -498,14 +512,14 @@ export const PairingBoard: React.FC = () => {
                <div className="w-px bg-slate-200 mx-1"></div>
                <button
                   onClick={undo}
-                  disabled={!history || history.length === 0}
+                  disabled={!history || history.length === 0 || isRemixing}
                   className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed"
                >
                  <RotateCcw size={18} />
                </button>
                <button
                   onClick={redo}
-                  disabled={!future || future.length === 0}
+                  disabled={!future || future.length === 0 || isRemixing}
                   className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed"
                >
                  <RotateCw size={18} />
@@ -592,8 +606,8 @@ export const PairingBoard: React.FC = () => {
                             <AlertTriangle size={20} />
                           </div>
                           <div className="absolute top-full right-0 mt-2 w-48 p-2 bg-white border border-slate-200 text-slate-800 text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                             {isOverCapacity && <div className="text-red-600 font-bold mb-1">חריגה מקיבולת ({team.members.length}/{capacity})</div>}
-                             {isMissingSkipper && <div className="text-red-600 font-bold mb-1">חסר סקיפר ({currentSkippers}/{minSkippers})</div>}
+                             {isOverCapacity && <div className="text-red-600 font-bold mb-1">חריגה מקיבולת (${team.members.length}/${capacity})</div>}
+                             {isMissingSkipper && <div className="text-red-600 font-bold mb-1">חסר סקיפר (${currentSkippers}/${minSkippers})</div>}
                              {team.warnings?.join(', ')}
                           </div>
                         </div>
