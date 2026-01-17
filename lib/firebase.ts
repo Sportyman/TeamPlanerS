@@ -1,6 +1,7 @@
 
 // Fix: Use standard modular imports for Firebase v9+ to resolve 'initializeApp' export issue
-import { initializeApp } from "firebase/app";
+// Standard named import for initializeApp from the modular Firebase app package
+import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
 
