@@ -6,6 +6,21 @@ export enum Role {
   GUEST = 'GUEST',
 }
 
+export type RoleColor = 'cyan' | 'orange' | 'purple' | 'emerald' | 'blue' | 'indigo' | 'pink' | 'slate' | 'red' | 'amber';
+
+export const RoleColorClasses: Record<RoleColor, { bg: string, text: string, border: string, ring: string, badge: string }> = {
+    cyan: { bg: 'bg-cyan-50', text: 'text-cyan-900', border: 'border-cyan-500', ring: 'ring-cyan-500', badge: 'bg-cyan-100 text-cyan-800' },
+    orange: { bg: 'bg-orange-50', text: 'text-orange-900', border: 'border-orange-500', ring: 'ring-orange-500', badge: 'bg-orange-100 text-orange-800' },
+    purple: { bg: 'bg-purple-50', text: 'text-purple-900', border: 'border-purple-500', ring: 'ring-purple-500', badge: 'bg-purple-100 text-purple-800' },
+    emerald: { bg: 'bg-emerald-50', text: 'text-emerald-900', border: 'border-emerald-500', ring: 'ring-emerald-500', badge: 'bg-emerald-100 text-emerald-800' },
+    blue: { bg: 'bg-blue-50', text: 'text-blue-900', border: 'border-blue-500', ring: 'ring-blue-500', badge: 'bg-blue-100 text-blue-800' },
+    indigo: { bg: 'bg-indigo-50', text: 'text-indigo-900', border: 'border-indigo-500', ring: 'ring-indigo-500', badge: 'bg-indigo-100 text-indigo-800' },
+    pink: { bg: 'bg-pink-50', text: 'text-pink-900', border: 'border-pink-500', ring: 'ring-pink-500', badge: 'bg-pink-100 text-pink-800' },
+    slate: { bg: 'bg-slate-50', text: 'text-slate-900', border: 'border-slate-500', ring: 'ring-slate-500', badge: 'bg-slate-100 text-slate-800' },
+    red: { bg: 'bg-red-50', text: 'text-red-900', border: 'border-red-500', ring: 'ring-red-500', badge: 'bg-red-100 text-red-800' },
+    amber: { bg: 'bg-amber-50', text: 'text-amber-900', border: 'border-amber-500', ring: 'ring-amber-500', badge: 'bg-amber-100 text-amber-800' },
+};
+
 export const getRoleLabel = (role: Role, gender: Gender): string => {
     const labels: Record<Role, { [key in Gender]: string }> = {
         [Role.INSTRUCTOR]: { [Gender.MALE]: 'מדריך', [Gender.FEMALE]: 'מדריכה' },
@@ -76,6 +91,7 @@ export interface Club {
 
 export interface ClubSettings {
   boatDefinitions: BoatDefinition[];
+  roleColors?: Record<Role, RoleColor>;
 }
 
 export interface UserPermission {
@@ -90,7 +106,7 @@ export interface PersonSnapshot {
   people: Person[];
 }
 
-export const APP_VERSION = '3.1.6'; 
+export const APP_VERSION = '3.3.0'; 
 
 export const TEAM_COLORS = [
   'bg-blue-50 border-blue-200',      
@@ -129,6 +145,9 @@ export interface Person {
   mustPairWith?: string[];   
   preferPairWith?: string[]; 
   cannotPairWith?: string[]; 
+  // Metadata for future scaling
+  createdAt?: string;
+  lastParticipation?: string;
 }
 
 export interface Team {

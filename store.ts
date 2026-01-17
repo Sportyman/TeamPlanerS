@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { 
   Person, Role, SessionState, Team, BoatInventory, BoatType, ClubID, UserPermission, 
-  Gender, DefaultBoatTypes, ClubSettings, BoatDefinition, Club, SyncStatus, PersonSnapshot 
+  Gender, DefaultBoatTypes, ClubSettings, BoatDefinition, Club, SyncStatus, PersonSnapshot, RoleColor
 } from './types';
 import { generateSmartPairings } from './services/pairingLogic';
 import { DEFAULT_CLUBS, INITIAL_PEOPLE, KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from './mockData';
@@ -20,11 +20,19 @@ const createInventoryFromDefs = (defs: BoatDefinition[]): BoatInventory => {
 
 const EMPTY_SESSION = { inventory: {}, presentPersonIds: [], teams: [] };
 
+const DEFAULT_ROLE_COLORS: Record<Role, RoleColor> = {
+    [Role.INSTRUCTOR]: 'cyan',
+    [Role.VOLUNTEER]: 'orange',
+    [Role.MEMBER]: 'purple',
+    [Role.GUEST]: 'emerald'
+};
+
 interface AppState {
   user: { email: string; isAdmin: boolean; photoURL?: string } | null;
   activeClub: ClubID | null;
   pairingDirty: boolean; 
   syncStatus: SyncStatus;
+  lastSyncTime: string | null;
   
   clubs: Club[];
   superAdmins: string[]; 
@@ -54,7 +62,7 @@ interface AppState {
   removePermission: (email: string, clubId: ClubID) => void;
   
   // Data actions
-  setCloudData: (data: { people: Person[], sessions: Record<ClubID, SessionState>, settings: Record<ClubID, ClubSettings>, snapshots?: Record<ClubID, PersonSnapshot[]> }) => void;
+  setCloudData: (data: { people: Person[], sessions: Record<ClubID, SessionState>, settings: Record<ClubID, ClubSettings>, snapshots?: Record<ClubID, PersonSnapshot[]>, lastUpdated?: string }) => void;
   addPerson: (person: Omit<Person, 'clubId'>) => void;
   updatePerson: (person: Person) => void;
   removePerson: (id: string) => void;
@@ -73,11 +81,12 @@ interface AppState {
   setBulkAttendance: (ids: string[]) => void;
   updateInventory: (inventory: BoatInventory) => void;
   
-  // Boat Definitions
+  // Settings
   addBoatDefinition: (def: BoatDefinition) => void;
   updateBoatDefinition: (def: BoatDefinition) => void;
   removeBoatDefinition: (boatId: string) => void;
   saveBoatDefinitions: (defs: BoatDefinition[]) => void;
+  updateRoleColor: (role: Role, color: RoleColor) => void;
 
   runPairing: () => void;
   resetSession: () => void;
@@ -104,6 +113,7 @@ export const useAppStore = create<AppState>()(
       activeClub: null,
       pairingDirty: false,
       syncStatus: 'OFFLINE',
+      lastSyncTime: null,
       
       clubs: DEFAULT_CLUBS,
       superAdmins: [ROOT_ADMIN_EMAIL],
@@ -116,8 +126,8 @@ export const useAppStore = create<AppState>()(
       },
       
       clubSettings: {
-        'KAYAK': { boatDefinitions: KAYAK_DEFINITIONS },
-        'SAILING': { boatDefinitions: SAILING_DEFINITIONS },
+        'KAYAK': { boatDefinitions: KAYAK_DEFINITIONS, roleColors: { ...DEFAULT_ROLE_COLORS } },
+        'SAILING': { boatDefinitions: SAILING_DEFINITIONS, roleColors: { ...DEFAULT_ROLE_COLORS } },
       },
 
       snapshots: {},
@@ -155,8 +165,6 @@ export const useAppStore = create<AppState>()(
         const normalizedEmail = email.toLowerCase().trim();
         const { superAdmins } = get();
         const isSuperAdmin = normalizedEmail === ROOT_ADMIN_EMAIL.toLowerCase() || superAdmins.some(a => a.toLowerCase() === normalizedEmail);
-        
-        // Allow any email for dev login for now
         set({ user: { email: normalizedEmail, isAdmin: isSuperAdmin } });
         return true;
       },
@@ -171,16 +179,16 @@ export const useAppStore = create<AppState>()(
         sessions: { ...state.sessions, ...data.sessions },
         clubSettings: { ...state.clubSettings, ...data.settings },
         snapshots: data.snapshots ? { ...state.snapshots, ...data.snapshots } : state.snapshots,
+        lastSyncTime: data.lastUpdated || state.lastSyncTime,
         syncStatus: 'SYNCED'
       })),
 
-      // --- Super Admin Actions ---
       addClub: (label) => set(state => {
           const newId = 'CLUB-' + Date.now();
           const newClub: Club = { id: newId, label };
           return {
               clubs: [...state.clubs, newClub],
-              clubSettings: { ...state.clubSettings, [newId]: { boatDefinitions: [] } },
+              clubSettings: { ...state.clubSettings, [newId]: { boatDefinitions: [], roleColors: { ...DEFAULT_ROLE_COLORS } } },
               sessions: { ...state.sessions, [newId]: { ...EMPTY_SESSION } },
               histories: { ...state.histories, [newId]: [] },
               futures: { ...state.futures, [newId]: [] }
@@ -230,7 +238,11 @@ export const useAppStore = create<AppState>()(
 
       addPerson: (personData) => set((state) => {
         if (!state.activeClub) return state;
-        const newPerson: Person = { ...personData, clubId: state.activeClub };
+        const newPerson: Person = { 
+            ...personData, 
+            clubId: state.activeClub,
+            createdAt: new Date().toISOString()
+        };
         return { 
           people: [...state.people, newPerson],
           pairingDirty: true 
@@ -261,8 +273,8 @@ export const useAppStore = create<AppState>()(
           clubs: DEFAULT_CLUBS,
           people: INITIAL_PEOPLE,
           clubSettings: {
-             'KAYAK': { boatDefinitions: KAYAK_DEFINITIONS },
-             'SAILING': { boatDefinitions: SAILING_DEFINITIONS }
+             'KAYAK': { boatDefinitions: KAYAK_DEFINITIONS, roleColors: { ...DEFAULT_ROLE_COLORS } },
+             'SAILING': { boatDefinitions: SAILING_DEFINITIONS, roleColors: { ...DEFAULT_ROLE_COLORS } }
           },
           sessions: {
             'KAYAK': { ...EMPTY_SESSION, inventory: createInventoryFromDefs(KAYAK_DEFINITIONS) },
@@ -277,7 +289,10 @@ export const useAppStore = create<AppState>()(
           const clubId = state.activeClub;
           if (!clubId) return state;
           const otherPeople = state.people.filter(p => p.clubId !== clubId);
-          const demoPeople = INITIAL_PEOPLE.filter(p => p.clubId === clubId);
+          const demoPeople = INITIAL_PEOPLE.filter(p => p.clubId === clubId).map(p => ({
+              ...p,
+              createdAt: new Date().toISOString()
+          }));
           return {
               people: [...otherPeople, ...demoPeople],
               pairingDirty: true
@@ -298,7 +313,7 @@ export const useAppStore = create<AppState>()(
           }));
           return {
               people: [...otherPeople, ...importedPeople],
-              clubSettings: { ...state.clubSettings, [currentClubId]: data.settings || { boatDefinitions: [] } },
+              clubSettings: { ...state.clubSettings, [currentClubId]: data.settings || { boatDefinitions: [], roleColors: { ...DEFAULT_ROLE_COLORS } } },
               sessions: { ...state.sessions, [currentClubId]: data.session || EMPTY_SESSION },
               snapshots: data.snapshots ? { ...state.snapshots, [currentClubId]: data.snapshots } : state.snapshots,
               pairingDirty: true
@@ -352,7 +367,13 @@ export const useAppStore = create<AppState>()(
         const currentSession = state.sessions[activeClub];
         const isPresent = currentSession.presentPersonIds.includes(id);
         const newPresent = isPresent ? currentSession.presentPersonIds.filter(pid => pid !== id) : [...currentSession.presentPersonIds, id];
-        return { sessions: { ...state.sessions, [activeClub]: { ...currentSession, presentPersonIds: newPresent } } };
+        
+        const newPeople = state.people.map(p => p.id === id ? { ...p, lastParticipation: new Date().toISOString() } : p);
+
+        return { 
+            people: newPeople,
+            sessions: { ...state.sessions, [activeClub]: { ...currentSession, presentPersonIds: newPresent } } 
+        };
       }),
 
       setBulkAttendance: (ids) => set((state) => {
@@ -423,6 +444,16 @@ export const useAppStore = create<AppState>()(
           };
       }),
 
+      updateRoleColor: (role, color) => set((state) => {
+          const { activeClub } = state;
+          if (!activeClub) return state;
+          const currentSettings = state.clubSettings[activeClub];
+          const newColors = { ...currentSettings.roleColors, [role]: color };
+          return {
+              clubSettings: { ...state.clubSettings, [activeClub]: { ...currentSettings, roleColors: newColors } }
+          };
+      }),
+
       runPairing: () => {
         const { people, activeClub, sessions, clubSettings } = get();
         if (!activeClub) return;
@@ -484,7 +515,8 @@ export const useAppStore = create<AppState>()(
             rank: 1,
             gender: Gender.MALE,
             tags: [],
-            notes: 'הוסף ידנית'
+            notes: 'הוסף ידנית',
+            createdAt: new Date().toISOString()
         };
         const newTeams = currentSession.teams.map(t => t.id === teamId ? { ...t, members: [...t.members, newGuest] } : t);
         set((state) => ({
@@ -604,7 +636,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'etgarim-storage',
-      version: 21.0, 
+      version: 23.0, 
       partialize: (state) => ({
         user: state.user,
         people: state.people,
@@ -614,7 +646,8 @@ export const useAppStore = create<AppState>()(
         clubs: state.clubs,
         superAdmins: state.superAdmins,
         pairingDirty: state.pairingDirty,
-        snapshots: state.snapshots
+        snapshots: state.snapshots,
+        lastSyncTime: state.lastSyncTime
       })
     }
   )
