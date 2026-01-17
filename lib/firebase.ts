@@ -1,11 +1,11 @@
 // Standard modular initialization for Firebase v9+
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
 import { 
   initializeFirestore, 
   persistentLocalCache, 
   persistentMultipleTabManager 
-} from "firebase/firestore";
+} from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCYGI1blVRY6ZIZSDTfST66aL_FQeBgvUk",
