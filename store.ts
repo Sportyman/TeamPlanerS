@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { 
   Person, Role, SessionState, Team, BoatInventory, BoatType, ClubID, UserPermission, 
-  Gender, DefaultBoatTypes, ClubSettings, BoatDefinition, Club, SyncStatus 
+  Gender, DefaultBoatTypes, ClubSettings, BoatDefinition, Club, SyncStatus, PersonSnapshot 
 } from './types';
 import { generateSmartPairings } from './services/pairingLogic';
 import { DEFAULT_CLUBS, INITIAL_PEOPLE, KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from './mockData';
@@ -33,6 +33,7 @@ interface AppState {
   people: Person[];
   sessions: Record<ClubID, SessionState>;
   clubSettings: Record<ClubID, ClubSettings>;
+  snapshots: Record<ClubID, PersonSnapshot[]>;
   histories: Record<ClubID, Team[][]>;
   futures: Record<ClubID, Team[][]>;
   
@@ -53,13 +54,19 @@ interface AppState {
   removePermission: (email: string, clubId: ClubID) => void;
   
   // Data actions
-  setCloudData: (data: { people: Person[], sessions: Record<ClubID, SessionState>, settings: Record<ClubID, ClubSettings> }) => void;
+  setCloudData: (data: { people: Person[], sessions: Record<ClubID, SessionState>, settings: Record<ClubID, ClubSettings>, snapshots?: Record<ClubID, PersonSnapshot[]> }) => void;
   addPerson: (person: Omit<Person, 'clubId'>) => void;
   updatePerson: (person: Person) => void;
   removePerson: (id: string) => void;
   restoreDemoData: () => void;
+  loadDemoForActiveClub: () => void;
   importClubData: (data: any) => void;
   
+  // Snapshots
+  saveSnapshot: (name: string) => void;
+  loadSnapshot: (snapshotId: string) => void;
+  deleteSnapshot: (snapshotId: string) => void;
+
   // Session Management
   toggleAttendance: (id: string) => void;
   setBulkAttendance: (ids: string[]) => void;
@@ -112,6 +119,7 @@ export const useAppStore = create<AppState>()(
         'SAILING': { boatDefinitions: SAILING_DEFINITIONS },
       },
 
+      snapshots: {},
       histories: { 'KAYAK': [], 'SAILING': [] },
       futures: { 'KAYAK': [], 'SAILING': [] },
 
@@ -170,6 +178,7 @@ export const useAppStore = create<AppState>()(
         people: data.people || state.people,
         sessions: { ...state.sessions, ...data.sessions },
         clubSettings: { ...state.clubSettings, ...data.settings },
+        snapshots: data.snapshots ? { ...state.snapshots, ...data.snapshots } : state.snapshots,
         syncStatus: 'SYNCED'
       })),
 
@@ -258,8 +267,20 @@ export const useAppStore = create<AppState>()(
             'KAYAK': { ...EMPTY_SESSION, inventory: createInventoryFromDefs(KAYAK_DEFINITIONS) },
             'SAILING': { ...EMPTY_SESSION, inventory: createInventoryFromDefs(SAILING_DEFINITIONS) },
           },
+          snapshots: {},
           pairingDirty: false
         };
+      }),
+
+      loadDemoForActiveClub: () => set(state => {
+          const clubId = state.activeClub;
+          if (!clubId) return state;
+          const otherPeople = state.people.filter(p => p.clubId !== clubId);
+          const demoPeople = INITIAL_PEOPLE.filter(p => p.clubId === clubId);
+          return {
+              people: [...otherPeople, ...demoPeople],
+              pairingDirty: true
+          };
       }),
 
       importClubData: (data: any) => set((state) => {
@@ -278,7 +299,49 @@ export const useAppStore = create<AppState>()(
               people: [...otherPeople, ...importedPeople],
               clubSettings: { ...state.clubSettings, [currentClubId]: data.settings || { boatDefinitions: [] } },
               sessions: { ...state.sessions, [currentClubId]: data.session || EMPTY_SESSION },
+              snapshots: data.snapshots ? { ...state.snapshots, [currentClubId]: data.snapshots } : state.snapshots,
               pairingDirty: true
+          };
+      }),
+
+      saveSnapshot: (name) => set(state => {
+          const clubId = state.activeClub;
+          if (!clubId) return state;
+          const currentPeople = state.people.filter(p => p.clubId === clubId);
+          const newSnapshot: PersonSnapshot = {
+              id: Date.now().toString(),
+              name,
+              date: new Date().toISOString(),
+              people: currentPeople
+          };
+          const currentSnapshots = state.snapshots[clubId] || [];
+          return {
+              snapshots: { ...state.snapshots, [clubId]: [newSnapshot, ...currentSnapshots] }
+          };
+      }),
+
+      loadSnapshot: (snapshotId) => set(state => {
+          const clubId = state.activeClub;
+          if (!clubId) return state;
+          const clubSnaps = state.snapshots[clubId] || [];
+          const snap = clubSnaps.find(s => s.id === snapshotId);
+          if (!snap) return state;
+          
+          const otherPeople = state.people.filter(p => p.clubId !== clubId);
+          const restoredPeople = snap.people.map(p => ({ ...p, clubId }));
+          
+          return {
+              people: [...otherPeople, ...restoredPeople],
+              pairingDirty: true
+          };
+      }),
+
+      deleteSnapshot: (snapshotId) => set(state => {
+          const clubId = state.activeClub;
+          if (!clubId) return state;
+          const clubSnaps = state.snapshots[clubId] || [];
+          return {
+              snapshots: { ...state.snapshots, [clubId]: clubSnaps.filter(s => s.id !== snapshotId) }
           };
       }),
 
@@ -540,7 +603,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'etgarim-storage',
-      version: 19.0, 
+      version: 20.0, 
       partialize: (state) => ({
         user: state.user,
         people: state.people,
@@ -549,7 +612,8 @@ export const useAppStore = create<AppState>()(
         permissions: state.permissions,
         clubs: state.clubs,
         superAdmins: state.superAdmins,
-        pairingDirty: state.pairingDirty
+        pairingDirty: state.pairingDirty,
+        snapshots: state.snapshots
       })
     }
   )

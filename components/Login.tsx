@@ -62,60 +62,68 @@ export const Login: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4 animate-in fade-in duration-500">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 space-y-6">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-8 md:p-10 space-y-8 border border-slate-100">
         
         <div className="text-center relative">
           <button 
              onClick={() => navigate('/')} 
-             className="absolute right-0 top-0 text-slate-400 hover:text-slate-600"
+             className="absolute right-0 -top-2 p-2 text-slate-400 hover:text-brand-600 hover:bg-slate-50 rounded-full transition-all"
              title="חזרה לדף הראשי"
           >
-              <ArrowRight size={20} />
+              <ArrowRight size={24} />
           </button>
           
-          <div className="w-16 h-16 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <ShieldCheck size={32} />
+          <div className="w-20 h-20 bg-brand-100 text-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner rotate-3">
+            <ShieldCheck size={40} />
           </div>
           
-          <h1 className="text-2xl font-bold text-slate-800">
-              {isAdminLogin ? 'ניהול מערכת (Super Admin)' : `כניסה - ${currentClubLabel}`}
+          <h1 className="text-3xl font-black text-slate-800 tracking-tight">
+              {isAdminLogin ? 'ניהול מערכת' : `כניסה - ${currentClubLabel}`}
           </h1>
-          <p className="text-slate-500 mt-2 text-sm">
-              התחבר למערכת באמצעות חשבון Google
+          <p className="text-slate-500 mt-3 text-sm font-medium">
+              התחבר למערכת השיבוץ של אתגרים
           </p>
         </div>
 
         {errorMsg && (
-            <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-lg text-sm">
-                <AlertTriangle size={16} />
+            <div className="flex items-center gap-3 text-red-600 bg-red-50 p-4 rounded-xl text-sm font-bold animate-in slide-in-from-top-2">
+                <AlertTriangle size={20} />
                 {errorMsg}
             </div>
         )}
 
-        {/* GOOGLE LOGIN BUTTON */}
+        {/* GOOGLE LOGIN BUTTON - BRANDED STYLE */}
         <button
             onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-3 rounded-lg transition-all shadow-sm"
+            className="w-full flex items-center justify-center gap-4 bg-white border border-slate-200 hover:border-brand-300 hover:bg-slate-50 text-slate-700 font-bold py-3.5 rounded-xl transition-all shadow-sm hover:shadow-md group"
         >
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/action/google.svg" alt="Google" className="w-6 h-6" />
-            התחברות עם Google
+            <div className="bg-white p-1 rounded-sm">
+                <svg width="18" height="18" viewBox="0 0 18 18">
+                    <path d="M17.64 9.2c0-.63-.06-1.25-.16-1.84H9v3.49h4.84c-.21 1.12-.84 2.07-1.79 2.7l2.85 2.2c1.67-1.53 2.63-3.79 2.63-6.46z" fill="#4285F4"/>
+                    <path d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.85-2.2c-.79.53-1.8.85-3.11.85-2.39 0-4.41-1.61-5.14-3.77L1.01 13.5C2.49 16.44 5.51 18 9 18z" fill="#34A853"/>
+                    <path d="M3.86 10.74c-.19-.56-.3-1.15-.3-1.74s.11-1.18.3-1.74l-2.85-2.2c-.62 1.25-.98 2.67-.98 4.16s.36 2.91.98 4.16l2.85-2.24z" fill="#FBBC05"/>
+                    <path d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47.89 11.43 0 9 0 5.51 0 2.49 1.56 1.01 4.5L3.86 6.74c.73-2.16 2.75-3.77 5.14-3.77z" fill="#EA4335"/>
+                </svg>
+            </div>
+            המשך עם Google
         </button>
 
-        <div className="relative pt-4">
+        <div className="relative py-2">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200"></div>
+              <div className="w-full border-t border-slate-100"></div>
             </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-slate-400">או כניסה ללא סיסמה (פיתוח)</span>
+            <div className="relative flex justify-center text-xs">
+              <span className="px-4 bg-white text-slate-400 font-bold uppercase tracking-widest">או כניסה מהירה</span>
             </div>
         </div>
 
         {/* Dev Mode Form */}
         <form onSubmit={handleDevLogin} className="space-y-4">
-            <div>
+            <div className="relative group">
+                <Mail className="absolute right-4 top-3.5 text-slate-400 group-focus-within:text-brand-500 transition-colors" size={20} />
                 <input 
                     type="email" 
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+                    className="w-full pr-12 pl-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
                     placeholder="הכנס אימייל מורשה..."
                     value={emailInput}
                     onChange={e => setEmailInput(e.target.value)}
@@ -124,18 +132,18 @@ export const Login: React.FC = () => {
             </div>
             <button
                 type="submit"
-                className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium py-3 px-4 rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-xl transition-all shadow-sm active:scale-95"
             >
-                <Zap size={16} className="text-yellow-400" />
-                כניסה מהירה (Dev Root)
+                <Zap size={18} className="text-yellow-400 fill-current" />
+                כניסה למפתחים
             </button>
         </form>
 
       </div>
       
       <div className="mt-8 text-center text-xs text-slate-400" dir="ltr">
-         <p>Version {APP_VERSION}</p>
-         <p className="mt-1">Built by Shay Kalimi - @Shay.A.i</p>
+         <p className="font-bold">TeamPlaner Hybrid v{APP_VERSION}</p>
+         <p className="mt-1 opacity-60">Built by Shay Kalimi - @Shay.A.i</p>
       </div>
     </div>
   );

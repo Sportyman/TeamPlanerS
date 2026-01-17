@@ -2,13 +2,13 @@
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useAppStore } from '../store';
-import { Person, SessionState, ClubSettings, ClubID } from '../types';
+import { Person, SessionState, ClubSettings, ClubID, PersonSnapshot } from '../types';
 
 let syncTimeout: any = null;
 
 export const syncToCloud = async (clubId: ClubID) => {
     const state = useAppStore.getState();
-    const { people, sessions, clubSettings, user, setSyncStatus } = state;
+    const { people, sessions, clubSettings, snapshots, user, setSyncStatus } = state;
 
     if (!user || !clubId) return;
 
@@ -16,6 +16,7 @@ export const syncToCloud = async (clubId: ClubID) => {
     const clubPeople = people.filter(p => p.clubId === clubId);
     const clubSession = sessions[clubId];
     const clubSet = clubSettings[clubId];
+    const clubSnapshots = snapshots[clubId] || [];
 
     setSyncStatus('SYNCING');
 
@@ -27,6 +28,7 @@ export const syncToCloud = async (clubId: ClubID) => {
             people: clubPeople,
             session: clubSession,
             settings: clubSet,
+            snapshots: clubSnapshots,
             updatedBy: user.email
         }, { merge: true });
         
@@ -50,7 +52,8 @@ export const fetchFromCloud = async (clubId: ClubID) => {
             setCloudData({
                 people: data.people as Person[],
                 sessions: { [clubId]: data.session as SessionState },
-                settings: { [clubId]: data.settings as ClubSettings }
+                settings: { [clubId]: data.settings as ClubSettings },
+                snapshots: { [clubId]: data.snapshots as PersonSnapshot[] || [] }
             });
         } else {
             setSyncStatus('SYNCED'); // Nothing to fetch
