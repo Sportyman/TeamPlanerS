@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { 
   Person, Role, SessionState, Team, BoatInventory, BoatType, ClubID, UserPermission, 
-  Gender, DefaultBoatTypes, ClubSettings, BoatDefinition, Club, SyncStatus, PersonSnapshot, RoleColor
+  Gender, DefaultBoatTypes, ClubSettings, BoatDefinition, Club, SyncStatus, PersonSnapshot, RoleColor, Participant, ClubMembership
 } from './types';
 import { generateSmartPairings } from './services/pairingLogic';
 import { DEFAULT_CLUBS, INITIAL_PEOPLE, KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from './mockData';
@@ -38,7 +38,7 @@ interface AppState {
   superAdmins: string[]; 
   permissions: UserPermission[];
   
-  people: Person[];
+  people: Participant[]; // Global identity pool
   sessions: Record<ClubID, SessionState>;
   clubSettings: Record<ClubID, ClubSettings>;
   snapshots: Record<ClubID, PersonSnapshot[]>;
@@ -57,18 +57,19 @@ interface AppState {
   removeClub: (id: string) => void;
   addSuperAdmin: (email: string) => void;
   removeSuperAdmin: (email: string) => void;
-  
   addPermission: (email: string, clubId: ClubID) => void;
   removePermission: (email: string, clubId: ClubID) => void;
   
-  // Data actions
-  setCloudData: (data: { people: Person[], sessions: Record<ClubID, SessionState>, settings: Record<ClubID, ClubSettings>, snapshots?: Record<ClubID, PersonSnapshot[]>, lastUpdated?: string }) => void;
-  addPerson: (person: Omit<Person, 'clubId'>) => void;
+  // Participant & Club Membership Actions
+  addPerson: (data: Omit<Person, 'clubId'>) => void;
   updatePerson: (person: Person) => void;
-  removePerson: (id: string) => void;
+  removePersonFromClub: (personId: string, clubId: ClubID) => void;
+  addExistingToClub: (personId: string, clubId: ClubID, defaults: Partial<ClubMembership>) => void;
   clearClubPeople: () => void;
   restoreDemoData: () => void;
   loadDemoForActiveClub: () => void;
+  
+  setCloudData: (data: any) => void;
   importClubData: (data: any) => void;
   
   // Snapshots
@@ -106,6 +107,22 @@ interface AppState {
   redo: () => void;
 }
 
+/**
+ * Utility to convert the complex Participant model back to the flat Person model used in UI
+ */
+const flattenParticipant = (p: Participant, clubId: ClubID): Person | null => {
+    const membership = p.memberships[clubId];
+    if (!membership) return null;
+    return {
+        ...membership,
+        id: p.id,
+        name: p.name,
+        gender: p.gender,
+        phone: p.phone,
+        clubId
+    };
+};
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -118,7 +135,7 @@ export const useAppStore = create<AppState>()(
       clubs: DEFAULT_CLUBS,
       superAdmins: [ROOT_ADMIN_EMAIL],
       permissions: [], 
-      people: INITIAL_PEOPLE,
+      people: [], // Participant Pool
       
       sessions: {
         'KAYAK': { ...EMPTY_SESSION, inventory: createInventoryFromDefs(KAYAK_DEFINITIONS) },
@@ -174,15 +191,6 @@ export const useAppStore = create<AppState>()(
         set({ user: null });
       },
 
-      setCloudData: (data) => set((state) => ({
-        people: data.people || state.people,
-        sessions: { ...state.sessions, ...data.sessions },
-        clubSettings: { ...state.clubSettings, ...data.settings },
-        snapshots: data.snapshots ? { ...state.snapshots, ...data.snapshots } : state.snapshots,
-        lastSyncTime: data.lastUpdated || state.lastSyncTime,
-        syncStatus: 'SYNCED'
-      })),
-
       addClub: (label) => set(state => {
           const newId = 'CLUB-' + Date.now();
           const newClub: Club = { id: newId, label };
@@ -236,42 +244,139 @@ export const useAppStore = create<AppState>()(
         ).filter(p => p.allowedClubs.length > 0)
       })),
 
-      addPerson: (personData) => set((state) => {
-        if (!state.activeClub) return state;
-        const newPerson: Person = { 
-            ...personData, 
-            clubId: state.activeClub,
-            createdAt: new Date().toISOString()
+      addPerson: (data) => set((state) => {
+        const clubId = state.activeClub;
+        if (!clubId) return state;
+        
+        const existingParticipant = state.people.find(p => p.phone && p.phone === data.phone);
+        
+        if (existingParticipant) {
+            // Check if already in this club
+            if (existingParticipant.memberships[clubId]) {
+                alert('משתתף עם מספר טלפון זה כבר קיים במועדון.');
+                return state;
+            }
+            // Add membership to existing participant
+            const updatedPeople = state.people.map(p => 
+                p.id === existingParticipant.id 
+                ? { ...p, memberships: { ...p.memberships, [clubId]: { ...data } } } 
+                : p
+            );
+            return { people: updatedPeople, pairingDirty: true };
+        }
+
+        // Create new global participant
+        const newParticipant: Participant = {
+            id: data.id || Date.now().toString(),
+            name: data.name,
+            gender: data.gender,
+            phone: data.phone,
+            createdAt: new Date().toISOString(),
+            memberships: {
+                [clubId]: { ...data }
+            }
         };
+        
         return { 
-          people: [...state.people, newPerson],
+          people: [...state.people, newParticipant],
           pairingDirty: true 
         };
       }),
       
-      updatePerson: (updatedPerson) => set((state) => ({
-        people: state.people.map(p => p.id === updatedPerson.id ? updatedPerson : p),
-        pairingDirty: true
-      })),
+      updatePerson: (person) => set((state) => {
+        const clubId = state.activeClub;
+        if (!clubId) return state;
+        
+        const updatedPeople = state.people.map(p => {
+            if (p.id === person.id) {
+                return {
+                    ...p,
+                    name: person.name,
+                    gender: person.gender,
+                    phone: person.phone,
+                    memberships: {
+                        ...p.memberships,
+                        [clubId]: {
+                            ...p.memberships[clubId],
+                            role: person.role,
+                            rank: person.rank,
+                            isSkipper: person.isSkipper,
+                            tags: person.tags,
+                            notes: person.notes,
+                            preferredBoatType: person.preferredBoatType,
+                            genderConstraint: person.genderConstraint
+                        }
+                    }
+                };
+            }
+            return p;
+        });
+        
+        return { people: updatedPeople, pairingDirty: true };
+      }),
 
-      removePerson: (id) => set((state) => ({ 
-        people: state.people.filter(p => p.id !== id),
-        pairingDirty: true
-      })),
+      removePersonFromClub: (personId, clubId) => set((state) => {
+        const updatedPeople = state.people.map(p => {
+            if (p.id === personId) {
+                const newMemberships = { ...p.memberships };
+                delete newMemberships[clubId];
+                return { ...p, memberships: newMemberships };
+            }
+            return p;
+        }).filter(p => Object.keys(p.memberships).length > 0); // Cleanup if no clubs left
+        
+        return { 
+          people: updatedPeople,
+          pairingDirty: true
+        };
+      }),
+
+      addExistingToClub: (personId, clubId, defaults) => set(state => {
+          const participant = state.people.find(p => p.id === personId);
+          if (!participant) return state;
+          
+          const newMembership: ClubMembership = {
+              role: Role.MEMBER,
+              rank: 3,
+              ...defaults
+          };
+          
+          const updatedPeople = state.people.map(p => 
+            p.id === personId ? { ...p, memberships: { ...p.memberships, [clubId]: newMembership } } : p
+          );
+          
+          return { people: updatedPeople, pairingDirty: true };
+      }),
 
       clearClubPeople: () => set(state => {
           const clubId = state.activeClub;
           if (!clubId) return state;
-          return {
-              people: state.people.filter(p => p.clubId !== clubId),
-              pairingDirty: true
-          };
+          const updatedPeople = state.people.map(p => {
+              const newMemberships = { ...p.memberships };
+              delete newMemberships[clubId];
+              return { ...p, memberships: newMemberships };
+          }).filter(p => Object.keys(p.memberships).length > 0);
+          
+          return { people: updatedPeople, pairingDirty: true };
       }),
 
       restoreDemoData: () => set(() => {
+          // Flatten mock data into Participant format
+          const participantsMap: Record<string, Participant> = {};
+          INITIAL_PEOPLE.forEach(p => {
+              if (!participantsMap[p.id]) {
+                  participantsMap[p.id] = {
+                      id: p.id, name: p.name, gender: p.gender, phone: p.phone, createdAt: new Date().toISOString(),
+                      memberships: {}
+                  };
+              }
+              const { id, name, gender, phone, clubId, ...membership } = p;
+              participantsMap[id].memberships[clubId] = membership;
+          });
+
         return { 
           clubs: DEFAULT_CLUBS,
-          people: INITIAL_PEOPLE,
+          people: Object.values(participantsMap),
           clubSettings: {
              'KAYAK': { boatDefinitions: KAYAK_DEFINITIONS, roleColors: { ...DEFAULT_ROLE_COLORS } },
              'SAILING': { boatDefinitions: SAILING_DEFINITIONS, roleColors: { ...DEFAULT_ROLE_COLORS } }
@@ -288,106 +393,145 @@ export const useAppStore = create<AppState>()(
       loadDemoForActiveClub: () => set(state => {
           const clubId = state.activeClub;
           if (!clubId) return state;
-          const otherPeople = state.people.filter(p => p.clubId !== clubId);
-          const demoPeople = INITIAL_PEOPLE.filter(p => p.clubId === clubId).map(p => ({
-              ...p,
-              createdAt: new Date().toISOString()
-          }));
-          return {
-              people: [...otherPeople, ...demoPeople],
-              pairingDirty: true
-          };
-      }),
-
-      importClubData: (data: any) => set((state) => {
-          if (!state.activeClub) return state;
-          const currentClubId = state.activeClub;
-          if (!data || !data.clubId || data.clubId !== currentClubId) {
-             alert("קובץ זה אינו תואם לחוג הנוכחי.");
-             return state;
-          }
-          const otherPeople = state.people.filter(p => p.clubId !== currentClubId);
-          const importedPeople = (data.people || []).map((p: Person) => ({
-              ...p,
-              clubId: currentClubId
-          }));
-          return {
-              people: [...otherPeople, ...importedPeople],
-              clubSettings: { ...state.clubSettings, [currentClubId]: data.settings || { boatDefinitions: [], roleColors: { ...DEFAULT_ROLE_COLORS } } },
-              sessions: { ...state.sessions, [currentClubId]: data.session || EMPTY_SESSION },
-              snapshots: data.snapshots ? { ...state.snapshots, [currentClubId]: data.snapshots } : state.snapshots,
-              pairingDirty: true
-          };
-      }),
-
-      saveSnapshot: (name) => set(state => {
-          const clubId = state.activeClub;
-          if (!clubId) return state;
-          const currentPeople = state.people.filter(p => p.clubId === clubId);
-          const newSnapshot: PersonSnapshot = {
-              id: Date.now().toString(),
-              name,
-              date: new Date().toISOString(),
-              people: currentPeople
-          };
-          const currentSnapshots = state.snapshots[clubId] || [];
-          return {
-              snapshots: { ...state.snapshots, [clubId]: [newSnapshot, ...currentSnapshots] }
-          };
-      }),
-
-      loadSnapshot: (snapshotId) => set(state => {
-          const clubId = state.activeClub;
-          if (!clubId) return state;
-          const clubSnaps = state.snapshots[clubId] || [];
-          const snap = clubSnaps.find(s => s.id === snapshotId);
-          if (!snap) return state;
           
-          const otherPeople = state.people.filter(p => p.clubId !== clubId);
-          const restoredPeople = snap.people.map(p => ({ ...p, clubId }));
+          const demoPeopleForClub = INITIAL_PEOPLE.filter(p => p.clubId === clubId);
+          const currentPeople = [...state.people];
           
-          return {
-              people: [...otherPeople, ...restoredPeople],
-              pairingDirty: true
-          };
+          demoPeopleForClub.forEach(dp => {
+              const existingIdx = currentPeople.findIndex(p => p.id === dp.id);
+              const { id, name, gender, phone, clubId: cid, ...membership } = dp;
+              if (existingIdx !== -1) {
+                  currentPeople[existingIdx].memberships[cid] = membership;
+              } else {
+                  currentPeople.push({
+                      id, name, gender, phone, createdAt: new Date().toISOString(),
+                      memberships: { [cid]: membership }
+                  });
+              }
+          });
+          
+          return { people: currentPeople, pairingDirty: true };
       }),
 
-      deleteSnapshot: (snapshotId) => set(state => {
-          const clubId = state.activeClub;
-          if (!clubId) return state;
-          const clubSnaps = state.snapshots[clubId] || [];
+      setCloudData: (data) => set((state) => {
+          // Cloud Data is expected to provide Participants
           return {
-              snapshots: { ...state.snapshots, [clubId]: clubSnaps.filter(s => s.id !== snapshotId) }
+            people: data.people || state.people,
+            sessions: { ...state.sessions, ...data.sessions },
+            clubSettings: { ...state.clubSettings, ...data.settings },
+            snapshots: data.snapshots ? { ...state.snapshots, ...data.snapshots } : state.snapshots,
+            lastSyncTime: data.lastUpdated || state.lastSyncTime,
+            syncStatus: 'SYNCED'
           };
       }),
 
       toggleAttendance: (id) => set((state) => {
-        const { activeClub } = state;
-        if (!activeClub) return state;
-        const currentSession = state.sessions[activeClub];
+        const clubId = state.activeClub;
+        if (!clubId) return state;
+        const currentSession = state.sessions[clubId];
         const isPresent = currentSession.presentPersonIds.includes(id);
         const newPresent = isPresent ? currentSession.presentPersonIds.filter(pid => pid !== id) : [...currentSession.presentPersonIds, id];
         
-        const newPeople = state.people.map(p => p.id === id ? { ...p, lastParticipation: new Date().toISOString() } : p);
+        const updatedPeople = state.people.map(p => {
+            if (p.id === id && p.memberships[clubId]) {
+                return {
+                    ...p,
+                    memberships: {
+                        ...p.memberships,
+                        [clubId]: { ...p.memberships[clubId], lastParticipation: new Date().toISOString() }
+                    }
+                };
+            }
+            return p;
+        });
 
         return { 
-            people: newPeople,
-            sessions: { ...state.sessions, [activeClub]: { ...currentSession, presentPersonIds: newPresent } } 
+            people: updatedPeople,
+            sessions: { ...state.sessions, [clubId]: { ...currentSession, presentPersonIds: newPresent } } 
         };
       }),
 
+      runPairing: () => {
+        const { people, activeClub, sessions, clubSettings } = get();
+        if (!activeClub) return;
+        const currentSession = sessions[activeClub];
+        const settings = clubSettings[activeClub];
+        
+        // Convert to flat Persons for the algorithm
+        const presentPersons = people
+            .filter(p => p.memberships[activeClub] && currentSession.presentPersonIds.includes(p.id))
+            .map(p => flattenParticipant(p, activeClub))
+            .filter((p): p is Person => p !== null);
+
+        set((state) => ({ histories: { ...state.histories, [activeClub]: [] }, futures: { ...state.futures, [activeClub]: [] } }));
+        const teams = generateSmartPairings(presentPersons, currentSession.inventory, settings.boatDefinitions);
+        set((state) => ({ sessions: { ...state.sessions, [activeClub]: { ...state.sessions[activeClub], teams } }, pairingDirty: false }));
+      },
+
+      // Rest of actions (Manual manipulation, Inventory, etc.) stay largely same but use people.find for identity
+      updateTeamBoatType: (tId, bType) => {
+         const clubId = get().activeClub;
+         if (!clubId) return;
+         const currentSession = get().sessions[clubId];
+         const newTeams = currentSession.teams.map(t => t.id === tId ? { ...t, boatType: bType } : t);
+         set(state => ({
+             histories: { ...state.histories, [clubId]: [...(state.histories[clubId]||[]), currentSession.teams]},
+             sessions: { ...state.sessions, [clubId]: { ...currentSession, teams: newTeams }}
+         }));
+      },
+
+      addGuestToTeam: (teamId, name) => {
+        const clubId = get().activeClub;
+        if (!clubId) return;
+        const currentSession = get().sessions[clubId];
+        
+        const guestId = 'guest-' + Date.now();
+        const guestParticipant: Participant = {
+            id: guestId,
+            name,
+            gender: Gender.MALE,
+            createdAt: new Date().toISOString(),
+            memberships: {
+                [clubId]: { role: Role.GUEST, rank: 1, isSkipper: false, notes: 'אורח זמני' }
+            }
+        };
+        
+        const guestPerson = flattenParticipant(guestParticipant, clubId)!;
+        const newTeams = currentSession.teams.map(t => t.id === teamId ? { ...t, members: [...t.members, guestPerson] } : t);
+        
+        set((state) => ({
+             people: [...state.people, guestParticipant],
+             sessions: { ...state.sessions, [clubId]: { ...currentSession, presentPersonIds: [...currentSession.presentPersonIds, guestId], teams: newTeams } }
+        }));
+      },
+
+      assignMemberToTeam: (teamId, personId) => {
+        const clubId = get().activeClub;
+        if (!clubId) return;
+        const currentSession = get().sessions[clubId];
+        const p = get().people.find(part => part.id === personId);
+        if (!p) return;
+        
+        const person = flattenParticipant(p, clubId);
+        if (!person) return;
+
+        const newTeams = currentSession.teams.map(t => t.id === teamId ? { ...t, members: [...t.members, person] } : t);
+        set((state) => ({
+             sessions: { ...state.sessions, [clubId]: { ...currentSession, presentPersonIds: Array.from(new Set([...currentSession.presentPersonIds, personId])), teams: newTeams } }
+        }));
+      },
+      
+      // ... all other actions stay same or slightly adjusted
       setBulkAttendance: (ids) => set((state) => {
         const { activeClub } = state;
         if (!activeClub) return state;
         return { sessions: { ...state.sessions, [activeClub]: { ...state.sessions[activeClub], presentPersonIds: ids } } };
       }),
-
       updateInventory: (inventory) => set((state) => {
         const { activeClub } = state;
         if (!activeClub) return state;
         return { sessions: { ...state.sessions, [activeClub]: { ...state.sessions[activeClub], inventory } } };
       }),
-
       addBoatDefinition: (def) => set((state) => {
           const { activeClub } = state;
           if (!activeClub) return state;
@@ -401,7 +545,6 @@ export const useAppStore = create<AppState>()(
               pairingDirty: true
           };
       }),
-
       updateBoatDefinition: (def) => set((state) => {
           const { activeClub } = state;
           if (!activeClub) return state;
@@ -412,7 +555,6 @@ export const useAppStore = create<AppState>()(
               pairingDirty: true
           };
       }),
-
       removeBoatDefinition: (boatId) => set((state) => {
           const { activeClub } = state;
           if (!activeClub) return state;
@@ -427,7 +569,6 @@ export const useAppStore = create<AppState>()(
               pairingDirty: true
           };
       }),
-
       saveBoatDefinitions: (defs) => set((state) => {
           const { activeClub } = state;
           if (!activeClub) return state;
@@ -443,7 +584,6 @@ export const useAppStore = create<AppState>()(
               pairingDirty: true
           };
       }),
-
       updateRoleColor: (role, color) => set((state) => {
           const clubId = state.activeClub;
           if (!clubId) return state;
@@ -462,18 +602,6 @@ export const useAppStore = create<AppState>()(
               }
           };
       }),
-
-      runPairing: () => {
-        const { people, activeClub, sessions, clubSettings } = get();
-        if (!activeClub) return;
-        const currentSession = sessions[activeClub];
-        const settings = clubSettings[activeClub];
-        set((state) => ({ histories: { ...state.histories, [activeClub]: [] }, futures: { ...state.futures, [activeClub]: [] } }));
-        const presentPeople = people.filter(p => p.clubId === activeClub && currentSession.presentPersonIds.includes(p.id));
-        const teams = generateSmartPairings(presentPeople, currentSession.inventory, settings.boatDefinitions);
-        set((state) => ({ sessions: { ...state.sessions, [activeClub]: { ...state.sessions[activeClub], teams } }, pairingDirty: false }));
-      },
-
       resetSession: () => {
         const { activeClub, clubSettings } = get();
         if (!activeClub) return;
@@ -486,7 +614,6 @@ export const useAppStore = create<AppState>()(
           pairingDirty: false
         }));
       },
-
       addManualTeam: () => {
         const { activeClub, sessions, clubSettings } = get();
         if (!activeClub) return;
@@ -500,7 +627,6 @@ export const useAppStore = create<AppState>()(
              sessions: { ...state.sessions, [activeClub]: { ...currentSession, teams: [newTeam, ...currentSession.teams] } }
         }));
       },
-
       removeTeam: (teamId) => {
         const { activeClub, sessions } = get();
         if (!activeClub) return;
@@ -511,45 +637,6 @@ export const useAppStore = create<AppState>()(
              sessions: { ...state.sessions, [activeClub]: { ...currentSession, teams: currentSession.teams.filter(t => t.id !== teamId) } }
         }));
       },
-
-      addGuestToTeam: (teamId, name) => {
-        const { activeClub, sessions } = get();
-        if (!activeClub) return;
-        const currentSession = sessions[activeClub];
-        const newGuest: Person = {
-            id: 'guest-' + Date.now(),
-            clubId: activeClub,
-            name: name,
-            role: Role.GUEST,
-            rank: 1,
-            gender: Gender.MALE,
-            tags: [],
-            notes: 'הוסף ידנית',
-            createdAt: new Date().toISOString()
-        };
-        const newTeams = currentSession.teams.map(t => t.id === teamId ? { ...t, members: [...t.members, newGuest] } : t);
-        set((state) => ({
-             people: [...state.people, newGuest],
-             histories: { ...state.histories, [activeClub]: [...(state.histories[activeClub] || []), currentSession.teams] },
-             futures: { ...state.futures, [activeClub]: [] },
-             sessions: { ...state.sessions, [activeClub]: { ...currentSession, presentPersonIds: [...currentSession.presentPersonIds, newGuest.id], teams: newTeams } }
-        }));
-      },
-
-      assignMemberToTeam: (teamId, personId) => {
-        const { activeClub, sessions, people } = get();
-        if (!activeClub) return;
-        const currentSession = sessions[activeClub];
-        const person = people.find(p => p.id === personId);
-        if (!person) return;
-        const newTeams = currentSession.teams.map(t => t.id === teamId ? { ...t, members: [...t.members, person] } : t);
-        set((state) => ({
-             histories: { ...state.histories, [activeClub]: [...(state.histories[activeClub] || []), currentSession.teams] },
-             futures: { ...state.futures, [activeClub]: [] },
-             sessions: { ...state.sessions, [activeClub]: { ...currentSession, presentPersonIds: Array.from(new Set([...currentSession.presentPersonIds, person.id])), teams: newTeams } }
-        }));
-      },
-
       removeMemberFromTeam: (teamId, personId) => {
         const { activeClub, sessions } = get();
         if (!activeClub) return;
@@ -561,13 +648,15 @@ export const useAppStore = create<AppState>()(
              sessions: { ...state.sessions, [activeClub]: { ...currentSession, teams: newTeams } }
         }));
       },
-
       moveMemberToTeam: (personId, targetTeamId) => {
         const { activeClub, sessions, people } = get();
         if (!activeClub) return;
         const currentSession = sessions[activeClub];
-        const person = people.find(p => p.id === personId);
+        const p = people.find(part => part.id === personId);
+        if (!p) return;
+        const person = flattenParticipant(p, activeClub);
         if (!person) return;
+
         let newTeams = currentSession.teams.map(t => ({ ...t, members: t.members.filter(m => m.id !== personId) }));
         newTeams = newTeams.map(t => t.id === targetTeamId ? { ...t, members: [...t.members, person] } : t);
         set(state => ({
@@ -608,16 +697,6 @@ export const useAppStore = create<AppState>()(
              }));
         }
       },
-      updateTeamBoatType: (tId, bType) => {
-         const { activeClub, sessions } = get();
-         if (!activeClub) return;
-         const currentSession = sessions[activeClub];
-         const newTeams = currentSession.teams.map(t => t.id === tId ? { ...t, boatType: bType } : t);
-         set(state => ({
-             histories: { ...state.histories, [activeClub]: [...(state.histories[activeClub]||[]), currentSession.teams]},
-             sessions: { ...state.sessions, [activeClub]: { ...currentSession, teams: newTeams }}
-         }));
-      },
       undo: () => {
          const { activeClub, histories, sessions } = get();
          if (!activeClub) return;
@@ -641,11 +720,89 @@ export const useAppStore = create<AppState>()(
              histories: { ...state.histories, [activeClub]: [...(state.histories[activeClub]||[]), sessions[activeClub].teams] },
              futures: { ...state.futures, [activeClub]: f.slice(1) }
          }));
-      }
+      },
+      saveSnapshot: (name) => set(state => {
+          const clubId = state.activeClub;
+          if (!clubId) return state;
+          const currentPeople = state.people
+            .filter(p => p.memberships[clubId])
+            .map(p => flattenParticipant(p, clubId)!);
+            
+          const newSnapshot: PersonSnapshot = {
+              id: Date.now().toString(),
+              name,
+              date: new Date().toISOString(),
+              people: currentPeople
+          };
+          const currentSnapshots = state.snapshots[clubId] || [];
+          return {
+              snapshots: { ...state.snapshots, [clubId]: [newSnapshot, ...currentSnapshots] }
+          };
+      }),
+      loadSnapshot: (snapshotId) => set(state => {
+          const clubId = state.activeClub;
+          if (!clubId) return state;
+          const clubSnaps = state.snapshots[clubId] || [];
+          const snap = clubSnaps.find(s => s.id === snapshotId);
+          if (!snap) return state;
+          
+          const currentPeople = [...state.people];
+          snap.people.forEach(sp => {
+              const { id, name, gender, phone, clubId: cid, ...membership } = sp;
+              const existingIdx = currentPeople.findIndex(p => p.id === id);
+              if (existingIdx !== -1) {
+                  currentPeople[existingIdx].memberships[clubId] = membership;
+              } else {
+                  currentPeople.push({
+                      id, name, gender, phone, createdAt: new Date().toISOString(),
+                      memberships: { [clubId]: membership }
+                  });
+              }
+          });
+          
+          return { people: currentPeople, pairingDirty: true };
+      }),
+      deleteSnapshot: (snapshotId) => set(state => {
+          const clubId = state.activeClub;
+          if (!clubId) return state;
+          const clubSnaps = state.snapshots[clubId] || [];
+          return {
+              snapshots: { ...state.snapshots, [clubId]: clubSnaps.filter(s => s.id !== snapshotId) }
+          };
+      }),
+      importClubData: (data: any) => set((state) => {
+          if (!state.activeClub) return state;
+          const currentClubId = state.activeClub;
+          if (!data || !data.clubId || data.clubId !== currentClubId) {
+             alert("קובץ זה אינו תואם לחוג הנוכחי.");
+             return state;
+          }
+          const currentPeople = [...state.people];
+          (data.people || []).forEach((sp: Person) => {
+               const { id, name, gender, phone, clubId: cid, ...membership } = sp;
+               const existingIdx = currentPeople.findIndex(p => p.id === id);
+               if (existingIdx !== -1) {
+                   currentPeople[existingIdx].memberships[currentClubId] = membership;
+               } else {
+                   currentPeople.push({
+                       id, name, gender, phone, createdAt: new Date().toISOString(),
+                       memberships: { [currentClubId]: membership }
+                   });
+               }
+          });
+          
+          return {
+              people: currentPeople,
+              clubSettings: { ...state.clubSettings, [currentClubId]: data.settings || { boatDefinitions: [], roleColors: { ...DEFAULT_ROLE_COLORS } } },
+              sessions: { ...state.sessions, [currentClubId]: data.session || EMPTY_SESSION },
+              snapshots: data.snapshots ? { ...state.snapshots, [currentClubId]: data.snapshots } : state.snapshots,
+              pairingDirty: true
+          };
+      }),
     }),
     {
       name: 'etgarim-storage',
-      version: 23.0, 
+      version: 24.0, 
       partialize: (state) => ({
         user: state.user,
         people: state.people,

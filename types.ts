@@ -91,7 +91,7 @@ export interface Club {
 
 export interface ClubSettings {
   boatDefinitions: BoatDefinition[];
-  roleColors: Record<Role, RoleColor>; // Mandatory for safety
+  roleColors: Record<Role, RoleColor>;
 }
 
 export interface UserPermission {
@@ -103,10 +103,10 @@ export interface PersonSnapshot {
   id: string;
   name: string;
   date: string;
-  people: Person[];
+  people: Person[]; // Flat snapshots for history
 }
 
-export const APP_VERSION = '3.3.1'; 
+export const APP_VERSION = '3.4.0'; 
 
 export const TEAM_COLORS = [
   'bg-blue-50 border-blue-200',      
@@ -129,25 +129,45 @@ export const TEAM_COLORS = [
   'bg-green-50 border-green-200',    
 ];
 
-export interface Person {
+/**
+ * Global identity of an individual
+ */
+export interface Participant {
   id: string;
-  clubId: ClubID;
   name: string;
   gender: Gender;
-  tags?: string[];
   phone?: string;
+  email?: string;
+  createdAt: string;
+  memberships: Record<ClubID, ClubMembership>;
+}
+
+/**
+ * Club-specific data for a participant
+ */
+export interface ClubMembership {
   role: Role;
   rank: number;
-  notes?: string;
   isSkipper?: boolean;
+  tags?: string[];
+  notes?: string;
   preferredBoatType?: string; 
   genderConstraint?: GenderConstraint;
   mustPairWith?: string[];   
   preferPairWith?: string[]; 
   cannotPairWith?: string[]; 
-  // Metadata for future scaling
-  createdAt?: string;
   lastParticipation?: string;
+}
+
+/**
+ * View-model interface for components to avoid breaking existing flat-access logic
+ */
+export interface Person extends ClubMembership {
+  id: string;
+  name: string;
+  gender: Gender;
+  phone?: string;
+  clubId: ClubID;
 }
 
 export interface Team {
