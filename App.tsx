@@ -8,7 +8,7 @@ import { Login } from './components/Login';
 import { LandingPage } from './components/LandingPage';
 import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { PublicPairingView } from './components/PublicPairingView';
-import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw, LayoutGrid } from 'lucide-react';
+import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw, LayoutGrid, History as HistoryIcon } from 'lucide-react';
 import { APP_VERSION } from './types';
 import { triggerCloudSync, fetchFromCloud } from './services/syncService';
 
@@ -147,7 +147,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                           <NavLink to="/app/manage" icon={<LayoutGrid size={24} />} text="מרכז ניהול (Dashboard)" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
                           <NavLink to="/app/manage?view=PEOPLE" icon={<Users size={24} />} text="ניהול משתתפים" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
                           <NavLink to="/app/manage?view=INVENTORY" icon={<Settings size={24} />} text="ניהול ציוד ומלאי" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
-                          <NavLink to="/app/manage?view=SNAPSHOTS" icon={<History size={24} />} text="גרסאות שמורות" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
+                          <NavLink to="/app/manage?view=SNAPSHOTS" icon={<HistoryIcon size={24} />} text="גרסאות שמורות" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
                         </div>
                     </div>
                 </div>

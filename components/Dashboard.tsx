@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
 import { Role, getRoleLabel, Person, Gender, GenderLabel, BoatDefinition, GenderPrefType, GenderPrefLabels, ConstraintStrength, APP_VERSION } from '../types';
-import { Trash2, UserPlus, Star, Edit, X, Save, ArrowRight, Tag, Database, Ship, Users, Calendar, Plus, Anchor, Wind, Users2, ShieldAlert, AlertOctagon, Heart, Ban, Shield, ShipWheel, Download, Upload, History, Camera, Search, AlertTriangle } from 'lucide-react';
+import { Trash2, UserPlus, Star, Edit, X, Save, ArrowRight, Tag, Database, Ship, Users, Calendar, Plus, Anchor, Wind, Users2, ShieldAlert, AlertOctagon, Heart, Ban, Shield, ShipWheel, Download, Upload, History as HistoryIcon, Camera, Search, AlertTriangle } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 type ViewMode = 'MENU' | 'PEOPLE' | 'INVENTORY' | 'SNAPSHOTS';
@@ -253,7 +253,7 @@ export const Dashboard: React.FC = () => {
                       <h3 className="font-bold text-lg text-slate-800">ניהול ציוד</h3>
                   </button>
                   <button onClick={() => setView('SNAPSHOTS')} className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-lg hover:border-brand-300 transition-all flex flex-col items-center gap-4">
-                      <div className="bg-purple-50 text-purple-600 p-4 rounded-full"><History size={32} /></div>
+                      <div className="bg-purple-50 text-purple-600 p-4 rounded-full"><HistoryIcon size={32} /></div>
                       <h3 className="font-bold text-lg text-slate-800">גרסאות שמורות</h3>
                   </button>
               </div>
@@ -277,7 +277,7 @@ export const Dashboard: React.FC = () => {
               </button>
               <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                   <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-                      <History className="text-purple-600" /> שמירת גרסאות של רשימת המשתתפים
+                      <HistoryIcon className="text-purple-600" /> שמירת גרסאות של רשימת המשתתפים
                   </h2>
                   <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 mb-8">
                       <h3 className="font-bold text-purple-900 mb-2">שמור את הרשימה הנוכחית</h3>
@@ -344,7 +344,7 @@ export const Dashboard: React.FC = () => {
                                       <span className="flex items-center gap-1"><Users size={14}/> קיבולת: {def.capacity}</span>
                                       <span className="flex items-center gap-1"><Database size={14}/> מלאי קבוע: {def.defaultCount}</span>
                                       <span className="flex items-center gap-1">{def.isStable ? <Anchor size={14}/> : <Wind size={14}/>} {def.isStable ? 'יציב' : 'מהיר'}</span>
-                                      {def.minSkippers ? <span className="flex items-center gap-1 text-blue-600 font-bold"><ShipWheel size={14}/> נדרש סקיפר</span> : null}
+                                      {def.minSkippers ? <span className="flex items-center gap-1 text-blue-600 font-bold"><ShipWheel size={14} /> נדרש סקיפר</span> : null}
                                   </div>
                               </div>
                               <button onClick={() => handleRemoveBoat(def.id)} className="text-slate-400 hover:text-red-500 p-2 self-end md:self-center">
@@ -447,7 +447,7 @@ export const Dashboard: React.FC = () => {
                             <td className="p-4">
                                 <div className="font-bold text-slate-800 flex items-center gap-2">
                                     {p.name}
-                                    {p.isSkipper && <ShipWheel size={14} className="text-blue-600" title="סקיפר" />}
+                                    {p.isSkipper && <ShipWheel size={14} className="text-blue-600" />}
                                 </div>
                                 <div className="text-xs text-slate-400">{getRoleLabel(p.role, p.gender)} • רמה {p.rank}</div>
                             </td>

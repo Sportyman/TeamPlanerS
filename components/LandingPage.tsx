@@ -2,7 +2,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
-import { ClubID } from '../types';
+import { ClubID, APP_VERSION } from '../types';
 import { Waves, Ship, Settings, Anchor } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
@@ -34,6 +34,9 @@ export const LandingPage: React.FC = () => {
                 אתגרים - מערכת שיבוץ
               </h1>
               <p className="text-lg md:text-xl text-slate-500 font-light">בחר חוג לכניסה</p>
+              <div className="inline-block bg-white/50 backdrop-blur px-3 py-1 rounded-full border border-slate-200 text-[10px] font-bold text-slate-400">
+                v{APP_VERSION}
+              </div>
             </div>
 
             {/* Dynamic Club Selection - Centered Flex Layout */}
