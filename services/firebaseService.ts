@@ -10,7 +10,8 @@ import {
 } from "firebase/firestore";
 import { 
   signInWithPopup, 
-  GoogleAuthProvider 
+  GoogleAuthProvider,
+  signOut
 } from "firebase/auth";
 import { db, auth } from "../lib/firebase";
 import { Person, BoatInventory } from "../types";
@@ -26,6 +27,9 @@ import { Person, BoatInventory } from "../types";
 
 export const loginWithGoogle = async () => {
   try {
+    // ודואים התנתקות מלאה לפני ניסיון התחברות חדש כדי למנוע לופים
+    await signOut(auth);
+
     const provider = new GoogleAuthProvider();
     
     // קריטי: שורה זו מכריחה את גוגל להציג את מסך בחירת החשבון בכל פעם

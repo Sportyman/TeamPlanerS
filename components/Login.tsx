@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../store';
@@ -128,7 +127,7 @@ export const Login: React.FC = () => {
       
       {/* Credits / Metadata */}
       <div className="mt-10 text-center space-y-1">
-         <p className="text-slate-400 text-xs font-mono">Build v{APP_VERSION}</p>
+         <p className="text-slate-400 text-xs font-mono">Build v2.0 (With SignOut Fix)</p>
          <p className="text-slate-300 text-[10px]">Architecture by @Shay.A.i</p>
       </div>
     </div>
