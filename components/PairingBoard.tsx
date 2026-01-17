@@ -95,7 +95,6 @@ export const PairingBoard: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-20"> 
-      {/* Share Modal & Member Modal Logic Hidden for brevity but fully functional */}
       {showShareMenu && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" onClick={() => setShowShareMenu(false)}>
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -148,9 +147,9 @@ export const PairingBoard: React.FC = () => {
                         const classes = RoleColorClasses[roleColor];
                         return (
                           <Draggable key={member.id} draggableId={member.id} index={mIdx}>
-                            {(p) => (
+                            {(p, dSnapshot) => (
                               <div ref={p.innerRef} {...p.draggableProps} className="relative group">
-                                <div onClick={() => swapSource && handleSwapClick(team.id, mIdx)} className={`p-4 rounded-xl border-2 flex items-center justify-between transition-all shadow-sm ${snapshot.isDragging ? 'shadow-2xl scale-105 z-50' : ''} ${getMemberStyle(member.role)} ${isSwapping ? 'ring-4 ring-brand-500 scale-105' : ''}`}>
+                                <div onClick={() => swapSource && handleSwapClick(team.id, mIdx)} className={`p-4 rounded-xl border-2 flex items-center justify-between transition-all shadow-sm ${dSnapshot.isDragging ? 'shadow-2xl scale-105 z-50' : ''} ${getMemberStyle(member.role)} ${isSwapping ? 'ring-4 ring-brand-500 scale-105' : ''}`}>
                                   <div {...p.dragHandleProps} className="p-3 -ml-2 text-slate-400 cursor-grab active:cursor-grabbing touch-none"><GripVertical size={24} /></div>
                                   <div className="flex-1 flex flex-col text-right pr-2">
                                      <div className="flex items-center gap-1">

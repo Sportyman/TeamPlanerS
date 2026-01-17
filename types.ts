@@ -91,7 +91,7 @@ export interface Club {
 
 export interface ClubSettings {
   boatDefinitions: BoatDefinition[];
-  roleColors?: Record<Role, RoleColor>;
+  roleColors: Record<Role, RoleColor>; // Mandatory for safety
 }
 
 export interface UserPermission {
@@ -106,7 +106,7 @@ export interface PersonSnapshot {
   people: Person[];
 }
 
-export const APP_VERSION = '3.3.0'; 
+export const APP_VERSION = '3.3.1'; 
 
 export const TEAM_COLORS = [
   'bg-blue-50 border-blue-200',      

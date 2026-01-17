@@ -445,12 +445,21 @@ export const useAppStore = create<AppState>()(
       }),
 
       updateRoleColor: (role, color) => set((state) => {
-          const { activeClub } = state;
-          if (!activeClub) return state;
-          const currentSettings = state.clubSettings[activeClub];
-          const newColors = { ...currentSettings.roleColors, [role]: color };
+          const clubId = state.activeClub;
+          if (!clubId) return state;
+          const currentSettings = state.clubSettings[clubId];
+          const newColors: Record<Role, RoleColor> = { 
+              ...(currentSettings.roleColors || DEFAULT_ROLE_COLORS), 
+              [role]: color 
+          };
           return {
-              clubSettings: { ...state.clubSettings, [activeClub]: { ...currentSettings, roleColors: newColors } }
+              clubSettings: { 
+                  ...state.clubSettings, 
+                  [clubId]: { 
+                      ...currentSettings, 
+                      roleColors: newColors 
+                  } 
+              }
           };
       }),
 
