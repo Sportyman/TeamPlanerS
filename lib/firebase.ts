@@ -1,22 +1,18 @@
 
-// Fix: Use standard modular imports for Firebase v9+ to resolve 'initializeApp' export issue
-// Standard named import for initializeApp from the modular Firebase app package
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore, enableMultiTabIndexedDbPersistence } from "firebase/firestore";
 
 /**
- * Firebase configuration using environment variables.
- * We use process.env instead of import.meta.env because in this specific 
- * environment, process.env is the standard way to access injected secrets.
+ * Firebase configuration with hardcoded values for reliable development environment connectivity.
  */
 const firebaseConfig = {
-  apiKey: process.env.VITE_FIREBASE_API_KEY,
-  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.VITE_FIREBASE_APP_ID
+  apiKey: "AIzaSyCYGI1blVRY6ZIZSDTfST66aL_FQeBgvUk",
+  authDomain: "etgarim-database.firebaseapp.com",
+  projectId: "etgarim-database",
+  storageBucket: "etgarim-database.firebasestorage.app",
+  messagingSenderId: "969970671528",
+  appId: "1:969970671528:web:7541abb86fc80a3bdc879d"
 };
 
 // Initialize Firebase instance
