@@ -1,13 +1,12 @@
-
 // Standard modular initialization for Firebase v9+
-// Fix: Use standard named import for initializeApp from 'firebase/app'
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+// Fix: Use standard named import for initializeApp from "firebase/app"
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 import { 
   initializeFirestore, 
   persistentLocalCache, 
   persistentMultipleTabManager 
-} from 'firebase/firestore';
+} from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCYGI1blVRY6ZIZSDTfST66aL_FQeBgvUk",

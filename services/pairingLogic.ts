@@ -1,8 +1,7 @@
-
 import { Person, Role, BoatInventory, Team, BoatDefinition, GenderPrefType } from '../types';
 // Fix: Use exact import spacing and standard imports as per guidelines
-import {GoogleGenAI} from "@google/genai";
-import {Type, GenerateContentResponse} from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
+import { Type, GenerateContentResponse } from "@google/genai";
 
 // --- Internal Helper for local algorithm (Fallback) ---
 interface Cluster {
@@ -337,7 +336,7 @@ export const generateSmartPairings = async (
   boatDefinitions: BoatDefinition[]
 ): Promise<Team[]> => {
   // Fix: Initialize ai using exact property object and spacing as defined in Gemini guidelines
-  const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
     // Separate system context for better instruction following

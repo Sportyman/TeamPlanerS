@@ -1,4 +1,3 @@
-
 import { 
   collection, 
   doc, 
@@ -28,7 +27,8 @@ import { Person, BoatInventory } from "../types";
 export const loginWithGoogle = async () => {
   try {
     const provider = new GoogleAuthProvider();
-    // forces the Google account selector to appear so users can switch accounts
+    
+    // קריטי: שורה זו מכריחה את גוגל להציג את מסך בחירת החשבון בכל פעם
     provider.setCustomParameters({ prompt: 'select_account' });
 
     const result = await signInWithPopup(auth, provider);
