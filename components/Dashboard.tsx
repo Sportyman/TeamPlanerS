@@ -2,12 +2,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
 import { Role, getRoleLabel, Person, Gender, BoatDefinition, APP_VERSION } from '../types';
-import { Trash2, UserPlus, Edit, X, Save, ArrowRight, Database, Ship, Users, Plus, Anchor, Wind, History as HistoryIcon, Camera, Search, Download, Upload, ShipWheel, AlertCircle } from 'lucide-react';
+import { Trash2, UserPlus, Edit, X, Save, ArrowRight, Database, Ship, Users, Plus, Anchor, Wind, History as HistoryIcon, Camera, Search, Download, Upload, ShipWheel, AlertCircle, Sparkles } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 type ViewMode = 'MENU' | 'PEOPLE' | 'INVENTORY' | 'SNAPSHOTS';
-
-const PHONE_REGEX = /^05\d-?\d{7}$/;
 
 const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel, type = 'DANGER' }: { 
     isOpen: boolean; 
@@ -131,7 +129,6 @@ export const Dashboard: React.FC = () => {
           session: sessions[activeClub],
           snapshots: snapshots[activeClub] || []
       };
-      
       const blob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -148,7 +145,6 @@ export const Dashboard: React.FC = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      
       setConfirmState({
           isOpen: true,
           title: 'שחזור מגיבוי',
@@ -234,8 +230,8 @@ export const Dashboard: React.FC = () => {
   const handleLoadDemo = () => {
       setConfirmState({
           isOpen: true,
-          title: 'טעינת נתוני דוגמה',
-          message: 'האם לטעון נתוני דוגמה? זה יחליף את הרשימה הנוכחית בגיבורי-על.',
+          title: 'טעינת גיבורי על',
+          message: 'האם לטעון את רשימת גיבורי העל כקבוצת דוגמה? המידע הקיים יימחק.',
           type: 'INFO',
           onConfirm: () => {
               loadDemoForActiveClub();
@@ -302,7 +298,7 @@ export const Dashboard: React.FC = () => {
               </div>
               <div className="mt-12 flex justify-center gap-4">
                   <button onClick={handleLoadDemo} className="text-slate-400 hover:text-brand-600 text-sm flex items-center gap-2 px-4 py-2 border rounded-full transition-all">
-                      <Database size={16} /> טען נתוני דוגמה
+                      <Sparkles size={16} /> טען גיבורי על
                   </button>
                   <button onClick={() => setConfirmState({ isOpen: true, title: 'איפוס כללי', message: 'האם לאפס את כל נתוני המועדון?', type: 'DANGER', onConfirm: () => { restoreDemoData(); setConfirmState(prev => ({...prev, isOpen: false})); }})} className="text-slate-400 hover:text-red-500 text-sm flex items-center gap-2 px-4 py-2 border rounded-full transition-all">
                       <Trash2 size={16} /> איפוס כללי
@@ -320,22 +316,159 @@ export const Dashboard: React.FC = () => {
       );
   }
 
-  if (view === 'SNAPSHOTS') {
+  if (view === 'PEOPLE') {
       return (
-          <div className="max-w-4xl mx-auto py-6 px-4 pb-24">
-              <div className="flex justify-between items-center mb-6">
-                <button onClick={() => setView('MENU')} className="flex items-center gap-2 text-slate-500 hover:text-brand-600 font-medium transition-colors">
-                    <ArrowRight size={20} /> חזרה לתפריט
-                </button>
-                <div className="flex gap-2">
-                    <button onClick={handleExport} className="p-2 border rounded-lg text-slate-400 hover:text-brand-600 transition-all"><Download size={20}/></button>
-                    <button onClick={handleImportClick} className="p-2 border rounded-lg text-slate-400 hover:text-brand-600 transition-all"><Upload size={20}/></button>
-                </div>
+        <div className="max-w-4xl mx-auto py-6 px-4 pb-20">
+          {/* TOP ROW: BACK (Right) | IMPORT/EXPORT (Left) */}
+          <div className="flex justify-between items-center mb-6">
+            <button onClick={() => setView('MENU')} className="flex items-center gap-2 text-slate-500 hover:text-brand-600 font-bold transition-colors">
+                <ArrowRight size={24} /> חזרה
+            </button>
+            <div className="flex gap-2">
+                <button onClick={handleExport} className="p-2 border rounded-lg text-slate-400 hover:text-brand-600 transition-all" title="ייצוא"><Download size={20}/></button>
+                <button onClick={handleImportClick} className="p-2 border rounded-lg text-slate-400 hover:text-brand-600 transition-all" title="ייבוא"><Upload size={20}/></button>
+                <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
+            </div>
+          </div>
+
+          <div className="space-y-6">
+              {/* SECOND ROW: NEW PARTICIPANT (Right) | SAVE GROUP (Left) */}
+              <div className="flex justify-between items-center">
+                  <button onClick={() => setIsAddFormOpen(true)} className="bg-emerald-600 text-white px-5 py-3 rounded-xl flex items-center gap-2 font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95">
+                      <UserPlus size={22} /> משתתף חדש
+                  </button>
+                  <button onClick={handleQuickSnapshot} className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-xl flex items-center gap-2 font-black shadow-lg shadow-purple-100 transition-all active:scale-95">
+                      <Camera size={20} /> שמור קבוצה
+                  </button>
               </div>
-              
+
+              <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
+                 <div className="relative flex-1 w-full">
+                    <Search className="absolute right-3 top-2.5 text-slate-400" size={18} />
+                    <input 
+                      type="text" 
+                      placeholder="חפש משתתף ברשימה..." 
+                      className="w-full pr-10 pl-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+                      value={peopleSearch}
+                      onChange={e => setPeopleSearch(e.target.value)}
+                    />
+                 </div>
+                 <button onClick={handleClearAll} className="text-xs text-red-500 flex items-center gap-1 hover:underline whitespace-nowrap font-bold"><Trash2 size={14}/> נקה הכל</button>
+              </div>
+
+              {clubPeople.length === 0 ? (
+                  <div className="bg-white p-12 rounded-2xl shadow-sm border-2 border-dashed border-slate-200 text-center flex flex-col items-center gap-4 animate-in fade-in zoom-in">
+                      <div className="bg-brand-50 p-6 rounded-full text-brand-600">
+                          <Users size={48} />
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-800 tracking-tight">נראה שאין עדיין משתתפים בחוג</h3>
+                      <p className="text-slate-500 max-w-xs mx-auto">כדי להתחיל, תוכל להוסיף משתתף ידנית או לטעון את רשימת גיבורי העל כדוגמה.</p>
+                      <button onClick={handleLoadDemo} className="bg-brand-600 text-white px-8 py-3 rounded-full font-black shadow-lg hover:bg-brand-700 transition-all flex items-center gap-2">
+                          <Sparkles size={20} /> טען גיבורי על (דוגמה)
+                      </button>
+                  </div>
+              ) : (
+                  <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                    <table className="w-full text-right">
+                        <thead className="bg-slate-50 border-b text-center">
+                            <tr>
+                                <th className="p-4 text-sm font-bold text-slate-600 text-right">שם מלא</th>
+                                <th className="p-4 text-sm font-bold text-slate-600 hidden md:table-cell">תפקיד</th>
+                                <th className="p-4 text-sm font-bold text-slate-600">פעולות</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                            {filteredClubPeople.map(p => (
+                                <tr key={p.id} className="hover:bg-slate-50/50">
+                                    <td className="p-4">
+                                        <div className="font-bold text-slate-800 flex items-center gap-2">
+                                            {p.name}
+                                            {p.isSkipper && <ShipWheel size={14} className="text-blue-600" />}
+                                            {p.tags?.includes('קבוצה לדוגמה') && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">דוגמה</span>}
+                                        </div>
+                                        <div className="text-xs text-slate-400">{getRoleLabel(p.role, p.gender)} • רמה {p.rank}</div>
+                                    </td>
+                                    <td className="p-4 hidden md:table-cell text-center">
+                                        <span className={`text-xs px-2 py-1 rounded-full font-bold ${getRoleBadgeStyle(p.role)}`}>{getRoleLabel(p.role, p.gender)}</span>
+                                    </td>
+                                    <td className="p-4">
+                                        <div className="flex gap-4 justify-center">
+                                            <button onClick={() => setEditingPerson(p)} className="p-2 text-slate-400 hover:text-brand-600 transition-colors"><Edit size={18} /></button>
+                                            <button onClick={() => setConfirmState({ isOpen: true, title: 'מחיקת משתתף', message: `האם למחוק את ${p.name}?`, type: 'DANGER', onConfirm: () => { removePerson(p.id); setConfirmState(prev => ({...prev, isOpen: false})); }})} className="p-2 text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={18} /></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                  </div>
+              )}
+          </div>
+          
+          {(isAddFormOpen || editingPerson) && (
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in duration-300">
+                      <div className="p-6 border-b bg-slate-50 flex justify-between items-center">
+                          <h3 className="font-bold text-xl text-slate-800">{editingPerson ? 'עריכת משתתף' : 'הוספת משתתף'}</h3>
+                          <button onClick={editingPerson ? () => setEditingPerson(null) : resetAddForm} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={20}/></button>
+                      </div>
+                      <form onSubmit={editingPerson ? handleUpdate : handleAdd} className="p-6 space-y-5 text-right overflow-y-auto">
+                          <div>
+                              <label className="block text-sm font-bold text-slate-700 mb-1.5">שם מלא</label>
+                              <input required type="text" className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={editingPerson ? editingPerson.name : newName} onChange={e => editingPerson ? setEditingPerson({...editingPerson, name: e.target.value}) : setNewName(e.target.value)} />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5">תפקיד</label>
+                                <select className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none" value={editingPerson ? editingPerson.role : newRole} onChange={e => editingPerson ? setEditingPerson({...editingPerson, role: e.target.value as Role}) : setNewRole(e.target.value as Role)}>
+                                    {Object.values(Role).map(r => <option key={r} value={r}>{getRoleLabel(r, Gender.MALE)}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5">דירוג (1-5)</label>
+                                <input type="number" min="1" max="5" className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none" value={editingPerson ? editingPerson.rank : newRank} onChange={e => editingPerson ? setEditingPerson({...editingPerson, rank: Number(e.target.value)}) : setNewRank(Number(e.target.value))} />
+                            </div>
+                          </div>
+                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                              <label className="flex items-center gap-3 cursor-pointer">
+                                 <input type="checkbox" checked={editingPerson ? editingPerson.isSkipper : newIsSkipper} onChange={e => editingPerson ? setEditingPerson({...editingPerson, isSkipper: e.target.checked}) : setNewIsSkipper(e.target.checked)} className="w-5 h-5 accent-brand-600" />
+                                 <span className="font-bold text-slate-700">סקיפר מוסמך</span>
+                              </label>
+                              <p className="text-xs text-slate-400 mt-1 mr-8">משתתף שיכול להוביל סירה לבדו.</p>
+                          </div>
+                          <div className="flex gap-3 pt-4">
+                              <button type="submit" className="flex-1 bg-brand-600 hover:bg-brand-700 text-white py-4 rounded-xl font-black shadow-lg shadow-brand-200 transition-all active:scale-95">שמור</button>
+                              <button type="button" onClick={editingPerson ? () => setEditingPerson(null) : resetAddForm} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-4 rounded-xl font-bold transition-all">ביטול</button>
+                          </div>
+                      </form>
+                  </div>
+              </div>
+          )}
+
+          <ConfirmModal 
+            isOpen={confirmState.isOpen} 
+            title={confirmState.title} 
+            message={confirmState.message} 
+            onConfirm={confirmState.onConfirm} 
+            onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))} 
+            type={confirmState.type}
+          />
+        </div>
+      );
+  }
+
+  // Fallback for snapshots and inventory
+  return (
+      <div className="max-w-4xl mx-auto py-6 px-4 pb-20">
+          <div className="flex justify-between items-center mb-6">
+            <button onClick={() => setView('MENU')} className="flex items-center gap-2 text-slate-500 hover:text-brand-600 font-bold transition-colors">
+                <ArrowRight size={24} /> חזרה
+            </button>
+          </div>
+          {view === 'SNAPSHOTS' && (
               <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                   <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-                      <HistoryIcon className="text-purple-600" /> קבוצות וגרסאות שמורות
+                      <HistoryIcon className="text-purple-600" /> קבוצות שמורות
                   </h2>
                   <div className="space-y-4">
                       {currentSnapshots.map(snap => (
@@ -353,223 +486,35 @@ export const Dashboard: React.FC = () => {
                       {currentSnapshots.length === 0 && <p className="text-center text-slate-400 py-8 italic">אין קבוצות שמורות עדיין.</p>}
                   </div>
               </div>
-              <ConfirmModal 
-                isOpen={confirmState.isOpen} 
-                title={confirmState.title} 
-                message={confirmState.message} 
-                onConfirm={confirmState.onConfirm} 
-                onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))} 
-                type={confirmState.type}
-              />
-          </div>
-      );
-  }
-
-  if (view === 'INVENTORY') {
-      return (
-          <div className="max-w-4xl mx-auto py-6 px-4 pb-24">
-              <div className="flex justify-between items-center mb-6">
-                <button onClick={() => setView('MENU')} className="flex items-center gap-2 text-slate-500 hover:text-brand-600 font-medium transition-colors">
-                    <ArrowRight size={20} /> חזרה לתפריט
-                </button>
-                <div className="flex gap-2">
-                    <button onClick={handleExport} className="p-2 border rounded-lg text-slate-400 hover:text-brand-600 transition-all"><Download size={20}/></button>
-                    <button onClick={handleImportClick} className="p-2 border rounded-lg text-slate-400 hover:text-brand-600 transition-all"><Upload size={20}/></button>
-                </div>
-              </div>
-              
+          )}
+          {view === 'INVENTORY' && (
               <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                   <div className="flex justify-between items-center mb-6">
                       <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
-                          <Ship className="text-orange-600" /> הגדרות ציוד ומלאי
+                          <Ship className="text-orange-600" /> הגדרות ציוד
                       </h2>
                       {hasChanges && (
                           <button onClick={handleSaveInventory} className="bg-brand-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 animate-pulse">
-                              <Save size={18} /> שמור שינויים
+                              <Save size={18} /> שמור
                           </button>
                       )}
                   </div>
-
-                  <div className="space-y-4 mb-8">
+                  <div className="space-y-4">
                       {draftDefs.map(def => (
-                          <div key={def.id} className="p-4 border rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50">
+                          <div key={def.id} className="p-4 border rounded-xl flex items-center justify-between bg-slate-50">
                               <div className="flex-1">
                                   <div className="font-bold text-slate-800 text-lg">{def.label}</div>
-                                  <div className="flex flex-wrap gap-3 mt-1 text-sm text-slate-500">
-                                      <span className="flex items-center gap-1"><Users size={14}/> קיבולת: {def.capacity}</span>
-                                      <span className="flex items-center gap-1"><Database size={14}/> מלאי קבוע: {def.defaultCount}</span>
-                                      <span className="flex items-center gap-1">{def.isStable ? <Anchor size={14}/> : <Wind size={14}/>} {def.isStable ? 'יציב' : 'מהיר'}</span>
-                                      {def.minSkippers ? <span className="flex items-center gap-1 text-blue-600 font-bold"><ShipWheel size={14} /> נדרש סקיפר</span> : null}
+                                  <div className="flex gap-3 mt-1 text-sm text-slate-500">
+                                      <span className="flex items-center gap-1"><Users size={14}/> {def.capacity}</span>
+                                      <span className="flex items-center gap-1"><Database size={14}/> {def.defaultCount}</span>
                                   </div>
                               </div>
-                              <button onClick={() => handleRemoveBoat(def.id)} className="text-slate-400 hover:text-red-500 p-2 self-end md:self-center">
-                                  <Trash2 size={20} />
-                              </button>
+                              <button onClick={() => handleRemoveBoat(def.id)} className="text-slate-400 hover:text-red-500 p-2"><Trash2 size={20} /></button>
                           </div>
                       ))}
-                      {draftDefs.length === 0 && <p className="text-center text-slate-400 py-8">לא הוגדר ציוד עדיין.</p>}
                   </div>
-
-                  {!isAddingBoat ? (
-                      <button onClick={() => setIsAddingBoat(true)} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 hover:border-brand-300 hover:text-brand-600 transition-all font-bold flex items-center justify-center gap-2">
-                          <Plus size={20} /> הוסף סוג כלי שיט חדש
-                      </button>
-                  ) : (
-                      <form onSubmit={handleAddBoat} className="bg-slate-50 p-6 rounded-xl border border-slate-200 space-y-4 animate-in slide-in-from-bottom-2">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="col-span-1 md:col-span-2">
-                                  <label className="block text-sm font-bold mb-1">שם הכלי (למשל: קיאק זוגי צהוב)</label>
-                                  <input required type="text" className="w-full p-2 border rounded-lg" value={newBoatName} onChange={e => setNewBoatName(e.target.value)} />
-                              </div>
-                              <div>
-                                  <label className="block text-sm font-bold mb-1">קיבולת משתתפים בסירה</label>
-                                  <input type="number" min="1" className="w-full p-2 border rounded-lg" value={newBoatCapacity} onChange={e => setNewBoatCapacity(Number(e.target.value))} />
-                              </div>
-                              <div>
-                                  <label className="block text-sm font-bold mb-1">מלאי קבוע (כמה יש במועדון?)</label>
-                                  <input type="number" min="0" className="w-full p-2 border rounded-lg" value={newBoatCount} onChange={e => setNewBoatCount(Number(e.target.value))} />
-                              </div>
-                          </div>
-                          <div className="flex gap-2 pt-2">
-                              <button type="submit" className="flex-1 bg-brand-600 text-white py-2 rounded-lg font-bold">הוסף לרשימה</button>
-                              <button type="button" onClick={() => setIsAddingBoat(false)} className="bg-slate-200 px-4 py-2 rounded-lg font-bold">ביטול</button>
-                          </div>
-                      </form>
-                  )}
               </div>
-          </div>
-      );
-  }
-
-  return (
-    <div className="space-y-6 pb-20">
-      <div className="flex justify-between items-center mb-6">
-        <button onClick={() => setView('MENU')} className="flex items-center gap-2 text-slate-500 hover:text-brand-600 font-medium transition-colors">
-            <ArrowRight size={20} /> חזרה לתפריט
-        </button>
-        <div className="flex gap-2">
-            <button onClick={handleExport} className="p-2 border rounded-lg text-slate-400 hover:text-brand-600 transition-all" title="ייצוא רשימה"><Download size={20}/></button>
-            <button onClick={handleImportClick} className="p-2 border rounded-lg text-slate-400 hover:text-brand-600 transition-all" title="ייבוא רשימה"><Upload size={20}/></button>
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
-        </div>
+          )}
       </div>
-
-      <div className="space-y-6">
-          <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-slate-800">רשימת משתתפים ({clubPeople.length})</h2>
-              <div className="flex gap-3">
-                  <button onClick={handleQuickSnapshot} className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-xl flex items-center gap-2 font-black shadow-lg shadow-purple-200 transition-all active:scale-95">
-                      <Camera size={20} /> שמור קבוצה
-                  </button>
-                  <button onClick={() => setIsAddFormOpen(true)} className="bg-brand-600 text-white px-5 py-3 rounded-xl flex items-center gap-2 font-black shadow-lg shadow-brand-200 hover:bg-brand-500 transition-all active:scale-95">
-                      <UserPlus size={22} /> משתתף חדש
-                  </button>
-              </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
-             <div className="relative flex-1 w-full">
-                <Search className="absolute right-3 top-2.5 text-slate-400" size={18} />
-                <input 
-                  type="text" 
-                  placeholder="חפש משתתף ברשימה..." 
-                  className="w-full pr-10 pl-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
-                  value={peopleSearch}
-                  onChange={e => setPeopleSearch(e.target.value)}
-                />
-             </div>
-             <button onClick={handleClearAll} className="text-xs text-red-500 flex items-center gap-1 hover:underline whitespace-nowrap font-bold"><Trash2 size={14}/> נקה הכל</button>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-            <table className="w-full text-right">
-                <thead className="bg-slate-50 border-b text-center">
-                    <tr>
-                        <th className="p-4 text-sm font-bold text-slate-600 text-right">שם מלא</th>
-                        <th className="p-4 text-sm font-bold text-slate-600 hidden md:table-cell">תפקיד</th>
-                        <th className="p-4 text-sm font-bold text-slate-600">פעולות</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y">
-                    {filteredClubPeople.map(p => (
-                        <tr key={p.id} className="hover:bg-slate-50/50">
-                            <td className="p-4">
-                                <div className="font-bold text-slate-800 flex items-center gap-2">
-                                    {p.name}
-                                    {p.isSkipper && <ShipWheel size={14} className="text-blue-600" />}
-                                    {p.tags?.includes('קבוצה לדוגמה') && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">דוגמה</span>}
-                                </div>
-                                <div className="text-xs text-slate-400">{getRoleLabel(p.role, p.gender)} • רמה {p.rank}</div>
-                            </td>
-                            <td className="p-4 hidden md:table-cell text-center">
-                                <span className={`text-xs px-2 py-1 rounded-full font-bold ${getRoleBadgeStyle(p.role)}`}>{getRoleLabel(p.role, p.gender)}</span>
-                            </td>
-                            <td className="p-4">
-                                <div className="flex gap-4 justify-center">
-                                    <button onClick={() => setEditingPerson(p)} className="p-2 text-slate-400 hover:text-brand-600 transition-colors"><Edit size={18} /></button>
-                                    <button onClick={() => setConfirmState({ isOpen: true, title: 'מחיקת משתתף', message: `האם למחוק את ${p.name}?`, type: 'DANGER', onConfirm: () => { removePerson(p.id); setConfirmState(prev => ({...prev, isOpen: false})); }})} className="p-2 text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={18} /></button>
-                                </div>
-                            </td>
-                        </tr>
-                    ))}
-                    {filteredClubPeople.length === 0 && (
-                        <tr>
-                            <td colSpan={3} className="p-12 text-center text-slate-400 italic">לא נמצאו משתתפים.</td>
-                        </tr>
-                    )}
-                </tbody>
-            </table>
-          </div>
-      </div>
-
-      {(isAddFormOpen || editingPerson) && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in duration-300">
-                  <div className="p-6 border-b bg-slate-50 flex justify-between items-center">
-                      <h3 className="font-bold text-xl text-slate-800">{editingPerson ? 'עריכת משתתף' : 'הוספת משתתף'}</h3>
-                      <button onClick={editingPerson ? () => setEditingPerson(null) : resetAddForm} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={20}/></button>
-                  </div>
-                  <form onSubmit={editingPerson ? handleUpdate : handleAdd} className="p-6 space-y-5 text-right overflow-y-auto">
-                      <div>
-                          <label className="block text-sm font-bold text-slate-700 mb-1.5">שם מלא</label>
-                          <input required type="text" className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={editingPerson ? editingPerson.name : newName} onChange={e => editingPerson ? setEditingPerson({...editingPerson, name: e.target.value}) : setNewName(e.target.value)} />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1.5">תפקיד</label>
-                            <select className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none" value={editingPerson ? editingPerson.role : newRole} onChange={e => editingPerson ? setEditingPerson({...editingPerson, role: e.target.value as Role}) : setNewRole(e.target.value as Role)}>
-                                {Object.values(Role).map(r => <option key={r} value={r}>{getRoleLabel(r, Gender.MALE)}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1.5">דירוג (1-5)</label>
-                            <input type="number" min="1" max="5" className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none" value={editingPerson ? editingPerson.rank : newRank} onChange={e => editingPerson ? setEditingPerson({...editingPerson, rank: Number(e.target.value)}) : setNewRank(Number(e.target.value))} />
-                        </div>
-                      </div>
-                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                          <label className="flex items-center gap-3 cursor-pointer">
-                             <input type="checkbox" checked={editingPerson ? editingPerson.isSkipper : newIsSkipper} onChange={e => editingPerson ? setEditingPerson({...editingPerson, isSkipper: e.target.checked}) : setNewIsSkipper(e.target.checked)} className="w-5 h-5 accent-brand-600" />
-                             <span className="font-bold text-slate-700">סקיפר מוסמך</span>
-                          </label>
-                          <p className="text-xs text-slate-400 mt-1 mr-8">משתתף שיכול להוביל סירה לבדו (נדרש בסוגי סירות מסוימים).</p>
-                      </div>
-                      <div className="flex gap-3 pt-4">
-                          <button type="submit" className="flex-1 bg-brand-600 hover:bg-brand-700 text-white py-4 rounded-xl font-black shadow-lg shadow-brand-200 transition-all active:scale-95">שמור</button>
-                          <button type="button" onClick={editingPerson ? () => setEditingPerson(null) : resetAddForm} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-4 rounded-xl font-bold transition-all">ביטול</button>
-                      </div>
-                  </form>
-              </div>
-          </div>
-      )}
-
-      <ConfirmModal 
-        isOpen={confirmState.isOpen} 
-        title={confirmState.title} 
-        message={confirmState.message} 
-        onConfirm={confirmState.onConfirm} 
-        onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))} 
-        type={confirmState.type}
-      />
-    </div>
   );
 };
