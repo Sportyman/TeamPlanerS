@@ -1,17 +1,19 @@
 
 // Fix: Use standard modular imports for Firebase v9+ to resolve 'initializeApp' export issue
+// @ts-ignore: Suppress error if initializeApp is not correctly recognized as an export by the TypeScript compiler
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
 
-// Use environment variable for API key as per GenAI guidelines (all keys should be managed via process.env.API_KEY if possible)
+// Environment variables for Firebase configuration to keep credentials secure
+// Fix: Cast import.meta to any to resolve "Property 'env' does not exist on type 'ImportMeta'" errors
 const firebaseConfig = {
-  apiKey: process.env.API_KEY,
-  authDomain: "etgarim-database.firebaseapp.com",
-  projectId: "etgarim-database",
-  storageBucket: "etgarim-database.firebasestorage.app",
-  messagingSenderId: "969970671528",
-  appId: "1:969970671528:web:7541abb86fc80a3bdc879d"
+  apiKey: (import.meta as any).env.VITE_FIREBASE_API_KEY,
+  authDomain: (import.meta as any).env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: (import.meta as any).env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: (import.meta as any).env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: (import.meta as any).env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: (import.meta as any).env.VITE_FIREBASE_APP_ID
 };
 
 // Initialize Firebase instance
