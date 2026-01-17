@@ -1,11 +1,12 @@
 
 // Fix: Use standard modular imports for Firebase v9+ to resolve 'initializeApp' export issue
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore, enableMultiTabIndexedDbPersistence } from "firebase/firestore";
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
 
+// Use environment variable for API key as per GenAI guidelines (all keys should be managed via process.env.API_KEY if possible)
 const firebaseConfig = {
-  apiKey: "AIzaSyCYGI1blVRY6ZIZSDTfST66aL_FQeBgvUk",
+  apiKey: process.env.API_KEY,
   authDomain: "etgarim-database.firebaseapp.com",
   projectId: "etgarim-database",
   storageBucket: "etgarim-database.firebasestorage.app",
