@@ -90,7 +90,7 @@ export interface PersonSnapshot {
   people: Person[];
 }
 
-export const APP_VERSION = '3.1.5'; 
+export const APP_VERSION = '3.1.6'; 
 
 export const TEAM_COLORS = [
   'bg-blue-50 border-blue-200',      

@@ -231,7 +231,7 @@ export const Dashboard: React.FC = () => {
       setConfirmState({
           isOpen: true,
           title: 'טעינת גיבורי על',
-          message: 'האם לטעון את רשימת גיבורי העל כקבוצת דוגמה? המידע הקיים יימחק.',
+          message: 'האם לטעון את רשימת גיבורי העל כקבוצת דוגמה? המידע הקיים ב-Firebase עבור חוג זה יוחלף.',
           type: 'INFO',
           onConfirm: () => {
               loadDemoForActiveClub();
