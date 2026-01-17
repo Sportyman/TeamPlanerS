@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { 
   Person, Role, SessionState, Team, BoatInventory, BoatType, ClubID, UserPermission, 
-  Gender, ClubSettings, BoatDefinition, Club, SyncStatus, RoleColor, Participant, ClubMembership
+  Gender, DefaultBoatTypes, ClubSettings, BoatDefinition, Club, SyncStatus, PersonSnapshot 
 } from './types';
 import { generateSmartPairings } from './services/pairingLogic';
 import { DEFAULT_CLUBS, INITIAL_PEOPLE, KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from './mockData';
@@ -20,13 +20,6 @@ const createInventoryFromDefs = (defs: BoatDefinition[]): BoatInventory => {
 
 const EMPTY_SESSION = { inventory: {}, presentPersonIds: [], teams: [] };
 
-const DEFAULT_ROLE_COLORS: Record<Role, RoleColor> = {
-    [Role.INSTRUCTOR]: 'cyan',
-    [Role.VOLUNTEER]: 'orange',
-    [Role.MEMBER]: 'purple',
-    [Role.GUEST]: 'emerald'
-};
-
 interface AppState {
   user: { email: string; isAdmin: boolean; photoURL?: string } | null;
   activeClub: ClubID | null;
@@ -38,9 +31,12 @@ interface AppState {
   superAdmins: string[]; 
   permissions: UserPermission[];
   
-  people: Participant[]; // Global identity pool
+  people: Person[];
   sessions: Record<ClubID, SessionState>;
   clubSettings: Record<ClubID, ClubSettings>;
+  snapshots: Record<ClubID, PersonSnapshot[]>;
+  histories: Record<ClubID, Team[][]>;
+  futures: Record<ClubID, Team[][]>;
   
   // Actions
   loginWithGoogle: () => Promise<boolean>;
@@ -49,47 +45,58 @@ interface AppState {
   setActiveClub: (clubId: ClubID) => void;
   setSyncStatus: (status: SyncStatus) => void;
   
-  // Super Admin Actions (Restricted for God Mode)
+  // Super Admin Actions
   addClub: (label: string) => void;
   removeClub: (id: string) => void;
   addSuperAdmin: (email: string) => void;
   removeSuperAdmin: (email: string) => void;
+  
   addPermission: (email: string, clubId: ClubID) => void;
   removePermission: (email: string, clubId: ClubID) => void;
   
-  // Identity & Membership Actions
-  addParticipant: (p: Omit<Participant, 'id' | 'createdAt' | 'memberships'>) => string;
-  updateParticipant: (p: Partial<Participant> & { id: string }) => void;
-  addMemberToClub: (participantId: string, clubId: ClubID, membership: Omit<ClubMembership, 'joinedClubAt' | 'participationDates'>) => void;
-  removeMemberFromClub: (participantId: string, clubId: ClubID) => void;
+  // Data actions
+  setCloudData: (data: { people: Person[], sessions: Record<ClubID, SessionState>, settings: Record<ClubID, ClubSettings>, snapshots?: Record<ClubID, PersonSnapshot[]>, lastUpdated?: string }) => void;
+  addPerson: (person: Omit<Person, 'clubId'>) => void;
+  updatePerson: (person: Person) => void;
+  removePerson: (id: string) => void;
+  clearClubPeople: () => void;
+  restoreDemoData: () => void;
+  loadDemoForActiveClub: () => void;
+  importClubData: (data: any) => void;
   
-  // Session Actions
+  // Snapshots
+  saveSnapshot: (name: string) => void;
+  loadSnapshot: (snapshotId: string) => void;
+  deleteSnapshot: (snapshotId: string) => void;
+
+  // Session Management
   toggleAttendance: (id: string) => void;
   setBulkAttendance: (ids: string[]) => void;
   updateInventory: (inventory: BoatInventory) => void;
+  
+  // Boat Definitions
+  addBoatDefinition: (def: BoatDefinition) => void;
+  updateBoatDefinition: (def: BoatDefinition) => void;
+  removeBoatDefinition: (boatId: string) => void;
+  saveBoatDefinitions: (defs: BoatDefinition[]) => void;
+
   runPairing: () => void;
   resetSession: () => void;
-
-  // Settings
-  updateRoleColor: (role: Role, color: RoleColor) => void;
-  saveBoatDefinitions: (defs: BoatDefinition[]) => void;
   
-  setCloudData: (data: any) => void;
-  restoreDemoData: () => void;
-  
-  // Reorder/Manual UI Helpers
+  // Board Manipulation
+  addManualTeam: () => void;
+  removeTeam: (teamId: string) => void;
+  addGuestToTeam: (teamId: string, name: string) => void;
+  assignMemberToTeam: (teamId: string, personId: string) => void;
+  removeMemberFromTeam: (teamId: string, personId: string) => void;
+  moveMemberToTeam: (personId: string, targetTeamId: string) => void;
   reorderSessionMembers: (sourceTeamId: string, sourceIndex: number, destTeamId: string, destIndex: number) => void;
   swapMembers: (teamAId: string, indexA: number, teamBId: string, indexB: number) => void;
   updateTeamBoatType: (teamId: string, boatType: BoatType) => void;
+  
   undo: () => void;
   redo: () => void;
 }
-
-const flattenParticipant = (p: Participant, clubId: ClubID): Person | null => {
-    const membership = p.memberships[clubId];
-    if (!membership) return null;
-    return { ...membership, id: p.id, name: p.name, gender: p.gender, phone: p.phone, email: p.email, clubId };
-};
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -99,18 +106,25 @@ export const useAppStore = create<AppState>()(
       pairingDirty: false,
       syncStatus: 'OFFLINE',
       lastSyncTime: null,
+      
       clubs: DEFAULT_CLUBS,
       superAdmins: [ROOT_ADMIN_EMAIL],
       permissions: [], 
-      people: [],
+      people: INITIAL_PEOPLE,
+      
       sessions: {
         'KAYAK': { ...EMPTY_SESSION, inventory: createInventoryFromDefs(KAYAK_DEFINITIONS) },
         'SAILING': { ...EMPTY_SESSION, inventory: createInventoryFromDefs(SAILING_DEFINITIONS) },
       },
+      
       clubSettings: {
-        'KAYAK': { boatDefinitions: KAYAK_DEFINITIONS, roleColors: { ...DEFAULT_ROLE_COLORS } },
-        'SAILING': { boatDefinitions: SAILING_DEFINITIONS, roleColors: { ...DEFAULT_ROLE_COLORS } },
+        'KAYAK': { boatDefinitions: KAYAK_DEFINITIONS },
+        'SAILING': { boatDefinitions: SAILING_DEFINITIONS },
       },
+
+      snapshots: {},
+      histories: { 'KAYAK': [], 'SAILING': [] },
+      futures: { 'KAYAK': [], 'SAILING': [] },
 
       setActiveClub: (clubId) => set({ activeClub: clubId }),
       setSyncStatus: (status) => set({ syncStatus: status }),
@@ -118,8 +132,9 @@ export const useAppStore = create<AppState>()(
       loginWithGoogle: async () => {
         try {
           const result = await signInWithPopup(auth, googleProvider);
-          const email = (result.user.email || '').toLowerCase().trim();
+          const email = result.user.email?.toLowerCase() || '';
           const { activeClub, permissions, superAdmins } = get();
+
           const isSuperAdmin = email === ROOT_ADMIN_EMAIL.toLowerCase() || superAdmins.some(a => a.toLowerCase() === email);
           const userPerm = permissions.find(p => p.email.toLowerCase() === email);
           const hasClubAccess = userPerm && activeClub && userPerm.allowedClubs.includes(activeClub);
@@ -128,209 +143,494 @@ export const useAppStore = create<AppState>()(
             set({ user: { email, isAdmin: isSuperAdmin, photoURL: result.user.photoURL || undefined } });
             return true;
           }
+          
           await signOut(auth);
-          alert('אין לך הרשאות גישה.');
+          alert('אין לך הרשאות גישה למועדון זה.');
           return false;
-        } catch (error) { return false; }
+        } catch (error) {
+          console.error("Login error:", error);
+          return false;
+        }
       },
 
       loginDev: (email) => {
-        const normalized = email.toLowerCase().trim();
-        const isSuperAdmin = normalized === ROOT_ADMIN_EMAIL.toLowerCase() || get().superAdmins.some(a => a.toLowerCase() === normalized);
-        set({ user: { email: normalized, isAdmin: isSuperAdmin } });
+        const normalizedEmail = email.toLowerCase().trim();
+        const { superAdmins } = get();
+        const isSuperAdmin = normalizedEmail === ROOT_ADMIN_EMAIL.toLowerCase() || superAdmins.some(a => a.toLowerCase() === normalizedEmail);
+        set({ user: { email: normalizedEmail, isAdmin: isSuperAdmin } });
         return true;
       },
 
-      logout: async () => { await signOut(auth); set({ user: null }); },
+      logout: async () => {
+        await signOut(auth);
+        set({ user: null });
+      },
 
-      addSuperAdmin: (email) => set(state => ({ superAdmins: Array.from(new Set([...state.superAdmins, email.toLowerCase().trim()])) })),
-      removeSuperAdmin: (email) => set(state => {
-          if (email.toLowerCase() === ROOT_ADMIN_EMAIL.toLowerCase()) {
-              alert("לא ניתן להסיר את מנהל העל הראשי.");
-              return state;
-          }
-          return { superAdmins: state.superAdmins.filter(a => a.toLowerCase() !== email.toLowerCase()) };
-      }),
+      setCloudData: (data) => set((state) => ({
+        people: data.people || state.people,
+        sessions: { ...state.sessions, ...data.sessions },
+        clubSettings: { ...state.clubSettings, ...data.settings },
+        snapshots: data.snapshots ? { ...state.snapshots, ...data.snapshots } : state.snapshots,
+        lastSyncTime: data.lastUpdated || state.lastSyncTime,
+        syncStatus: 'SYNCED'
+      })),
 
       addClub: (label) => set(state => {
           const newId = 'CLUB-' + Date.now();
+          const newClub: Club = { id: newId, label };
           return {
-              clubs: [...state.clubs, { id: newId, label }],
-              clubSettings: { ...state.clubSettings, [newId]: { boatDefinitions: [], roleColors: { ...DEFAULT_ROLE_COLORS } } },
-              sessions: { ...state.sessions, [newId]: { ...EMPTY_SESSION } }
+              clubs: [...state.clubs, newClub],
+              clubSettings: { ...state.clubSettings, [newId]: { boatDefinitions: [] } },
+              sessions: { ...state.sessions, [newId]: { ...EMPTY_SESSION } },
+              histories: { ...state.histories, [newId]: [] },
+              futures: { ...state.futures, [newId]: [] }
           };
       }),
 
-      removeClub: (id) => set(state => ({ clubs: state.clubs.filter(c => c.id !== id) })),
+      removeClub: (id) => set(state => {
+          const isActive = state.activeClub === id;
+          return {
+              clubs: state.clubs.filter(c => c.id !== id),
+              activeClub: isActive ? null : state.activeClub
+          };
+      }),
+
+      addSuperAdmin: (email) => set(state => ({
+          superAdmins: [...state.superAdmins, email.trim()]
+      })),
+
+      removeSuperAdmin: (email) => set(state => {
+          if (email.toLowerCase() === ROOT_ADMIN_EMAIL.toLowerCase()) return state;
+          return {
+              superAdmins: state.superAdmins.filter(a => a.toLowerCase() !== email.toLowerCase())
+          };
+      }),
 
       addPermission: (email, clubId) => set(state => {
-          const existing = state.permissions.find(p => p.email === email);
-          const newPerms = existing 
-            ? state.permissions.map(p => p.email === email ? { ...p, allowedClubs: Array.from(new Set([...p.allowedClubs, clubId])) } : p)
-            : [...state.permissions, { email, allowedClubs: [clubId] }];
-          return { permissions: newPerms };
+        const existing = state.permissions.find(p => p.email === email);
+        let newPermissions;
+        if (existing) {
+          if (existing.allowedClubs.includes(clubId)) return state;
+          newPermissions = state.permissions.map(p => 
+            p.email === email ? { ...p, allowedClubs: [...p.allowedClubs, clubId] } : p
+          );
+        } else {
+          newPermissions = [...state.permissions, { email, allowedClubs: [clubId] }];
+        }
+        return { permissions: newPermissions };
       }),
 
       removePermission: (email, clubId) => set(state => ({
-          permissions: state.permissions.map(p => p.email === email ? { ...p, allowedClubs: p.allowedClubs.filter(c => c !== clubId) } : p).filter(p => p.allowedClubs.length > 0)
+        permissions: state.permissions.map(p => 
+          p.email === email 
+            ? { ...p, allowedClubs: p.allowedClubs.filter(c => c !== clubId) }
+            : p
+        ).filter(p => p.allowedClubs.length > 0)
       })),
 
-      addParticipant: (data) => {
-          const id = Date.now().toString();
-          const newP: Participant = { ...data, id, createdAt: new Date().toISOString(), memberships: {} };
-          set(state => ({ people: [...state.people, newP] }));
-          return id;
-      },
-
-      updateParticipant: (update) => set(state => ({
-          people: state.people.map(p => p.id === update.id ? { ...p, ...update } : p)
+      addPerson: (personData) => set((state) => {
+        if (!state.activeClub) return state;
+        const newPerson: Person = { 
+            ...personData, 
+            clubId: state.activeClub,
+            createdAt: new Date().toISOString()
+        };
+        return { 
+          people: [...state.people, newPerson],
+          pairingDirty: true 
+        };
+      }),
+      
+      updatePerson: (updatedPerson) => set((state) => ({
+        people: state.people.map(p => p.id === updatedPerson.id ? updatedPerson : p),
+        pairingDirty: true
       })),
 
-      addMemberToClub: (pId, clubId, membership) => set(state => ({
-          people: state.people.map(p => p.id === pId ? {
-              ...p, memberships: { ...p.memberships, [clubId]: { ...membership, joinedClubAt: new Date().toISOString(), participationDates: [] } }
-          } : p)
+      removePerson: (id) => set((state) => ({ 
+        people: state.people.filter(p => p.id !== id),
+        pairingDirty: true
       })),
 
-      removeMemberFromClub: (pId, clubId) => set(state => ({
-          people: state.people.map(p => {
-              if (p.id === pId) {
-                  const newM = { ...p.memberships };
-                  delete newM[clubId];
-                  return { ...p, memberships: newM };
-              }
-              return p;
-          }).filter(p => Object.keys(p.memberships).length > 0)
-      })),
-
-      toggleAttendance: (id) => set(state => {
+      clearClubPeople: () => set(state => {
           const clubId = state.activeClub;
           if (!clubId) return state;
-          const session = state.sessions[clubId];
-          const isPresent = session.presentPersonIds.includes(id);
-          const newPresent = isPresent ? session.presentPersonIds.filter(pid => pid !== id) : [...session.presentPersonIds, id];
+          return {
+              people: state.people.filter(p => p.clubId !== clubId),
+              pairingDirty: true
+          };
+      }),
+
+      restoreDemoData: () => set(() => {
+        return { 
+          clubs: DEFAULT_CLUBS,
+          people: INITIAL_PEOPLE,
+          clubSettings: {
+             'KAYAK': { boatDefinitions: KAYAK_DEFINITIONS },
+             'SAILING': { boatDefinitions: SAILING_DEFINITIONS }
+          },
+          sessions: {
+            'KAYAK': { ...EMPTY_SESSION, inventory: createInventoryFromDefs(KAYAK_DEFINITIONS) },
+            'SAILING': { ...EMPTY_SESSION, inventory: createInventoryFromDefs(SAILING_DEFINITIONS) },
+          },
+          snapshots: {},
+          pairingDirty: false
+        };
+      }),
+
+      loadDemoForActiveClub: () => set(state => {
+          const clubId = state.activeClub;
+          if (!clubId) return state;
+          const otherPeople = state.people.filter(p => p.clubId !== clubId);
+          const demoPeople = INITIAL_PEOPLE.filter(p => p.clubId === clubId).map(p => ({
+              ...p,
+              createdAt: new Date().toISOString()
+          }));
+          return {
+              people: [...otherPeople, ...demoPeople],
+              pairingDirty: true
+          };
+      }),
+
+      importClubData: (data: any) => set((state) => {
+          if (!state.activeClub) return state;
+          const currentClubId = state.activeClub;
+          if (!data || !data.clubId || data.clubId !== currentClubId) {
+             alert("קובץ זה אינו תואם לחוג הנוכחי.");
+             return state;
+          }
+          const otherPeople = state.people.filter(p => p.clubId !== currentClubId);
+          const importedPeople = (data.people || []).map((p: Person) => ({
+              ...p,
+              clubId: currentClubId
+          }));
+          return {
+              people: [...otherPeople, ...importedPeople],
+              clubSettings: { ...state.clubSettings, [currentClubId]: data.settings || { boatDefinitions: [] } },
+              sessions: { ...state.sessions, [currentClubId]: data.session || EMPTY_SESSION },
+              snapshots: data.snapshots ? { ...state.snapshots, [currentClubId]: data.snapshots } : state.snapshots,
+              pairingDirty: true
+          };
+      }),
+
+      saveSnapshot: (name) => set(state => {
+          const clubId = state.activeClub;
+          if (!clubId) return state;
+          const currentPeople = state.people.filter(p => p.clubId === clubId);
+          const newSnapshot: PersonSnapshot = {
+              id: Date.now().toString(),
+              name,
+              date: new Date().toISOString(),
+              people: currentPeople
+          };
+          const currentSnapshots = state.snapshots[clubId] || [];
+          return {
+              snapshots: { ...state.snapshots, [clubId]: [newSnapshot, ...currentSnapshots] }
+          };
+      }),
+
+      loadSnapshot: (snapshotId) => set(state => {
+          const clubId = state.activeClub;
+          if (!clubId) return state;
+          const clubSnaps = state.snapshots[clubId] || [];
+          const snap = clubSnaps.find(s => s.id === snapshotId);
+          if (!snap) return state;
+          
+          const otherPeople = state.people.filter(p => p.clubId !== clubId);
+          const restoredPeople = snap.people.map(p => ({ ...p, clubId }));
           
           return {
-              sessions: { ...state.sessions, [clubId]: { ...session, presentPersonIds: newPresent } }
+              people: [...otherPeople, ...restoredPeople],
+              pairingDirty: true
+          };
+      }),
+
+      deleteSnapshot: (snapshotId) => set(state => {
+          const clubId = state.activeClub;
+          if (!clubId) return state;
+          const clubSnaps = state.snapshots[clubId] || [];
+          return {
+              snapshots: { ...state.snapshots, [clubId]: clubSnaps.filter(s => s.id !== snapshotId) }
+          };
+      }),
+
+      toggleAttendance: (id) => set((state) => {
+        const { activeClub } = state;
+        if (!activeClub) return state;
+        const currentSession = state.sessions[activeClub];
+        const isPresent = currentSession.presentPersonIds.includes(id);
+        const newPresent = isPresent ? currentSession.presentPersonIds.filter(pid => pid !== id) : [...currentSession.presentPersonIds, id];
+        
+        // Update last participation date for analytics
+        const newPeople = state.people.map(p => p.id === id ? { ...p, lastParticipation: new Date().toISOString() } : p);
+
+        return { 
+            people: newPeople,
+            sessions: { ...state.sessions, [activeClub]: { ...currentSession, presentPersonIds: newPresent } } 
+        };
+      }),
+
+      setBulkAttendance: (ids) => set((state) => {
+        const { activeClub } = state;
+        if (!activeClub) return state;
+        return { sessions: { ...state.sessions, [activeClub]: { ...state.sessions[activeClub], presentPersonIds: ids } } };
+      }),
+
+      updateInventory: (inventory) => set((state) => {
+        const { activeClub } = state;
+        if (!activeClub) return state;
+        return { sessions: { ...state.sessions, [activeClub]: { ...state.sessions[activeClub], inventory } } };
+      }),
+
+      addBoatDefinition: (def) => set((state) => {
+          const { activeClub } = state;
+          if (!activeClub) return state;
+          const currentSettings = state.clubSettings[activeClub];
+          const newDefs = [...currentSettings.boatDefinitions, def];
+          const currentSession = state.sessions[activeClub];
+          const newInventory = { ...currentSession.inventory, [def.id]: def.defaultCount };
+          return {
+              clubSettings: { ...state.clubSettings, [activeClub]: { ...currentSettings, boatDefinitions: newDefs } },
+              sessions: { ...state.sessions, [activeClub]: { ...currentSession, inventory: newInventory } },
+              pairingDirty: true
+          };
+      }),
+
+      updateBoatDefinition: (def) => set((state) => {
+          const { activeClub } = state;
+          if (!activeClub) return state;
+          const currentSettings = state.clubSettings[activeClub];
+          const newDefs = currentSettings.boatDefinitions.map(d => d.id === def.id ? def : d);
+          return {
+              clubSettings: { ...state.clubSettings, [activeClub]: { ...currentSettings, boatDefinitions: newDefs } },
+              pairingDirty: true
+          };
+      }),
+
+      removeBoatDefinition: (boatId) => set((state) => {
+          const { activeClub } = state;
+          if (!activeClub) return state;
+          const currentSettings = state.clubSettings[activeClub];
+          const newDefs = currentSettings.boatDefinitions.filter(d => d.id !== boatId);
+          const currentSession = state.sessions[activeClub];
+          const newInventory = { ...currentSession.inventory };
+          delete newInventory[boatId];
+          return {
+              clubSettings: { ...state.clubSettings, [activeClub]: { ...currentSettings, boatDefinitions: newDefs } },
+              sessions: { ...state.sessions, [activeClub]: { ...currentSession, inventory: newInventory } },
+              pairingDirty: true
+          };
+      }),
+
+      saveBoatDefinitions: (defs) => set((state) => {
+          const { activeClub } = state;
+          if (!activeClub) return state;
+          const currentSettings = state.clubSettings[activeClub];
+          const currentSession = state.sessions[activeClub];
+          const newInventory: BoatInventory = {};
+          defs.forEach(d => {
+              newInventory[d.id] = currentSession.inventory[d.id] !== undefined ? currentSession.inventory[d.id] : d.defaultCount;
+          });
+          return {
+              clubSettings: { ...state.clubSettings, [activeClub]: { ...currentSettings, boatDefinitions: defs } },
+              sessions: { ...state.sessions, [activeClub]: { ...currentSession, inventory: newInventory } },
+              pairingDirty: true
           };
       }),
 
       runPairing: () => {
-          const { activeClub, people, sessions, clubSettings } = get();
-          if (!activeClub) return;
-          const session = sessions[activeClub];
-          const settings = clubSettings[activeClub];
-          const presentPeople = people
-            .filter(p => p.memberships[activeClub] && session.presentPersonIds.includes(p.id))
-            .map(p => flattenParticipant(p, activeClub)!);
-          
-          const teams = generateSmartPairings(presentPeople, session.inventory, settings.boatDefinitions);
-          
-          // Log participation dates
-          const today = new Date().toISOString().split('T')[0];
-          const updatedPeople = people.map(p => {
-              if (session.presentPersonIds.includes(p.id) && p.memberships[activeClub]) {
-                  const m = p.memberships[activeClub];
-                  if (!m.participationDates.includes(today)) {
-                      return { ...p, memberships: { ...p.memberships, [activeClub]: { ...m, participationDates: [...m.participationDates, today], lastParticipation: today } } };
-                  }
-              }
-              return p;
-          });
-
-          set(state => ({ 
-              people: updatedPeople,
-              sessions: { ...state.sessions, [activeClub]: { ...session, teams } },
-              pairingDirty: false 
-          }));
+        const { people, activeClub, sessions, clubSettings } = get();
+        if (!activeClub) return;
+        const currentSession = sessions[activeClub];
+        const settings = clubSettings[activeClub];
+        set((state) => ({ histories: { ...state.histories, [activeClub]: [] }, futures: { ...state.futures, [activeClub]: [] } }));
+        const presentPeople = people.filter(p => p.clubId === activeClub && currentSession.presentPersonIds.includes(p.id));
+        const teams = generateSmartPairings(presentPeople, currentSession.inventory, settings.boatDefinitions);
+        set((state) => ({ sessions: { ...state.sessions, [activeClub]: { ...state.sessions[activeClub], teams } }, pairingDirty: false }));
       },
 
-      updateRoleColor: (role, color) => set(state => {
-          if (!state.activeClub) return state;
-          const clubId = state.activeClub;
-          return { clubSettings: { ...state.clubSettings, [clubId]: { ...state.clubSettings[clubId], roleColors: { ...state.clubSettings[clubId].roleColors, [role]: color } } } };
-      }),
+      resetSession: () => {
+        const { activeClub, clubSettings } = get();
+        if (!activeClub) return;
+        const settings = clubSettings[activeClub];
+        const defaultInv = createInventoryFromDefs(settings.boatDefinitions);
+        set((state) => ({
+          histories: { ...state.histories, [activeClub]: [] },
+          futures: { ...state.futures, [activeClub]: [] },
+          sessions: { ...state.sessions, [activeClub]: { inventory: defaultInv, presentPersonIds: [], teams: [] } },
+          pairingDirty: false
+        }));
+      },
 
-      setCloudData: (data) => set(state => ({
-          people: data.people || state.people,
-          sessions: { ...state.sessions, ...data.sessions },
-          clubSettings: { ...state.clubSettings, ...data.settings },
-          syncStatus: 'SYNCED'
-      })),
+      addManualTeam: () => {
+        const { activeClub, sessions, clubSettings } = get();
+        if (!activeClub) return;
+        const currentSession = sessions[activeClub];
+        const defaultBoatDef = clubSettings[activeClub].boatDefinitions[0];
+        const defaultBoatId = defaultBoatDef?.id || DefaultBoatTypes.DOUBLE;
+        const newTeam: Team = { id: Date.now().toString(), members: [], boatType: defaultBoatId, boatCount: 1 };
+        set((state) => ({
+             histories: { ...state.histories, [activeClub]: [...(state.histories[activeClub] || []), currentSession.teams] },
+             futures: { ...state.futures, [activeClub]: [] },
+             sessions: { ...state.sessions, [activeClub]: { ...currentSession, teams: [newTeam, ...currentSession.teams] } }
+        }));
+      },
 
-      restoreDemoData: () => set(() => {
-          const participantsMap: Record<string, Participant> = {};
-          INITIAL_PEOPLE.forEach(p => {
-              if (!participantsMap[p.id]) {
-                  participantsMap[p.id] = { id: p.id, name: p.name, gender: p.gender, phone: p.phone, createdAt: new Date().toISOString(), memberships: {} };
-              }
-              const { clubId, role, rank, isSkipper } = p;
-              participantsMap[p.id].memberships[clubId] = { role, rank, isSkipper, joinedClubAt: new Date().toISOString(), participationDates: [] };
-          });
-          return { people: Object.values(participantsMap) };
-      }),
+      removeTeam: (teamId) => {
+        const { activeClub, sessions } = get();
+        if (!activeClub) return;
+        const currentSession = sessions[activeClub];
+        set((state) => ({
+            histories: { ...state.histories, [activeClub]: [...(state.histories[activeClub] || []), currentSession.teams] },
+             futures: { ...state.futures, [activeClub]: [] },
+             sessions: { ...state.sessions, [activeClub]: { ...currentSession, teams: currentSession.teams.filter(t => t.id !== teamId) } }
+        }));
+      },
 
-      // Reorder/Manual Logic (Kept consistent with previous logic)
+      addGuestToTeam: (teamId, name) => {
+        const { activeClub, sessions } = get();
+        if (!activeClub) return;
+        const currentSession = sessions[activeClub];
+        const newGuest: Person = {
+            id: 'guest-' + Date.now(),
+            clubId: activeClub,
+            name: name,
+            role: Role.GUEST,
+            rank: 1,
+            gender: Gender.MALE,
+            tags: [],
+            notes: 'הוסף ידנית',
+            createdAt: new Date().toISOString()
+        };
+        const newTeams = currentSession.teams.map(t => t.id === teamId ? { ...t, members: [...t.members, newGuest] } : t);
+        set((state) => ({
+             people: [...state.people, newGuest],
+             histories: { ...state.histories, [activeClub]: [...(state.histories[activeClub] || []), currentSession.teams] },
+             futures: { ...state.futures, [activeClub]: [] },
+             sessions: { ...state.sessions, [activeClub]: { ...currentSession, presentPersonIds: [...currentSession.presentPersonIds, newGuest.id], teams: newTeams } }
+        }));
+      },
+
+      assignMemberToTeam: (teamId, personId) => {
+        const { activeClub, sessions, people } = get();
+        if (!activeClub) return;
+        const currentSession = sessions[activeClub];
+        const person = people.find(p => p.id === personId);
+        if (!person) return;
+        const newTeams = currentSession.teams.map(t => t.id === teamId ? { ...t, members: [...t.members, person] } : t);
+        set((state) => ({
+             histories: { ...state.histories, [activeClub]: [...(state.histories[activeClub] || []), currentSession.teams] },
+             futures: { ...state.futures, [activeClub]: [] },
+             sessions: { ...state.sessions, [activeClub]: { ...currentSession, presentPersonIds: Array.from(new Set([...currentSession.presentPersonIds, person.id])), teams: newTeams } }
+        }));
+      },
+
+      removeMemberFromTeam: (teamId, personId) => {
+        const { activeClub, sessions } = get();
+        if (!activeClub) return;
+        const currentSession = sessions[activeClub];
+        const newTeams = currentSession.teams.map(t => t.id === teamId ? { ...t, members: t.members.filter(m => m.id !== personId) } : t);
+        set((state) => ({
+             histories: { ...state.histories, [activeClub]: [...(state.histories[activeClub] || []), currentSession.teams] },
+             futures: { ...state.futures, [activeClub]: [] },
+             sessions: { ...state.sessions, [activeClub]: { ...currentSession, teams: newTeams } }
+        }));
+      },
+
+      moveMemberToTeam: (personId, targetTeamId) => {
+        const { activeClub, sessions, people } = get();
+        if (!activeClub) return;
+        const currentSession = sessions[activeClub];
+        const person = people.find(p => p.id === personId);
+        if (!person) return;
+        let newTeams = currentSession.teams.map(t => ({ ...t, members: t.members.filter(m => m.id !== personId) }));
+        newTeams = newTeams.map(t => t.id === targetTeamId ? { ...t, members: [...t.members, person] } : t);
+        set(state => ({
+            histories: { ...state.histories, [activeClub]: [...(state.histories[activeClub]||[]), currentSession.teams]},
+            sessions: { ...state.sessions, [activeClub]: { ...currentSession, teams: newTeams }}
+        }));
+      },
       reorderSessionMembers: (sId, sIdx, dId, dIdx) => {
-         const clubId = get().activeClub;
-         if (!clubId) return;
-         const session = get().sessions[clubId];
-         const newTeams = JSON.parse(JSON.stringify(session.teams));
-         const sTeam = newTeams.find((t:any) => t.id === sId);
-         const dTeam = newTeams.find((t:any) => t.id === dId);
+         const { activeClub, sessions } = get();
+         if (!activeClub) return;
+         const currentSession = sessions[activeClub];
+         const newTeams = JSON.parse(JSON.stringify(currentSession.teams));
+         const sTeam = newTeams.find((t:Team) => t.id === sId);
+         const dTeam = newTeams.find((t:Team) => t.id === dId);
          if(sTeam && dTeam) {
              const [moved] = sTeam.members.splice(sIdx, 1);
              dTeam.members.splice(dIdx, 0, moved);
-             set(state => ({ sessions: { ...state.sessions, [clubId]: { ...session, teams: newTeams }} }));
+             set(state => ({
+                 histories: { ...state.histories, [activeClub]: [...(state.histories[activeClub]||[]), currentSession.teams]},
+                 sessions: { ...state.sessions, [activeClub]: { ...currentSession, teams: newTeams }}
+             }));
          }
       },
       swapMembers: (tAId, iA, tBId, iB) => {
-        const clubId = get().activeClub;
-        if (!clubId) return;
-        const session = get().sessions[clubId];
-        const newTeams = JSON.parse(JSON.stringify(session.teams));
-        const tA = newTeams.find((t:any) => t.id === tAId);
-        const tB = newTeams.find((t:any) => t.id === tBId);
+        const { activeClub, sessions } = get();
+        if (!activeClub) return;
+        const currentSession = sessions[activeClub];
+        const newTeams = JSON.parse(JSON.stringify(currentSession.teams));
+        const tA = newTeams.find((t:Team) => t.id === tAId);
+        const tB = newTeams.find((t:Team) => t.id === tBId);
         if (tA && tB) {
             const temp = tA.members[iA];
             tA.members[iA] = tB.members[iB];
             tB.members[iB] = temp;
-            set(state => ({ sessions: { ...state.sessions, [clubId]: { ...session, teams: newTeams }} }));
+            set(state => ({
+                 histories: { ...state.histories, [activeClub]: [...(state.histories[activeClub]||[]), currentSession.teams]},
+                 sessions: { ...state.sessions, [activeClub]: { ...currentSession, teams: newTeams }}
+             }));
         }
       },
       updateTeamBoatType: (tId, bType) => {
-         const clubId = get().activeClub;
-         if (!clubId) return;
-         const session = get().sessions[clubId];
-         const newTeams = session.teams.map(t => t.id === tId ? { ...t, boatType: bType } : t);
-         set(state => ({ sessions: { ...state.sessions, [clubId]: { ...session, teams: newTeams }} }));
+         const { activeClub, sessions } = get();
+         if (!activeClub) return;
+         const currentSession = sessions[activeClub];
+         const newTeams = currentSession.teams.map(t => t.id === tId ? { ...t, boatType: bType } : t);
+         set(state => ({
+             histories: { ...state.histories, [activeClub]: [...(state.histories[activeClub]||[]), currentSession.teams]},
+             sessions: { ...state.sessions, [activeClub]: { ...currentSession, teams: newTeams }}
+         }));
       },
-      resetSession: () => {
-          const clubId = get().activeClub;
-          if (!clubId) return;
-          const settings = get().clubSettings[clubId];
-          set(state => ({ sessions: { ...state.sessions, [clubId]: { inventory: createInventoryFromDefs(settings.boatDefinitions), presentPersonIds: [], teams: [] } } }));
+      undo: () => {
+         const { activeClub, histories, sessions } = get();
+         if (!activeClub) return;
+         const h = histories[activeClub] || [];
+         if (h.length === 0) return;
+         const prev = h[h.length - 1];
+         set(state => ({
+             sessions: { ...state.sessions, [activeClub]: { ...sessions[activeClub], teams: prev }},
+             histories: { ...state.histories, [activeClub]: h.slice(0, -1) },
+             futures: { ...state.futures, [activeClub]: [sessions[activeClub].teams, ...(state.futures[activeClub]||[])] }
+         }));
       },
-      updateInventory: (inventory) => set(state => {
-          if (!state.activeClub) return state;
-          return { sessions: { ...state.sessions, [state.activeClub]: { ...state.sessions[state.activeClub], inventory } } };
-      }),
-      saveBoatDefinitions: (defs) => set(state => {
-          if (!state.activeClub) return state;
-          return { clubSettings: { ...state.clubSettings, [state.activeClub]: { ...state.clubSettings[state.activeClub], boatDefinitions: defs } } };
-      }),
-      undo: () => {}, redo: () => {} // Historical UNDO can be added later if requested
+      redo: () => {
+          const { activeClub, futures, sessions } = get();
+         if (!activeClub) return;
+         const f = futures[activeClub] || [];
+         if (f.length === 0) return;
+         const next = f[0];
+         set(state => ({
+             sessions: { ...state.sessions, [activeClub]: { ...sessions[activeClub], teams: next }},
+             histories: { ...state.histories, [activeClub]: [...(state.histories[activeClub]||[]), sessions[activeClub].teams] },
+             futures: { ...state.futures, [activeClub]: f.slice(1) }
+         }));
+      }
     }),
     {
-      name: 'etgarim-crm-storage',
-      version: 35.0, 
+      name: 'etgarim-storage',
+      version: 22.0, 
       partialize: (state) => ({
         user: state.user,
         people: state.people,
+        sessions: state.sessions,
+        clubSettings: state.clubSettings,
+        permissions: state.permissions,
         clubs: state.clubs,
         superAdmins: state.superAdmins,
-        clubSettings: state.clubSettings,
-        sessions: state.sessions
+        pairingDirty: state.pairingDirty,
+        snapshots: state.snapshots,
+        lastSyncTime: state.lastSyncTime
       })
     }
   )

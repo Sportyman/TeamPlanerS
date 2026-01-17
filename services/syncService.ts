@@ -1,41 +1,37 @@
 
 import { db } from '../firebase';
-import { doc, getDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useAppStore } from '../store';
-import { ClubID, Participant, SessionState, ClubSettings } from '../types';
+import { Person, SessionState, ClubSettings, ClubID, PersonSnapshot } from '../types';
 
 let syncTimeout: any = null;
 
 export const syncToCloud = async (clubId: ClubID) => {
     const state = useAppStore.getState();
-    const { people, sessions, clubSettings, user, setSyncStatus } = state;
+    const { people, sessions, clubSettings, snapshots, user, setSyncStatus } = state;
 
     if (!user || !clubId) return;
+
+    // Filter people for this club
+    const clubPeople = people.filter(p => p.clubId === clubId);
+    const clubSession = sessions[clubId];
+    const clubSet = clubSettings[clubId];
+    const clubSnapshots = snapshots[clubId] || [];
+
     setSyncStatus('SYNCING');
 
     try {
-        const batch = writeBatch(db);
-        
-        // 1. Sync Identities (Participants) - Individual documents for efficiency
-        people.forEach(p => {
-            const partRef = doc(db, 'participants', p.id);
-            batch.set(partRef, p, { merge: true });
-        });
-
-        // 2. Sync Club Specific Repositories
-        const clubMetaRef = doc(db, 'clubs', clubId);
-        const clubSession = sessions[clubId];
-        const clubSet = clubSettings[clubId];
-
-        batch.set(clubMetaRef, {
+        const clubDocRef = doc(db, 'clubs', clubId);
+        await setDoc(clubDocRef, {
             clubId,
             lastUpdated: new Date().toISOString(),
+            people: clubPeople,
             session: clubSession,
             settings: clubSet,
+            snapshots: clubSnapshots,
             updatedBy: user.email
         }, { merge: true });
         
-        await batch.commit();
         setSyncStatus('SYNCED');
     } catch (error) {
         console.error("Cloud Sync Error:", error);
@@ -48,32 +44,32 @@ export const fetchFromCloud = async (clubId: ClubID) => {
     setSyncStatus('SYNCING');
 
     try {
-        // Fetch identity repository
-        const partsSnap = await getDocs(collection(db, 'participants'));
-        const people: Participant[] = [];
-        partsSnap.forEach(d => people.push(d.data() as Participant));
-
-        // Fetch club repository
         const clubDocRef = doc(db, 'clubs', clubId);
         const docSnap = await getDoc(clubDocRef);
 
         if (docSnap.exists()) {
             const data = docSnap.data();
             setCloudData({
-                people,
+                people: data.people as Person[],
                 sessions: { [clubId]: data.session as SessionState },
-                settings: { [clubId]: data.settings as ClubSettings }
+                settings: { [clubId]: data.settings as ClubSettings },
+                snapshots: { [clubId]: data.snapshots as PersonSnapshot[] || [] }
             });
         } else {
-            setCloudData({ people });
-            setSyncStatus('SYNCED');
+            setSyncStatus('SYNCED'); // Nothing to fetch
         }
     } catch (error) {
+        console.error("Cloud Fetch Error:", error);
         setSyncStatus('OFFLINE');
     }
 };
 
+/**
+ * Debounced sync to avoid excessive writes
+ */
 export const triggerCloudSync = (clubId: ClubID) => {
     if (syncTimeout) clearTimeout(syncTimeout);
-    syncTimeout = setTimeout(() => syncToCloud(clubId), 3000); 
+    syncTimeout = setTimeout(() => {
+        syncToCloud(clubId);
+    }, 2000); 
 };
