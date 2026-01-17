@@ -8,7 +8,7 @@ import { Login } from './components/Login';
 import { LandingPage } from './components/LandingPage';
 import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { PublicPairingView } from './components/PublicPairingView';
-import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw, LayoutGrid } from 'lucide-react';
 import { APP_VERSION } from './types';
 import { triggerCloudSync, fetchFromCloud } from './services/syncService';
 
@@ -85,9 +85,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
               </button>
               
-              <div className="hidden md:flex space-x-4 space-x-reverse">
-                <NavLink to="/app" icon={<Calendar size={18} />} text="אימון ראשי" className="px-3 py-2 text-sm" />
-                <NavLink to="/app/manage?view=PEOPLE" icon={<Users size={18} />} text="משתתפים" className="px-3 py-2 text-sm" />
+              <div className="hidden lg:flex space-x-4 space-x-reverse">
+                <NavLink to="/app" icon={<Calendar size={18} />} text="אימון" className="px-3 py-2 text-sm" />
+                <NavLink to="/app/manage" icon={<LayoutGrid size={18} />} text="ניהול מועדון" className="px-3 py-2 text-sm" />
               </div>
             </div>
 
@@ -103,7 +103,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                         {currentClub ? currentClub.label : 'TeamPlaner'}
                     </span>
                  </div>
-                 {/* SYNC INDICATOR */}
                  <div className="flex items-center gap-1 mt-0.5">
                     {syncStatus === 'SYNCING' && <RefreshCw size={10} className="text-brand-500 animate-spin" />}
                     {syncStatus === 'SYNCED' && <Cloud size={10} className="text-green-500" />}
@@ -121,9 +120,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   <span className="text-xs md:text-sm text-slate-500">{user?.email}</span>
                   <span className="text-[10px] text-slate-300">v{APP_VERSION}</span>
               </div>
-              {user?.photoURL && (
-                  <img src={user.photoURL} alt="User" className="w-8 h-8 rounded-full border border-slate-200 hidden sm:block" />
-              )}
               <button onClick={handleLogout} className="text-slate-400 hover:text-red-500 p-2" title="התנתק ויציאה">
                 <LogOut size={20} />
               </button>
@@ -140,25 +136,20 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     <div>
                         <div className="px-3 py-2 text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">אימון ושיבוץ</div>
                         <div className="space-y-2">
+                          <NavLink to="/app" icon={<Calendar size={24} />} text="לוח שיבוץ ראשי" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
                           <NavLink to="/app?step=1" icon={<ClipboardCheck size={24} />} text="בדיקת נוכחות" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
                           <NavLink to="/app?step=2" icon={<Ship size={24} />} text="הגדרת ציוד" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
-                          <NavLink to="/app" icon={<Calendar size={24} />} text="לוח שיבוץ ראשי" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
                         </div>
                     </div>
                     <div>
                         <div className="px-3 py-2 text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">ניהול שוטף</div>
                         <div className="space-y-2">
+                          <NavLink to="/app/manage" icon={<LayoutGrid size={24} />} text="מרכז ניהול (Dashboard)" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
                           <NavLink to="/app/manage?view=PEOPLE" icon={<Users size={24} />} text="ניהול משתתפים" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
                           <NavLink to="/app/manage?view=INVENTORY" icon={<Settings size={24} />} text="ניהול ציוד ומלאי" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
+                          <NavLink to="/app/manage?view=SNAPSHOTS" icon={<History size={24} />} text="גרסאות שמורות" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
                         </div>
                     </div>
-                </div>
-                <div className="border-t border-slate-200 mt-6 pt-4 flex justify-between items-center px-4">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-slate-600">{user?.email}</span>
-                      <span className="text-xs text-slate-400">מחובר כרגע (Hybrid Mode)</span>
-                    </div>
-                    <div className="text-xs text-slate-300 font-mono">v{APP_VERSION}</div>
                 </div>
               </div>
             </div>

@@ -58,6 +58,7 @@ interface AppState {
   addPerson: (person: Omit<Person, 'clubId'>) => void;
   updatePerson: (person: Person) => void;
   removePerson: (id: string) => void;
+  clearClubPeople: () => void;
   restoreDemoData: () => void;
   loadDemoForActiveClub: () => void;
   importClubData: (data: any) => void;
@@ -152,21 +153,12 @@ export const useAppStore = create<AppState>()(
 
       loginDev: (email) => {
         const normalizedEmail = email.toLowerCase().trim();
-        const { activeClub, permissions, superAdmins } = get();
+        const { superAdmins } = get();
         const isSuperAdmin = normalizedEmail === ROOT_ADMIN_EMAIL.toLowerCase() || superAdmins.some(a => a.toLowerCase() === normalizedEmail);
         
-        if (isSuperAdmin) {
-          set({ user: { email: normalizedEmail, isAdmin: true } });
-          return true;
-        }
-
-        if (!activeClub) return false;
-        const userPerm = permissions.find(p => p.email.toLowerCase() === normalizedEmail);
-        if (userPerm && userPerm.allowedClubs.includes(activeClub)) {
-          set({ user: { email: normalizedEmail, isAdmin: false } }); 
-          return true;
-        }
-        return false;
+        // Allow any email for dev login for now
+        set({ user: { email: normalizedEmail, isAdmin: isSuperAdmin } });
+        return true;
       },
 
       logout: async () => {
@@ -254,6 +246,15 @@ export const useAppStore = create<AppState>()(
         people: state.people.filter(p => p.id !== id),
         pairingDirty: true
       })),
+
+      clearClubPeople: () => set(state => {
+          const clubId = state.activeClub;
+          if (!clubId) return state;
+          return {
+              people: state.people.filter(p => p.clubId !== clubId),
+              pairingDirty: true
+          };
+      }),
 
       restoreDemoData: () => set(() => {
         return { 
@@ -603,7 +604,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'etgarim-storage',
-      version: 20.0, 
+      version: 21.0, 
       partialize: (state) => ({
         user: state.user,
         people: state.people,

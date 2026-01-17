@@ -2,153 +2,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
 import { Role, getRoleLabel, Person, Gender, GenderLabel, BoatDefinition, GenderPrefType, GenderPrefLabels, ConstraintStrength, APP_VERSION } from '../types';
-import { Trash2, UserPlus, Star, Edit, X, Save, ArrowRight, Tag, Database, Ship, Users, Calendar, Plus, Anchor, Wind, Users2, ShieldAlert, AlertOctagon, Heart, Ban, Shield, ShipWheel, Download, Upload, History, Camera } from 'lucide-react';
+import { Trash2, UserPlus, Star, Edit, X, Save, ArrowRight, Tag, Database, Ship, Users, Calendar, Plus, Anchor, Wind, Users2, ShieldAlert, AlertOctagon, Heart, Ban, Shield, ShipWheel, Download, Upload, History, Camera, Search, AlertTriangle } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 type ViewMode = 'MENU' | 'PEOPLE' | 'INVENTORY' | 'SNAPSHOTS';
 
 const PHONE_REGEX = /^05\d-?\d{7}$/;
-
-const RelationshipManager = ({ 
-    currentId, 
-    must, 
-    prefer, 
-    cannot, 
-    people,
-    onToggle, 
-    onClear 
-}: { 
-    currentId?: string, 
-    must: string[], 
-    prefer: string[], 
-    cannot: string[], 
-    people: Person[],
-    onToggle: (id: string, type: 'MUST' | 'PREFER' | 'CANNOT') => void,
-    onClear: (id: string) => void
-}) => {
-    const [search, setSearch] = useState('');
-    const candidates = people.filter(p => p.id !== currentId && p.name.includes(search));
-
-    const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    };
-
-    return (
-        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-             <div className="flex items-center justify-between mb-2">
-                 <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                     <Users2 size={16} className="text-brand-600"/> מנהל קשרים והעדפות
-                 </div>
-                 <input 
-                    type="text" 
-                    placeholder="חפש חבר..." 
-                    className="text-xs border rounded px-2 py-1 w-32 focus:ring-2 focus:ring-brand-500 outline-none"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    onFocus={handleFocus}
-                 />
-             </div>
-             
-             <div className="grid grid-cols-[1fr_32px_32px_32px] gap-1 px-2 mb-1 text-[10px] text-slate-500 font-bold items-center">
-                 <div></div>
-                 <div className="text-center text-yellow-600">עדיף</div>
-                 <div className="text-center text-green-600">חובה</div>
-                 <div className="text-center text-red-600">אסור</div>
-             </div>
-
-             <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                 {candidates.map(p => {
-                     const isMust = must.includes(p.id);
-                     const isPrefer = prefer.includes(p.id);
-                     const isCannot = cannot.includes(p.id);
-
-                     return (
-                         <div key={p.id} className="bg-white p-2 rounded border grid grid-cols-[1fr_32px_32px_32px] gap-1 items-center shadow-sm">
-                             <div className="flex flex-col overflow-hidden">
-                                 <span className="text-xs font-bold text-slate-700 truncate">{p.name}</span>
-                                 <span className="text-[10px] text-slate-400 truncate">{getRoleLabel(p.role, p.gender)}</span>
-                             </div>
-                             
-                             <button 
-                                type="button" 
-                                onClick={() => isPrefer ? onClear(p.id) : onToggle(p.id, 'PREFER')}
-                                className={`h-8 w-8 flex items-center justify-center rounded transition-colors ${isPrefer ? 'bg-yellow-100 text-yellow-600 ring-1 ring-yellow-400' : 'bg-slate-100 text-slate-300 hover:bg-slate-200'}`}
-                             >
-                                 <Heart size={14} className={isPrefer ? "fill-current" : ""}/>
-                             </button>
-                             <button 
-                                type="button" 
-                                onClick={() => isMust ? onClear(p.id) : onToggle(p.id, 'MUST')}
-                                className={`h-8 w-8 flex items-center justify-center rounded transition-colors ${isMust ? 'bg-green-100 text-green-600 ring-1 ring-green-400' : 'bg-slate-100 text-slate-300 hover:bg-slate-200'}`}
-                             >
-                                 <Shield size={14} />
-                             </button>
-                             <button 
-                                type="button" 
-                                onClick={() => isCannot ? onClear(p.id) : onToggle(p.id, 'CANNOT')}
-                                className={`h-8 w-8 flex items-center justify-center rounded transition-colors ${isCannot ? 'bg-red-100 text-red-600 ring-1 ring-red-400' : 'bg-slate-100 text-slate-300 hover:bg-slate-200'}`}
-                             >
-                                 <Ban size={14} />
-                             </button>
-                         </div>
-                     )
-                 })}
-                 {candidates.length === 0 && <div className="text-center text-xs text-slate-400 py-4">לא נמצאו תוצאות</div>}
-             </div>
-        </div>
-    );
-};
-
-const SmartNumberInput = ({ 
-    value, 
-    onChange, 
-    min = 0, 
-    className 
-}: { 
-    value: number, 
-    onChange: (val: number) => void, 
-    min?: number, 
-    className?: string 
-}) => {
-    const [displayVal, setDisplayVal] = useState<string>(value.toString());
-
-    useEffect(() => {
-        setDisplayVal(value.toString());
-    }, [value]);
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value;
-        if (val === '') {
-            setDisplayVal('');
-            onChange(0);
-        } else {
-            const num = Number(val);
-            if (!isNaN(num)) {
-                setDisplayVal(val);
-                onChange(num);
-            }
-        }
-    };
-
-    const handleBlur = () => {
-        if (displayVal === '') {
-            setDisplayVal('0');
-            onChange(0);
-        }
-    };
-
-    return (
-        <input 
-            type="number"
-            min={min}
-            value={displayVal}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            className={className}
-        />
-    );
-};
-
 
 export const Dashboard: React.FC = () => {
   const { 
@@ -159,6 +18,7 @@ export const Dashboard: React.FC = () => {
       addPerson, 
       updatePerson, 
       removePerson, 
+      clearClubPeople,
       restoreDemoData,
       loadDemoForActiveClub,
       importClubData,
@@ -208,6 +68,7 @@ export const Dashboard: React.FC = () => {
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
   const [snapshotNameInput, setSnapshotNameInput] = useState('');
+  const [peopleSearch, setPeopleSearch] = useState('');
   
   const [newName, setNewName] = useState('');
   const [newGender, setNewGender] = useState<Gender>(Gender.MALE);
@@ -217,18 +78,11 @@ export const Dashboard: React.FC = () => {
   const [newNotes, setNewNotes] = useState('');
   const [newTags, setNewTags] = useState<string[]>([]);
   const [newIsSkipper, setNewIsSkipper] = useState(false);
-  const [tagInput, setTagInput] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [newPreferredBoat, setNewPreferredBoat] = useState<string>('');
 
-  const [newGenderPrefType, setNewGenderPrefType] = useState<GenderPrefType>('NONE');
-  const [newGenderPrefStrength, setNewGenderPrefStrength] = useState<ConstraintStrength>('PREFER');
-  const [newMustPair, setNewMustPair] = useState<string[]>([]);
-  const [newPreferPair, setNewPreferPair] = useState<string[]>([]);
-  const [newCannotPair, setNewCannotPair] = useState<string[]>([]);
-
   const clubPeople = people.filter(p => p.clubId === activeClub);
-  const boatDefinitions = currentSettings.boatDefinitions;
+  const filteredClubPeople = clubPeople.filter(p => p.name.includes(peopleSearch));
 
   const handleExport = () => {
       const dataToSave = {
@@ -236,7 +90,7 @@ export const Dashboard: React.FC = () => {
           date: new Date().toISOString(),
           clubId: activeClub,
           clubLabel: currentClubLabel,
-          people: people.filter(p => p.clubId === activeClub),
+          people: clubPeople,
           settings: clubSettings[activeClub],
           session: sessions[activeClub],
           snapshots: snapshots[activeClub] || []
@@ -277,19 +131,6 @@ export const Dashboard: React.FC = () => {
       e.target.value = '';
   };
 
-  const formatPhoneNumber = (value: string) => {
-      const digits = value.replace(/\D/g, '');
-      const truncated = digits.slice(0, 10);
-      if (truncated.length > 3) return `${truncated.slice(0, 3)}-${truncated.slice(3)}`;
-      return truncated;
-  };
-
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
-      const formatted = formatPhoneNumber(e.target.value);
-      setter(formatted);
-      if (formatted.length === 11) setPhoneError('');
-  };
-
   const validatePhone = (phone: string) => {
       if (!phone) return true;
       return PHONE_REGEX.test(phone);
@@ -298,9 +139,7 @@ export const Dashboard: React.FC = () => {
   const resetAddForm = () => {
     setNewName(''); setNewGender(Gender.MALE); setNewPhone(''); setNewNotes('');
     setNewRole(Role.VOLUNTEER); setNewRank(3); setNewTags([]); setNewIsSkipper(false);
-    setTagInput(''); setPhoneError(''); setNewPreferredBoat(''); setNewGenderPrefType('NONE');
-    setNewGenderPrefStrength('PREFER'); setNewMustPair([]); setNewPreferPair([]); setNewCannotPair([]);
-    setIsAddFormOpen(false); 
+    setPhoneError(''); setNewPreferredBoat(''); setIsAddFormOpen(false); 
   };
 
   const handleAdd = (e: React.FormEvent) => {
@@ -313,9 +152,7 @@ export const Dashboard: React.FC = () => {
     addPerson({
       id: Date.now().toString(),
       name: newName, gender: newGender, phone: newPhone, role: newRole, rank: newRank,
-      notes: newNotes, tags: newTags, isSkipper: newIsSkipper, preferredBoatType: newPreferredBoat || undefined,
-      genderConstraint: { type: newGenderPrefType, strength: newGenderPrefStrength },
-      mustPairWith: newMustPair, preferPairWith: newPreferPair, cannotPairWith: newCannotPair
+      notes: newNotes, tags: newTags, isSkipper: newIsSkipper, preferredBoatType: newPreferredBoat || undefined
     });
     resetAddForm();
   };
@@ -332,45 +169,28 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  const toggleRelationship = (targetId: string, type: 'MUST' | 'PREFER' | 'CANNOT', isEditMode: boolean) => {
-      if (isEditMode && editingPerson) {
-          let must = editingPerson.mustPairWith || [], prefer = editingPerson.preferPairWith || [], cannot = editingPerson.cannotPairWith || [];
-          must = must.filter(id => id !== targetId); prefer = prefer.filter(id => id !== targetId); cannot = cannot.filter(id => id !== targetId);
-          if (type === 'MUST') must.push(targetId); if (type === 'PREFER') prefer.push(targetId); if (type === 'CANNOT') cannot.push(targetId);
-          setEditingPerson({ ...editingPerson, mustPairWith: must, preferPairWith: prefer, cannotPairWith: cannot });
-      } else {
-          let must = newMustPair.filter(id => id !== targetId), prefer = newPreferPair.filter(id => id !== targetId), cannot = newCannotPair.filter(id => id !== targetId);
-          if (type === 'MUST') must.push(targetId); if (type === 'PREFER') prefer.push(targetId); if (type === 'CANNOT') cannot.push(targetId);
-          setNewMustPair(must); setNewPreferPair(prefer); setNewCannotPair(cannot);
+  const handleClearAll = () => {
+      if (confirm('זהירות: האם אתה בטוח שברצונך למחוק את כל רשימת המשתתפים של המועדון? פעולה זו אינה הפיכה (אלא אם שמרת גרסה).')) {
+          if (confirm('אישור סופי: מחק את כולם?')) {
+              clearClubPeople();
+              alert('הרשימה נוקתה.');
+          }
       }
   };
 
-  const clearRelationship = (targetId: string, isEditMode: boolean) => {
-      if (isEditMode && editingPerson) {
-          setEditingPerson({
-              ...editingPerson,
-              mustPairWith: (editingPerson.mustPairWith || []).filter(id => id !== targetId),
-              preferPairWith: (editingPerson.preferPairWith || []).filter(id => id !== targetId),
-              cannotPairWith: (editingPerson.cannotPairWith || []).filter(id => id !== targetId)
-          });
-      } else {
-          setNewMustPair(newMustPair.filter(id => id !== targetId));
-          setNewPreferPair(newPreferPair.filter(id => id !== targetId));
-          setNewCannotPair(newCannotPair.filter(id => id !== targetId));
+  const handleQuickSnapshot = () => {
+      const name = prompt('תן שם לרשימה השמורה (למשל: יוני 2024)', `רשימה מתאריך ${new Date().toLocaleDateString('he-IL')}`);
+      if (name && name.trim()) {
+          saveSnapshot(name.trim());
+          alert('הרשימה נשמרה בהצלחה!');
       }
-  };
-
-  const handleSaveSnapshot = () => {
-      if (!snapshotNameInput.trim()) return;
-      saveSnapshot(snapshotNameInput.trim());
-      setSnapshotNameInput('');
-      alert('הרשימה נשמרה בהצלחה!');
   };
 
   const handleLoadSnapshot = (id: string, name: string) => {
       if (confirm(`האם לטעון את הגרסה "${name}"? זה יחליף את רשימת המשתתפים הנוכחית.`)) {
           loadSnapshot(id);
           alert('הרשימה נטענה בהצלחה!');
+          navigate('/app/manage?view=PEOPLE');
       }
   };
 
@@ -381,13 +201,33 @@ export const Dashboard: React.FC = () => {
       }
   };
 
+  const handleAddBoat = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newBoatName) return;
+      const newDef: BoatDefinition = {
+          id: 'boat-' + Date.now(),
+          label: newBoatName,
+          defaultCount: newBoatCount,
+          capacity: newBoatCapacity,
+          isStable: newBoatStable,
+          minSkippers: newBoatMinSkippers
+      };
+      setDraftDefs([...draftDefs, newDef]);
+      setHasChanges(true);
+      setIsAddingBoat(false);
+      setNewBoatName('');
+  };
+
+  const handleRemoveBoat = (id: string) => {
+      setDraftDefs(draftDefs.filter(d => d.id !== id));
+      setHasChanges(true);
+  };
+
   const handleSaveInventory = () => {
       saveBoatDefinitions(draftDefs);
       setHasChanges(false);
-      navigate('/app');
+      alert('הגדרות הציוד נשמרו!');
   };
-
-  const getRankColor = (rank: number) => rank <= 2 ? 'text-red-500' : rank === 3 ? 'text-yellow-500' : 'text-green-500';
 
   const getRoleBadgeStyle = (role: Role) => {
     switch (role) {
@@ -404,15 +244,15 @@ export const Dashboard: React.FC = () => {
           <div className="max-w-4xl mx-auto py-8 px-4">
               <h1 className="text-2xl font-bold text-slate-800 mb-2 text-center">מרכז ניהול - {currentClubLabel}</h1>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto mt-8">
-                  <button onClick={() => navigate('/app/manage?view=PEOPLE')} className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-lg hover:border-brand-300 transition-all flex flex-col items-center gap-4">
+                  <button onClick={() => setView('PEOPLE')} className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-lg hover:border-brand-300 transition-all flex flex-col items-center gap-4">
                       <div className="bg-brand-50 text-brand-600 p-4 rounded-full"><Users size={32} /></div>
                       <h3 className="font-bold text-lg text-slate-800">ניהול משתתפים</h3>
                   </button>
-                  <button onClick={() => navigate('/app/manage?view=INVENTORY')} className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-lg hover:border-brand-300 transition-all flex flex-col items-center gap-4">
+                  <button onClick={() => setView('INVENTORY')} className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-lg hover:border-brand-300 transition-all flex flex-col items-center gap-4">
                       <div className="bg-orange-50 text-orange-600 p-4 rounded-full"><Ship size={32} /></div>
                       <h3 className="font-bold text-lg text-slate-800">ניהול ציוד</h3>
                   </button>
-                  <button onClick={() => navigate('/app/manage?view=SNAPSHOTS')} className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-lg hover:border-brand-300 transition-all flex flex-col items-center gap-4">
+                  <button onClick={() => setView('SNAPSHOTS')} className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-lg hover:border-brand-300 transition-all flex flex-col items-center gap-4">
                       <div className="bg-purple-50 text-purple-600 p-4 rounded-full"><History size={32} /></div>
                       <h3 className="font-bold text-lg text-slate-800">גרסאות שמורות</h3>
                   </button>
@@ -450,7 +290,7 @@ export const Dashboard: React.FC = () => {
                             value={snapshotNameInput}
                             onChange={e => setSnapshotNameInput(e.target.value)}
                           />
-                          <button onClick={handleSaveSnapshot} className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2">
+                          <button onClick={() => { if(snapshotNameInput.trim()) { saveSnapshot(snapshotNameInput.trim()); setSnapshotNameInput(''); alert('נשמר!'); } }} className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2">
                               <Camera size={18} /> שמור גרסה
                           </button>
                       </div>
@@ -476,60 +316,162 @@ export const Dashboard: React.FC = () => {
       );
   }
 
-  // PEOPLE and INVENTORY views remain similar with minor additions...
+  if (view === 'INVENTORY') {
+      return (
+          <div className="max-w-4xl mx-auto py-6 px-4 pb-24">
+              <button onClick={() => setView('MENU')} className="flex items-center gap-2 text-slate-500 hover:text-brand-600 mb-6 font-medium">
+                  <ArrowRight size={20} /> חזרה לתפריט
+              </button>
+              
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                  <div className="flex justify-between items-center mb-6">
+                      <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
+                          <Ship className="text-orange-600" /> הגדרות ציוד ומלאי
+                      </h2>
+                      {hasChanges && (
+                          <button onClick={handleSaveInventory} className="bg-brand-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 animate-pulse">
+                              <Save size={18} /> שמור שינויים
+                          </button>
+                      )}
+                  </div>
+
+                  <div className="space-y-4 mb-8">
+                      {draftDefs.map(def => (
+                          <div key={def.id} className="p-4 border rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50">
+                              <div className="flex-1">
+                                  <div className="font-bold text-slate-800 text-lg">{def.label}</div>
+                                  <div className="flex flex-wrap gap-3 mt-1 text-sm text-slate-500">
+                                      <span className="flex items-center gap-1"><Users size={14}/> קיבולת: {def.capacity}</span>
+                                      <span className="flex items-center gap-1"><Database size={14}/> מלאי קבוע: {def.defaultCount}</span>
+                                      <span className="flex items-center gap-1">{def.isStable ? <Anchor size={14}/> : <Wind size={14}/>} {def.isStable ? 'יציב' : 'מהיר'}</span>
+                                      {def.minSkippers ? <span className="flex items-center gap-1 text-blue-600 font-bold"><ShipWheel size={14}/> נדרש סקיפר</span> : null}
+                                  </div>
+                              </div>
+                              <button onClick={() => handleRemoveBoat(def.id)} className="text-slate-400 hover:text-red-500 p-2 self-end md:self-center">
+                                  <Trash2 size={20} />
+                              </button>
+                          </div>
+                      ))}
+                      {draftDefs.length === 0 && <p className="text-center text-slate-400 py-8">לא הוגדר ציוד עדיין.</p>}
+                  </div>
+
+                  {!isAddingBoat ? (
+                      <button onClick={() => setIsAddingBoat(true)} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 hover:border-brand-300 hover:text-brand-600 transition-all font-bold flex items-center justify-center gap-2">
+                          <Plus size={20} /> הוסף סוג כלי שיט חדש
+                      </button>
+                  ) : (
+                      <form onSubmit={handleAddBoat} className="bg-slate-50 p-6 rounded-xl border border-slate-200 space-y-4 animate-in slide-in-from-bottom-2">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="col-span-1 md:col-span-2">
+                                  <label className="block text-sm font-bold mb-1">שם הכלי (למשל: קיאק זוגי צהוב)</label>
+                                  <input required type="text" className="w-full p-2 border rounded-lg" value={newBoatName} onChange={e => setNewBoatName(e.target.value)} />
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-bold mb-1">קיבולת משתתפים בסירה</label>
+                                  <input type="number" min="1" className="w-full p-2 border rounded-lg" value={newBoatCapacity} onChange={e => setNewBoatCapacity(Number(e.target.value))} />
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-bold mb-1">מלאי קבוע (כמה יש במועדון?)</label>
+                                  <input type="number" min="0" className="w-full p-2 border rounded-lg" value={newBoatCount} onChange={e => setNewBoatCount(Number(e.target.value))} />
+                              </div>
+                              <div className="flex items-center gap-6 py-2">
+                                  <label className="flex items-center gap-2 cursor-pointer">
+                                      <input type="checkbox" checked={newBoatStable} onChange={e => setNewBoatStable(e.target.checked)} className="w-5 h-5 accent-brand-600" />
+                                      <span className="text-sm font-bold">כלי שיט יציב</span>
+                                  </label>
+                                  <label className="flex items-center gap-2 cursor-pointer">
+                                      <input type="checkbox" checked={newBoatMinSkippers > 0} onChange={e => setNewBoatMinSkippers(e.target.checked ? 1 : 0)} className="w-5 h-5 accent-brand-600" />
+                                      <span className="text-sm font-bold">חובת סקיפר</span>
+                                  </label>
+                              </div>
+                          </div>
+                          <div className="flex gap-2 pt-2">
+                              <button type="submit" className="flex-1 bg-brand-600 text-white py-2 rounded-lg font-bold">הוסף לרשימה</button>
+                              <button type="button" onClick={() => setIsAddingBoat(false)} className="bg-slate-200 px-4 py-2 rounded-lg font-bold">ביטול</button>
+                          </div>
+                      </form>
+                  )}
+              </div>
+          </div>
+      );
+  }
+
   return (
     <div className="space-y-6 pb-20">
       <button onClick={() => setView('MENU')} className="flex items-center gap-2 text-slate-500 hover:text-brand-600 font-medium px-1">
            <ArrowRight size={20} /> חזרה לתפריט
       </button>
 
-      {view === 'PEOPLE' && (
-          <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <h2 className="text-2xl font-bold text-slate-800">רשימת משתתפים ({clubPeople.length})</h2>
-                  <div className="flex gap-2 w-full sm:w-auto">
-                    <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
-                    <button onClick={handleExport} className="bg-white border border-slate-200 text-slate-600 hover:text-brand-600 px-3 py-2 rounded-lg flex items-center gap-2 font-medium shadow-sm"><Download size={18} /></button>
-                    <button onClick={handleImportClick} className="bg-white border border-slate-200 text-slate-600 hover:text-brand-600 px-3 py-2 rounded-lg flex items-center gap-2 font-medium shadow-sm"><Upload size={18} /></button>
-                    <button onClick={() => setIsAddFormOpen(true)} className="bg-brand-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold shadow-sm hover:bg-brand-500 mr-auto sm:mr-0">
-                        <UserPlus size={20} /> משתתף חדש
-                    </button>
-                  </div>
+      <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-800">רשימת משתתפים ({clubPeople.length})</h2>
+                <div className="flex gap-4 mt-2">
+                    <button onClick={handleQuickSnapshot} className="text-xs text-purple-600 flex items-center gap-1 hover:underline"><Camera size={14}/> שמור גרסה (Snapshot)</button>
+                    <button onClick={handleClearAll} className="text-xs text-red-500 flex items-center gap-1 hover:underline"><Trash2 size={14}/> נקה את כל הרשימה</button>
+                </div>
               </div>
-              <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-                <table className="w-full text-right">
-                    <thead className="bg-slate-50 border-b">
-                        <tr>
-                            <th className="p-4 text-sm font-bold text-slate-600">שם מלא</th>
-                            <th className="p-4 text-sm font-bold text-slate-600 hidden md:table-cell">תפקיד</th>
-                            <th className="p-4 text-sm font-bold text-slate-600">פעולות</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                        {clubPeople.map(p => (
-                            <tr key={p.id} className="hover:bg-slate-50/50">
-                                <td className="p-4">
-                                    <div className="font-bold text-slate-800">{p.name}</div>
-                                    <div className="text-xs text-slate-400">{getRoleLabel(p.role, p.gender)} • רמה {p.rank}</div>
-                                </td>
-                                <td className="p-4 hidden md:table-cell">
-                                    <span className={`text-xs px-2 py-1 rounded-full font-bold ${getRoleBadgeStyle(p.role)}`}>{getRoleLabel(p.role, p.gender)}</span>
-                                </td>
-                                <td className="p-4">
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setEditingPerson(p)} className="p-2 text-slate-400 hover:text-brand-600"><Edit size={18} /></button>
-                                        <button onClick={() => removePerson(p.id)} className="p-2 text-slate-400 hover:text-red-600"><Trash2 size={18} /></button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
+                <button onClick={handleExport} className="bg-white border border-slate-200 text-slate-600 hover:text-brand-600 px-3 py-2 rounded-lg flex items-center gap-2 font-medium shadow-sm"><Download size={18} /></button>
+                <button onClick={handleImportClick} className="bg-white border border-slate-200 text-slate-600 hover:text-brand-600 px-3 py-2 rounded-lg flex items-center gap-2 font-medium shadow-sm"><Upload size={18} /></button>
+                <button onClick={() => setIsAddFormOpen(true)} className="bg-brand-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold shadow-sm hover:bg-brand-500 mr-auto sm:mr-0">
+                    <UserPlus size={20} /> משתתף חדש
+                </button>
               </div>
           </div>
-      )}
 
-      {/* MODALS for Add/Edit Person (Keep existing logic but ensure clean UI) */}
+          <div className="relative mb-4">
+              <Search className="absolute right-3 top-2.5 text-slate-400" size={18} />
+              <input 
+                type="text" 
+                placeholder="חפש משתתף ברשימה..." 
+                className="w-full pr-10 pl-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+                value={peopleSearch}
+                onChange={e => setPeopleSearch(e.target.value)}
+              />
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+            <table className="w-full text-right">
+                <thead className="bg-slate-50 border-b">
+                    <tr>
+                        <th className="p-4 text-sm font-bold text-slate-600">שם מלא</th>
+                        <th className="p-4 text-sm font-bold text-slate-600 hidden md:table-cell text-center">תפקיד</th>
+                        <th className="p-4 text-sm font-bold text-slate-600 text-center">פעולות</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y">
+                    {filteredClubPeople.map(p => (
+                        <tr key={p.id} className="hover:bg-slate-50/50">
+                            <td className="p-4">
+                                <div className="font-bold text-slate-800 flex items-center gap-2">
+                                    {p.name}
+                                    {p.isSkipper && <ShipWheel size={14} className="text-blue-600" title="סקיפר" />}
+                                </div>
+                                <div className="text-xs text-slate-400">{getRoleLabel(p.role, p.gender)} • רמה {p.rank}</div>
+                            </td>
+                            <td className="p-4 hidden md:table-cell text-center">
+                                <span className={`text-xs px-2 py-1 rounded-full font-bold ${getRoleBadgeStyle(p.role)}`}>{getRoleLabel(p.role, p.gender)}</span>
+                            </td>
+                            <td className="p-4">
+                                <div className="flex gap-4 justify-center">
+                                    <button onClick={() => setEditingPerson(p)} className="p-2 text-slate-400 hover:text-brand-600"><Edit size={18} /></button>
+                                    <button onClick={() => removePerson(p.id)} className="p-2 text-slate-400 hover:text-red-600"><Trash2 size={18} /></button>
+                                </div>
+                            </td>
+                        </tr>
+                    ))}
+                    {filteredClubPeople.length === 0 && (
+                        <tr>
+                            <td colSpan={3} className="p-12 text-center text-slate-400 italic">לא נמצאו משתתפים תואמים לחיפוש.</td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+          </div>
+      </div>
+
       {(isAddFormOpen || editingPerson) && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-in fade-in">
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] overflow-y-auto">
@@ -538,7 +480,6 @@ export const Dashboard: React.FC = () => {
                       <button onClick={editingPerson ? () => setEditingPerson(null) : resetAddForm}><X /></button>
                   </div>
                   <form onSubmit={editingPerson ? handleUpdate : handleAdd} className="p-6 space-y-4 text-right">
-                      {/* Form Fields... */}
                       <div>
                           <label className="block text-sm font-bold mb-1">שם מלא</label>
                           <input required type="text" className="w-full border rounded-lg p-2" value={editingPerson ? editingPerson.name : newName} onChange={e => editingPerson ? setEditingPerson({...editingPerson, name: e.target.value}) : setNewName(e.target.value)} />
@@ -554,6 +495,12 @@ export const Dashboard: React.FC = () => {
                             <label className="block text-sm font-bold mb-1">דירוג (1-5)</label>
                             <input type="number" min="1" max="5" className="w-full border rounded-lg p-2" value={editingPerson ? editingPerson.rank : newRank} onChange={e => editingPerson ? setEditingPerson({...editingPerson, rank: Number(e.target.value)}) : setNewRank(Number(e.target.value))} />
                         </div>
+                      </div>
+                      <div>
+                          <label className="block text-sm font-bold mb-1 flex items-center gap-2">
+                             <input type="checkbox" checked={editingPerson ? editingPerson.isSkipper : newIsSkipper} onChange={e => editingPerson ? setEditingPerson({...editingPerson, isSkipper: e.target.checked}) : setNewIsSkipper(e.target.checked)} className="w-4 h-4" />
+                             סקיפר (מוסמך להוביל סירה)
+                          </label>
                       </div>
                       <div className="flex gap-2 pt-4">
                           <button type="submit" className="flex-1 bg-brand-600 text-white py-3 rounded-lg font-bold">שמור</button>
