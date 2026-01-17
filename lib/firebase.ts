@@ -1,4 +1,6 @@
+
 // Standard modular initialization for Firebase v9+
+// Fix: Use standard named import for initializeApp from 'firebase/app'
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { 
@@ -16,6 +18,7 @@ const firebaseConfig = {
   appId: "1:969970671528:web:7541abb86fc80a3bdc879d"
 };
 
+// Initialize Firebase app instance
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 

@@ -1,5 +1,8 @@
+
 import { Person, Role, BoatInventory, Team, BoatDefinition, GenderPrefType } from '../types';
-import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
+// Fix: Use exact import spacing and standard imports as per guidelines
+import {GoogleGenAI} from "@google/genai";
+import {Type, GenerateContentResponse} from "@google/genai";
 
 // --- Internal Helper for local algorithm (Fallback) ---
 interface Cluster {
@@ -333,8 +336,8 @@ export const generateSmartPairings = async (
   inventory: BoatInventory,
   boatDefinitions: BoatDefinition[]
 ): Promise<Team[]> => {
-  // Always initialize AI instance locally right before making an API call to use latest env key
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Fix: Initialize ai using exact property object and spacing as defined in Gemini guidelines
+  const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
   
   try {
     // Separate system context for better instruction following
@@ -394,6 +397,7 @@ export const generateSmartPairings = async (
       }
     });
 
+    // Fix: Access response.text as a property, not a method, as per guidelines
     const text = response.text;
     if (!text) {
         throw new Error("AI returned an empty response.");

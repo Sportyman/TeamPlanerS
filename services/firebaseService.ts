@@ -28,9 +28,9 @@ import { Person, BoatInventory } from "../types";
 export const loginWithGoogle = async () => {
   try {
     const provider = new GoogleAuthProvider();
-    // Forces the account selector to appear so users can switch accounts
+    // forces the Google account selector to appear so users can switch accounts
     provider.setCustomParameters({ prompt: 'select_account' });
-    
+
     const result = await signInWithPopup(auth, provider);
     const user = result.user;
 
