@@ -1,7 +1,9 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
 import { BoatInventory, getRoleLabel, Role } from '../types';
-import { Ship, Users, CheckCircle2, Circle, ArrowLeft, ArrowRight, CheckSquare, Square, RotateCcw, Shield, ArrowDownAZ, ArrowUpNarrowWide, Settings, Wind, Anchor, AlertTriangle, ShipWheel, Loader2 } from 'lucide-react';
+import { Ship, Users, CheckCircle2, Circle, ArrowLeft, ArrowRight, CheckSquare, Square, RotateCcw, Shield, ArrowDownAZ, ArrowUpNarrowWide, Settings, Wind, Anchor, AlertTriangle, ShipWheel } from 'lucide-react';
 import { PairingBoard } from './PairingBoard';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 
@@ -24,13 +26,13 @@ export const SessionManager: React.FC = () => {
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [isPairing, setIsPairing] = useState(false);
 
   if (!activeClub) return null;
 
   const currentClubLabel = clubs.find(c => c.id === activeClub)?.label;
   const currentSession = sessions[activeClub];
   
+  // Safety check: if session data is missing (e.g. after club deletion), show error or redirect
   if (!currentSession) {
       return (
           <div className="p-8 text-center text-slate-500">
@@ -45,6 +47,7 @@ export const SessionManager: React.FC = () => {
   const boatDefinitions = settings.boatDefinitions;
   const clubPeople = people.filter(p => p.clubId === activeClub);
 
+  // Initialize step
   const [step, setStep] = useState<1 | 2 | 3>(3);
 
   useEffect(() => {
@@ -60,17 +63,22 @@ export const SessionManager: React.FC = () => {
     }
   }, [searchParams, currentSession.teams.length]);
 
+  // SMART AUTO SCROLL LOGIC (Instead of Advance)
   const prevPresentCount = useRef(currentSession.presentPersonIds.length);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const currentCount = currentSession.presentPersonIds.length;
+    // Only trigger if we added people (not removed, and not just navigation)
     const increased = currentCount > prevPresentCount.current;
     prevPresentCount.current = currentCount;
 
     if (step === 1 && increased && clubPeople.length > 0) {
+        // Check if everyone is present
         const allPresent = clubPeople.every(p => currentSession.presentPersonIds.includes(p.id));
+        
         if (allPresent) {
+            // Scroll to the next button instead of auto advancing
             setTimeout(() => {
                 nextButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }, 300);
@@ -89,15 +97,10 @@ export const SessionManager: React.FC = () => {
     setLocalInventory(prev => ({ ...prev, [key]: value }));
   };
 
-  const startPairing = async () => {
-    setIsPairing(true);
-    try {
-      await updateInventory(localInventory);
-      await runPairing();
-      setStep(3);
-    } finally {
-      setIsPairing(false);
-    }
+  const startPairing = () => {
+    updateInventory(localInventory);
+    runPairing();
+    setStep(3);
   };
 
   const handleReset = () => {
@@ -162,13 +165,12 @@ export const SessionManager: React.FC = () => {
                     <span className="text-sm hidden md:inline">מומלץ לבצע שיבוץ מחדש כדי להתחשב בשינויים.</span>
                 </div>
                 <button 
-                    disabled={isPairing}
                     onClick={() => {
                         if(confirm('האם לבצע שיבוץ מחדש? הנתונים הקיימים יימחקו.')) {
-                            setStep(2); 
+                            setStep(2); // Go back to inventory/pairing trigger
                         }
                     }} 
-                    className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-md text-sm font-bold shadow-sm disabled:opacity-50"
+                    className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-md text-sm font-bold shadow-sm"
                 >
                     ערבב מחדש
                 </button>
@@ -264,15 +266,7 @@ export const SessionManager: React.FC = () => {
       )}
 
       {step === 2 && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-xl mx-auto relative overflow-hidden">
-          {isPairing && (
-             <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-300">
-                <Loader2 size={48} className="text-brand-600 animate-spin mb-4" />
-                <h3 className="text-xl font-bold text-slate-800">מחשב שיבוצים אופטימליים...</h3>
-                <p className="text-slate-500 mt-2 text-sm">ה-AI שלנו בונה את הצוותים הטובים ביותר</p>
-             </div>
-          )}
-
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-xl mx-auto">
           <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-4">
              <div>
                 <h2 className="text-2xl font-bold text-slate-800">ציוד זמין ({currentClubLabel})</h2>
@@ -322,7 +316,7 @@ export const SessionManager: React.FC = () => {
           
           <div className="mt-8 flex justify-between">
              <button onClick={() => setStep(1)} className="text-slate-500 hover:text-slate-800 px-4 py-2">חזור</button>
-             <button onClick={startPairing} disabled={boatDefinitions.length === 0 || isPairing} className="bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white px-8 py-3 rounded-lg font-bold shadow-lg flex items-center gap-2 transform transition hover:scale-105">צור שיבוצים <ArrowLeft size={16} /></button>
+             <button onClick={startPairing} disabled={boatDefinitions.length === 0} className="bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white px-8 py-3 rounded-lg font-bold shadow-lg flex items-center gap-2 transform transition hover:scale-105">צור שיבוצים <ArrowLeft size={16} /></button>
           </div>
         </div>
       )}
