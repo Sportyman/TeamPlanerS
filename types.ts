@@ -1,13 +1,11 @@
 
-
 export enum Role {
-  INSTRUCTOR = 'INSTRUCTOR', // New Role
+  INSTRUCTOR = 'INSTRUCTOR',
   VOLUNTEER = 'VOLUNTEER',
   MEMBER = 'MEMBER',
   GUEST = 'GUEST',
 }
 
-// Helper to get gender-aware label
 export const getRoleLabel = (role: Role, gender: Gender): string => {
     const labels: Record<Role, { [key in Gender]: string }> = {
         [Role.INSTRUCTOR]: { [Gender.MALE]: 'מדריך', [Gender.FEMALE]: 'מדריכה' },
@@ -28,7 +26,6 @@ export const GenderLabel: Record<Gender, string> = {
   [Gender.FEMALE]: 'נקבה',
 };
 
-// Gender Preference Definitions
 export type GenderPrefType = 'NONE' | 'MALE' | 'FEMALE';
 export type ConstraintStrength = 'NONE' | 'MUST' | 'PREFER';
 
@@ -43,10 +40,8 @@ export const GenderPrefLabels: Record<GenderPrefType, string> = {
     'FEMALE': 'נשים בלבד'
 };
 
-// Dynamic Boat Type
 export type BoatType = string;
 
-// Standard Defaults (for fallback/init)
 export const DefaultBoatTypes = {
   DOUBLE: 'DOUBLE',
   SINGLE: 'SINGLE',
@@ -65,14 +60,13 @@ export interface BoatDefinition {
   isStable: boolean; 
   capacity: number; 
   defaultCount: number;
-  minSkippers?: number; // New: Minimum skippers required
+  minSkippers?: number;
 }
 
 export interface BoatInventory {
   [boatTypeId: string]: number;
 }
 
-// Club Definitions
 export type ClubID = string; 
 
 export interface Club {
@@ -89,7 +83,7 @@ export interface UserPermission {
   allowedClubs: ClubID[];
 }
 
-export const APP_VERSION = '2.9.4';
+export const APP_VERSION = '3.0.0'; // Major version bump for Hybrid Sync
 
 export const TEAM_COLORS = [
   'bg-blue-50 border-blue-200',      
@@ -122,17 +116,12 @@ export interface Person {
   role: Role;
   rank: number;
   notes?: string;
-  isSkipper?: boolean; // New: Is this person a certified skipper?
-  
-  // Pairing Constraints
+  isSkipper?: boolean;
   preferredBoatType?: string; 
-  
-  // New Granular Constraints
   genderConstraint?: GenderConstraint;
-  
-  mustPairWith?: string[];   // Hard constraint (Green)
-  preferPairWith?: string[]; // Soft constraint (Yellow)
-  cannotPairWith?: string[]; // Hard negative (Red)
+  mustPairWith?: string[];   
+  preferPairWith?: string[]; 
+  cannotPairWith?: string[]; 
 }
 
 export interface Team {
@@ -148,3 +137,5 @@ export interface SessionState {
   presentPersonIds: string[];
   teams: Team[];
 }
+
+export type SyncStatus = 'SYNCED' | 'SYNCING' | 'OFFLINE' | 'ERROR';

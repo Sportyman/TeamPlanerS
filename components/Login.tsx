@@ -6,7 +6,7 @@ import { ShieldCheck, Mail, Zap, AlertTriangle, ArrowRight, Loader2 } from 'luci
 import { APP_VERSION } from '../types';
 
 export const Login: React.FC = () => {
-  const { login, user, activeClub, clubs } = useAppStore();
+  const { loginWithGoogle, loginDev, user, activeClub, clubs } = useAppStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [emailInput, setEmailInput] = useState('');
@@ -16,10 +16,8 @@ export const Login: React.FC = () => {
   const isAdminLogin = searchParams.get('admin') === 'true';
   const currentClubLabel = activeClub ? clubs.find(c => c.id === activeClub)?.label : '';
 
-  // Watch for changes in user state and redirect
   useEffect(() => {
     if (user) {
-      // Small delay to allow the "Success" spinner to be seen and prevent flickering
       const timer = setTimeout(() => {
           if (isAdminLogin && user.isAdmin) {
               navigate('/super-admin');
@@ -31,24 +29,23 @@ export const Login: React.FC = () => {
     }
   }, [user, navigate, isAdminLogin]);
 
-  const handleLogin = (e: React.FormEvent) => {
-      e.preventDefault();
-      const success = login(emailInput.trim());
-      
-      if (success) {
-          setIsRedirecting(true); // Trigger loading view
-      } else {
-          setErrorMsg(isAdminLogin 
-            ? 'אימייל זה אינו מורשה כמנהל על.'
-            : 'אימייל זה אינו מורשה לניהול חוג זה.');
-            setIsRedirecting(false);
+  const handleGoogleLogin = async () => {
+      setIsRedirecting(true);
+      const success = await loginWithGoogle();
+      if (!success) {
+          setIsRedirecting(false);
+          setErrorMsg('התחברות נכשלה או שאין לך הרשאות מתאימות.');
       }
   };
 
-  // Allow Super Admin shortcut for demo
-  const handleDevLogin = () => {
-    const success = login(ROOT_ADMIN_EMAIL);
-    if (success) setIsRedirecting(true);
+  const handleDevLogin = (e: React.FormEvent) => {
+      e.preventDefault();
+      const success = loginDev(emailInput.trim());
+      if (success) {
+          setIsRedirecting(true);
+      } else {
+          setErrorMsg('אימייל זה אינו מורשה.');
+      }
   };
 
   if (isRedirecting) {
@@ -67,7 +64,6 @@ export const Login: React.FC = () => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4 animate-in fade-in duration-500">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 space-y-6">
         
-        {/* Header */}
         <div className="text-center relative">
           <button 
              onClick={() => navigate('/')} 
@@ -85,64 +81,58 @@ export const Login: React.FC = () => {
               {isAdminLogin ? 'ניהול מערכת (Super Admin)' : `כניסה - ${currentClubLabel}`}
           </h1>
           <p className="text-slate-500 mt-2 text-sm">
-              הזן את כתובת האימייל המורשית שלך
+              התחבר למערכת באמצעות חשבון Google
           </p>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">אימייל</label>
-                <div className="relative">
-                    <Mail className="absolute right-3 top-3 text-slate-400" size={20} />
-                    <input 
-                        type="email" 
-                        required
-                        className="w-full pr-10 pl-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
-                        placeholder="your@email.com"
-                        value={emailInput}
-                        onChange={e => setEmailInput(e.target.value)}
-                        dir="ltr"
-                    />
-                </div>
+        {errorMsg && (
+            <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-lg text-sm">
+                <AlertTriangle size={16} />
+                {errorMsg}
             </div>
+        )}
 
-            {errorMsg && (
-                <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-lg text-sm">
-                    <AlertTriangle size={16} />
-                    {errorMsg}
-                </div>
-            )}
+        {/* GOOGLE LOGIN BUTTON */}
+        <button
+            onClick={handleGoogleLogin}
+            className="w-full flex items-center justify-center gap-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-3 rounded-lg transition-all shadow-sm"
+        >
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/action/google.svg" alt="Google" className="w-6 h-6" />
+            התחברות עם Google
+        </button>
 
-            <button
-                type="submit"
-                className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-lg transition-colors"
-            >
-                התחבר
-            </button>
-        </form>
-
-        {/* Dev Mode Shortcut */}
         <div className="relative pt-4">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-slate-200"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-slate-400">אפשרויות פיתוח</span>
+              <span className="px-2 bg-white text-slate-400">או כניסה ללא סיסמה (פיתוח)</span>
             </div>
         </div>
 
-        <button
-            onClick={handleDevLogin}
-            className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium py-3 px-4 rounded-lg transition-colors"
-        >
-            <Zap size={16} className="text-yellow-400" />
-            כניסה ללא סיסמה (Dev Root)
-        </button>
+        {/* Dev Mode Form */}
+        <form onSubmit={handleDevLogin} className="space-y-4">
+            <div>
+                <input 
+                    type="email" 
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+                    placeholder="הכנס אימייל מורשה..."
+                    value={emailInput}
+                    onChange={e => setEmailInput(e.target.value)}
+                    dir="ltr"
+                />
+            </div>
+            <button
+                type="submit"
+                className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium py-3 px-4 rounded-lg transition-colors"
+            >
+                <Zap size={16} className="text-yellow-400" />
+                כניסה מהירה (Dev Root)
+            </button>
+        </form>
 
       </div>
       
-      {/* Credits Footer */}
       <div className="mt-8 text-center text-xs text-slate-400" dir="ltr">
          <p>Version {APP_VERSION}</p>
          <p className="mt-1">Built by Shay Kalimi - @Shay.A.i</p>

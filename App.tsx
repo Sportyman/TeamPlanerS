@@ -8,28 +8,20 @@ import { Login } from './components/Login';
 import { LandingPage } from './components/LandingPage';
 import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { PublicPairingView } from './components/PublicPairingView';
-import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings } from 'lucide-react';
+import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw } from 'lucide-react';
 import { APP_VERSION } from './types';
+import { triggerCloudSync, fetchFromCloud } from './services/syncService';
 
-// Guard: Must be logged in AND have an active club selected AND the club must exist
 const ProtectedAppRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, activeClub, clubs } = useAppStore();
-  
   if (!user) return <Navigate to="/" />;
-  
-  // Critical Fix: Ensure the activeClub actually exists in the clubs list
   const clubExists = clubs.some(c => c.id === activeClub);
-  if (!activeClub || !clubExists) {
-      return <Navigate to="/" />;
-  }
-  
+  if (!activeClub || !clubExists) return <Navigate to="/" />;
   return <>{children}</>;
 };
 
-// Guard: Must be logged in as Super Admin
 const SuperAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { user } = useAppStore();
-    // In real app, check isAdmin flag or specific email
     if (!user) return <Navigate to="/" />; 
     return <>{children}</>;
 };
@@ -37,7 +29,6 @@ const SuperAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) 
 const NavLink: React.FC<{ to: string; icon: React.ReactNode; text: string; onClick?: () => void; className?: string }> = ({ to, icon, text, onClick, className }) => {
   const location = useLocation();
   const isActive = location.pathname + location.search === to;
-  
   return (
     <Link 
       to={to} 
@@ -55,9 +46,23 @@ const NavLink: React.FC<{ to: string; icon: React.ReactNode; text: string; onCli
 }
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { logout, user, activeClub, clubs } = useAppStore();
+  const { logout, user, activeClub, clubs, syncStatus, people, sessions, clubSettings } = useAppStore();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
+
+  // CLOUD SYNC TRIGGER
+  useEffect(() => {
+    if (user && activeClub) {
+      triggerCloudSync(activeClub);
+    }
+  }, [people, sessions, clubSettings, user, activeClub]);
+
+  // INITIAL CLOUD FETCH
+  useEffect(() => {
+    if (user && activeClub) {
+        fetchFromCloud(activeClub);
+    }
+  }, [user, activeClub]);
 
   const handleLogout = () => {
       logout();
@@ -72,7 +77,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative flex justify-between h-16 items-center">
             
-            {/* Right: Hamburger Menu & Desktop Nav Links */}
             <div className="flex items-center gap-4 z-20">
               <button 
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -87,26 +91,39 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </div>
             </div>
 
-            {/* Center: Logo & Club Name - ALWAYS VISIBLE */}
             <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30">
                <button 
                  onClick={() => navigate('/app')}
-                 className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                 className="flex flex-col items-center hover:opacity-80 transition-opacity"
                  title="דף הבית"
                >
-                 {activeClub === 'SAILING' ? <Ship className="text-sky-600" size={24} /> : <Waves className="text-brand-600" size={24} />}
-                 <span className="font-bold text-lg text-slate-800 whitespace-nowrap">
-                     {currentClub ? currentClub.label : 'TeamPlaner'}
-                 </span>
+                 <div className="flex items-center gap-2">
+                    {activeClub === 'SAILING' ? <Ship className="text-sky-600" size={20} /> : <Waves className="text-brand-600" size={20} />}
+                    <span className="font-bold text-sm md:text-lg text-slate-800 whitespace-nowrap">
+                        {currentClub ? currentClub.label : 'TeamPlaner'}
+                    </span>
+                 </div>
+                 {/* SYNC INDICATOR */}
+                 <div className="flex items-center gap-1 mt-0.5">
+                    {syncStatus === 'SYNCING' && <RefreshCw size={10} className="text-brand-500 animate-spin" />}
+                    {syncStatus === 'SYNCED' && <Cloud size={10} className="text-green-500" />}
+                    {syncStatus === 'OFFLINE' && <CloudOff size={10} className="text-slate-400" />}
+                    {syncStatus === 'ERROR' && <CloudOff size={10} className="text-red-500" />}
+                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
+                        {syncStatus === 'SYNCED' ? 'Cloud Saved' : syncStatus === 'SYNCING' ? 'Syncing...' : 'Local Only'}
+                    </span>
+                 </div>
                </button>
             </div>
             
-            {/* Left: User & Logout */}
             <div className="flex items-center gap-3 z-20">
               <div className="hidden sm:flex flex-col items-end">
                   <span className="text-xs md:text-sm text-slate-500">{user?.email}</span>
                   <span className="text-[10px] text-slate-300">v{APP_VERSION}</span>
               </div>
+              {user?.photoURL && (
+                  <img src={user.photoURL} alt="User" className="w-8 h-8 rounded-full border border-slate-200 hidden sm:block" />
+              )}
               <button onClick={handleLogout} className="text-slate-400 hover:text-red-500 p-2" title="התנתק ויציאה">
                 <LogOut size={20} />
               </button>
@@ -114,78 +131,34 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </div>
         </div>
 
-        {/* Full Screen / Large Dropdown Menu */}
         {isMenuOpen && (
           <>
-            {/* Backdrop to close menu when clicking outside */}
-            <div 
-              className="fixed inset-0 bg-black/25 z-40 backdrop-blur-sm" 
-              onClick={() => setIsMenuOpen(false)}
-              aria-hidden="true"
-            />
+            <div className="fixed inset-0 bg-black/25 z-40 backdrop-blur-sm" onClick={() => setIsMenuOpen(false)} aria-hidden="true" />
             <div className="absolute top-16 inset-x-0 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xl z-50 animate-in slide-in-from-top-2">
               <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
-                        <div className="px-3 py-2 text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">
-                            אימון ושיבוץ
-                        </div>
+                        <div className="px-3 py-2 text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">אימון ושיבוץ</div>
                         <div className="space-y-2">
-                          <NavLink 
-                              to="/app?step=1" 
-                              icon={<ClipboardCheck size={24} />} 
-                              text="בדיקת נוכחות" 
-                              className="px-4 py-3 text-lg"
-                              onClick={() => setIsMenuOpen(false)}
-                          />
-                          <NavLink 
-                              to="/app?step=2" 
-                              icon={<Ship size={24} />} 
-                              text="הגדרת ציוד" 
-                              className="px-4 py-3 text-lg"
-                              onClick={() => setIsMenuOpen(false)}
-                          />
-                          <NavLink 
-                              to="/app" 
-                              icon={<Calendar size={24} />} 
-                              text="לוח שיבוץ ראשי" 
-                              className="px-4 py-3 text-lg"
-                              onClick={() => setIsMenuOpen(false)}
-                          />
+                          <NavLink to="/app?step=1" icon={<ClipboardCheck size={24} />} text="בדיקת נוכחות" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
+                          <NavLink to="/app?step=2" icon={<Ship size={24} />} text="הגדרת ציוד" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
+                          <NavLink to="/app" icon={<Calendar size={24} />} text="לוח שיבוץ ראשי" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
                         </div>
                     </div>
-                    
                     <div>
-                        <div className="px-3 py-2 text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">
-                            ניהול שוטף
-                        </div>
+                        <div className="px-3 py-2 text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">ניהול שוטף</div>
                         <div className="space-y-2">
-                          <NavLink 
-                              to="/app/manage?view=PEOPLE" 
-                              icon={<Users size={24} />} 
-                              text="ניהול משתתפים" 
-                              className="px-4 py-3 text-lg"
-                              onClick={() => setIsMenuOpen(false)}
-                          />
-                          <NavLink 
-                              to="/app/manage?view=INVENTORY" 
-                              icon={<Settings size={24} />} 
-                              text="ניהול ציוד ומלאי" 
-                              className="px-4 py-3 text-lg"
-                              onClick={() => setIsMenuOpen(false)}
-                          />
+                          <NavLink to="/app/manage?view=PEOPLE" icon={<Users size={24} />} text="ניהול משתתפים" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
+                          <NavLink to="/app/manage?view=INVENTORY" icon={<Settings size={24} />} text="ניהול ציוד ומלאי" className="px-4 py-3 text-lg" onClick={() => setIsMenuOpen(false)} />
                         </div>
                     </div>
                 </div>
-
                 <div className="border-t border-slate-200 mt-6 pt-4 flex justify-between items-center px-4">
                     <div className="flex flex-col">
                       <span className="text-sm font-medium text-slate-600">{user?.email}</span>
-                      <span className="text-xs text-slate-400">מחובר כרגע</span>
+                      <span className="text-xs text-slate-400">מחובר כרגע (Hybrid Mode)</span>
                     </div>
-                    <div className="text-xs text-slate-300 font-mono">
-                      v{APP_VERSION}
-                    </div>
+                    <div className="text-xs text-slate-300 font-mono">v{APP_VERSION}</div>
                 </div>
               </div>
             </div>
@@ -204,11 +177,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
-// Admin Layout (Simple)
 const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { logout, user } = useAppStore();
     const navigate = useNavigate();
-
     return (
         <div className="min-h-screen bg-slate-100 flex flex-col">
              <nav className="bg-slate-800 text-white p-4 shadow-md">
@@ -238,15 +209,9 @@ const App: React.FC = () => {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/share" element={<PublicPairingView />} />
-
-        {/* Protected App Routes */}
         <Route path="/app" element={<ProtectedAppRoute><Layout><SessionManager /></Layout></ProtectedAppRoute>} />
         <Route path="/app/manage" element={<ProtectedAppRoute><Layout><Dashboard /></Layout></ProtectedAppRoute>} />
-
-        {/* Super Admin Route */}
         <Route path="/super-admin" element={<SuperAdminRoute><AdminLayout><SuperAdminDashboard /></AdminLayout></SuperAdminRoute>} />
-        
-        {/* Catch all */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
