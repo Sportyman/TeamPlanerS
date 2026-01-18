@@ -2,7 +2,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
-import { ClubID } from '../types';
+import { ClubID, APP_VERSION } from '../types';
 import { Waves, Ship, Settings, Anchor } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
@@ -61,7 +61,7 @@ export const LandingPage: React.FC = () => {
                  className="text-slate-400 hover:text-slate-600 text-sm flex items-center justify-center gap-2 mx-auto transition-colors"
                >
                  <Settings size={14} />
-                 כניסה למנהל מערכת ראשי
+                 כניסה לניהול מערכת
                </button>
             </div>
 
@@ -69,8 +69,9 @@ export const LandingPage: React.FC = () => {
       </div>
       
       {/* Credits Footer */}
-      <footer className="w-full py-4 text-center text-xs text-slate-400 opacity-60" dir="ltr">
-         Built by Shay Kalimi - @Shay.A.i
+      <footer className="w-full py-4 text-center text-xs text-slate-400 opacity-60 flex flex-col gap-1" dir="ltr">
+         <div>Built by Shay Kalimi - @Shay.A.i</div>
+         <div className="text-[10px] font-black opacity-50 uppercase tracking-[0.2em]">v{APP_VERSION}</div>
       </footer>
     </div>
   );
