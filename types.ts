@@ -83,7 +83,7 @@ export interface UserPermission {
   allowedClubs: ClubID[];
 }
 
-export const APP_VERSION = '3.0.0'; // Major version bump for Hybrid Sync
+export const APP_VERSION = '3.1.0'; // Version bumped for Root Protection & Security Rules
 
 export const TEAM_COLORS = [
   'bg-blue-50 border-blue-200',      
@@ -124,7 +124,6 @@ export interface Person {
   cannotPairWith?: string[]; 
 }
 
-// Added missing PersonSnapshot interface used in store.ts and syncService.ts
 export interface PersonSnapshot {
   id: string;
   name: string;

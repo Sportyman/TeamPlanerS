@@ -21,6 +21,7 @@ export const fetchGlobalConfig = async () => {
                 superAdmins: data.superAdmins || [],
                 protectedAdmins: data.protectedAdmins || []
             });
+            console.debug("Global config synchronized with cloud.");
         }
     } catch (error) {
         console.error("Global Config Fetch Error:", error);
@@ -55,7 +56,6 @@ export const syncToCloud = async (clubId: ClubID) => {
         }, { merge: true });
 
         // If user is admin, also sync the global admin list
-        // Note: Security rules should protect 'protectedAdmins' from being overwritten via SDK if implemented correctly
         if (user.isAdmin) {
             const configDocRef = doc(db, 'config', 'global');
             await setDoc(configDocRef, {
@@ -64,8 +64,14 @@ export const syncToCloud = async (clubId: ClubID) => {
         }
         
         setSyncStatus('SYNCED');
-    } catch (error) {
+    } catch (error: any) {
         console.error("Cloud Sync Error:", error);
+        
+        // Specific handling for Security Rules rejection
+        if (error.code === 'permission-denied') {
+            alert('שגיאת הרשאה: הפעולה נחסמה על ידי חוקי האבטחה של השרת. ייתכן שמישהו ניסה למחוק מנהל מוגן (Root).');
+        }
+        
         setSyncStatus('ERROR');
     }
 };

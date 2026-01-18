@@ -19,7 +19,7 @@ const createInventoryFromDefs = (defs: BoatDefinition[]): BoatInventory => {
 const EMPTY_SESSION = { inventory: {}, presentPersonIds: [], teams: [] };
 
 interface AppState {
-  user: { email: string; isAdmin: boolean; photoURL?: string } | null;
+  user: { email: string; isAdmin: boolean; isRoot?: boolean; photoURL?: string } | null;
   activeClub: ClubID | null;
   pairingDirty: boolean; 
   syncStatus: SyncStatus;
@@ -128,23 +128,34 @@ export const useAppStore = create<AppState>()(
       setActiveClub: (clubId) => set({ activeClub: clubId }),
       setSyncStatus: (status) => set({ syncStatus: status }),
       
-      setGlobalConfig: (config) => set({ 
-          superAdmins: config.superAdmins.map(a => a.toLowerCase().trim()),
-          protectedAdmins: (config.protectedAdmins || []).map(a => a.toLowerCase().trim())
-      }),
+      setGlobalConfig: (config) => {
+          const { user } = get();
+          const protectedAdmins = (config.protectedAdmins || []).map(a => a.toLowerCase().trim());
+          const superAdmins = config.superAdmins.map(a => a.toLowerCase().trim());
+          
+          set({ superAdmins, protectedAdmins });
+          
+          // Re-evaluate current user status
+          if (user) {
+              const isRoot = protectedAdmins.includes(user.email.toLowerCase().trim());
+              const isAdmin = superAdmins.includes(user.email.toLowerCase().trim()) || isRoot;
+              set({ user: { ...user, isAdmin, isRoot } });
+          }
+      },
 
       loginWithGoogle: async () => {
         try {
           const result = await signInWithPopup(auth, googleProvider);
           const email = result.user.email?.toLowerCase().trim() || '';
-          const { activeClub, permissions, superAdmins } = get();
+          const { activeClub, permissions, superAdmins, protectedAdmins } = get();
 
-          const isSuperAdmin = superAdmins.some(a => a.toLowerCase() === email);
+          const isRoot = protectedAdmins.some(a => a.toLowerCase() === email);
+          const isSuperAdmin = isRoot || superAdmins.some(a => a.toLowerCase() === email);
           const userPerm = permissions.find(p => p.email.toLowerCase() === email);
           const hasClubAccess = userPerm && activeClub && userPerm.allowedClubs.includes(activeClub);
 
           if (isSuperAdmin || hasClubAccess) {
-            set({ user: { email, isAdmin: isSuperAdmin, photoURL: result.user.photoURL || undefined } });
+            set({ user: { email, isAdmin: isSuperAdmin, isRoot, photoURL: result.user.photoURL || undefined } });
             return true;
           }
           
@@ -160,12 +171,11 @@ export const useAppStore = create<AppState>()(
         const normalizedEmail = email.trim().toLowerCase() || 'developer@internal.dev';
         const { superAdmins, protectedAdmins } = get();
         
-        // Root dev access: If forced from ?admin=true OR if in the superAdmins list
-        const isSuperAdmin = forceAdmin || 
-                             superAdmins.some(a => a.toLowerCase() === normalizedEmail) ||
-                             protectedAdmins.some(a => a.toLowerCase() === normalizedEmail);
+        const isRoot = protectedAdmins.some(a => a.toLowerCase() === normalizedEmail);
+        const isSuperAdmin = forceAdmin || isRoot ||
+                             superAdmins.some(a => a.toLowerCase() === normalizedEmail);
         
-        set({ user: { email: normalizedEmail, isAdmin: isSuperAdmin } });
+        set({ user: { email: normalizedEmail, isAdmin: isSuperAdmin, isRoot } });
         return true;
       },
 
@@ -620,7 +630,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'etgarim-storage',
-      version: 25.0, 
+      version: 31.0, // Bumped for Root Admin feature
       partialize: (state) => ({
         user: state.user,
         people: state.people,
