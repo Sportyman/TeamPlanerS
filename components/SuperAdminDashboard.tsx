@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
-import { useAppStore, ROOT_ADMIN_EMAIL } from '../store';
-import { Shield, Trash2, UserCheck, Home, Waves, Plus } from 'lucide-react';
+import { useAppStore } from '../store';
+import { Shield, Trash2, UserCheck, Home, Waves, Plus, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const SuperAdminDashboard: React.FC = () => {
-  const { user, clubs, superAdmins, addClub, removeClub, addSuperAdmin, removeSuperAdmin } = useAppStore();
+  const { user, clubs, superAdmins, protectedAdmins, addClub, removeClub, addSuperAdmin, removeSuperAdmin } = useAppStore();
   const navigate = useNavigate();
   
   const [newEmail, setNewEmail] = useState('');
@@ -43,15 +43,15 @@ export const SuperAdminDashboard: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-8">
-       {/* Header with redesigned Back Button */}
+       {/* Header */}
        <div className="flex items-start justify-between border-b border-slate-200 pb-6">
            <div className="flex items-center gap-4">
                 <div className="bg-slate-800 p-3 rounded-full text-white hidden sm:block">
                     <Shield size={32} />
                 </div>
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-slate-800">ניהול על (Super Admin)</h1>
-                    <p className="text-slate-500 text-sm md:text-base">ניהול חוגים ומנהלי מערכת</p>
+                    <h1 className="text-2xl md:text-3xl font-bold text-slate-800">ניהול מערכת (Super Admin)</h1>
+                    <p className="text-slate-500 text-sm md:text-base">הגדרות הרשאות וניהול חוגים גלובלי</p>
                 </div>
            </div>
            
@@ -71,7 +71,6 @@ export const SuperAdminDashboard: React.FC = () => {
                ניהול חוגים
            </h2>
            
-           {/* Form - Responsive Stack */}
            <form onSubmit={handleAddClub} className="flex flex-col sm:flex-row gap-3 mb-6">
                <input 
                  type="text" 
@@ -103,9 +102,6 @@ export const SuperAdminDashboard: React.FC = () => {
                        </button>
                    </div>
                ))}
-               {clubs.length === 0 && (
-                   <p className="text-slate-400 italic">אין חוגים במערכת.</p>
-               )}
            </div>
        </div>
 
@@ -115,6 +111,7 @@ export const SuperAdminDashboard: React.FC = () => {
                <UserCheck size={24} className="text-brand-600" />
                ניהול מנהלי-על
            </h2>
+           <p className="text-xs text-slate-400 mb-4">כתובות אלו מורשות לגשת לניהול העל ולמחוק חוגים.</p>
            
            <form onSubmit={handleAddAdmin} className="flex flex-col sm:flex-row gap-3 mb-6">
                <input 
@@ -122,7 +119,7 @@ export const SuperAdminDashboard: React.FC = () => {
                  value={newEmail}
                  onChange={e => setNewEmail(e.target.value)}
                  className="w-full sm:flex-1 px-4 py-3 border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
-                 placeholder="כתובת אימייל..."
+                 placeholder="כתובת אימייל מורשית..."
                  dir="ltr"
                />
                <button 
@@ -135,23 +132,40 @@ export const SuperAdminDashboard: React.FC = () => {
            </form>
 
            <div className="space-y-2">
-               {superAdmins.map(email => (
-                   <div key={email} className="p-3 border-b flex justify-between items-center last:border-0 hover:bg-slate-50 transition-colors rounded-lg">
-                       <span className="font-mono text-slate-700 break-all">{email}</span>
-                       {email.toLowerCase() !== ROOT_ADMIN_EMAIL.toLowerCase() ? (
+               {superAdmins.map(email => {
+                   const isProtected = protectedAdmins.includes(email.toLowerCase().trim());
+                   return (
+                       <div key={email} className={`p-3 border-b flex justify-between items-center last:border-0 hover:bg-slate-50 transition-colors rounded-lg ${isProtected ? 'bg-brand-50/30' : ''}`}>
+                           <div className="flex items-center gap-2">
+                               <span className="font-mono text-slate-700 break-all">{email}</span>
+                               {isProtected && (
+                                   <span className="bg-brand-100 text-brand-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                       <Lock size={10} /> Root
+                                   </span>
+                               )}
+                           </div>
                            <button 
                                 type="button"
-                                onClick={() => { if(confirm('להסיר גישת ניהול?')) removeSuperAdmin(email); }}
-                                className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-full ml-2 shrink-0"
-                                title="הסר מנהל"
+                                onClick={() => { 
+                                    if(isProtected) return;
+                                    if(confirm('להסיר גישת ניהול?')) removeSuperAdmin(email); 
+                                }}
+                                disabled={isProtected}
+                                className={`p-2 rounded-full ml-2 shrink-0 transition-colors ${
+                                    isProtected 
+                                    ? 'text-slate-300 cursor-not-allowed' 
+                                    : 'text-slate-400 hover:text-red-500 hover:bg-red-50'
+                                }`}
+                                title={isProtected ? 'חשבון מוגן' : 'הסר מנהל'}
                            >
                                <Trash2 size={18} />
                            </button>
-                       ) : (
-                           <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded whitespace-nowrap ml-2">ראשי</span>
-                       )}
-                   </div>
-               ))}
+                       </div>
+                   );
+               })}
+               {superAdmins.length === 0 && (
+                   <p className="text-sm text-amber-600 font-bold bg-amber-50 p-3 rounded">שים לב: לא הוגדרו מנהלי על במסד הנתונים!</p>
+               )}
            </div>
        </div>
     </div>

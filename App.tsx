@@ -10,7 +10,7 @@ import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { PublicPairingView } from './components/PublicPairingView';
 import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw, LayoutGrid, History as HistoryIcon, Clock, ChevronLeft, Home, Shield } from 'lucide-react';
 import { APP_VERSION } from './types';
-import { triggerCloudSync, fetchFromCloud } from './services/syncService';
+import { triggerCloudSync, fetchFromCloud, fetchGlobalConfig } from './services/syncService';
 
 const ProtectedAppRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, activeClub, clubs } = useAppStore();
@@ -22,7 +22,7 @@ const ProtectedAppRoute: React.FC<{ children: React.ReactNode }> = ({ children }
 
 const SuperAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { user } = useAppStore();
-    if (!user) return <Navigate to="/" />; 
+    if (!user || !user.isAdmin) return <Navigate to="/" />; 
     return <>{children}</>;
 };
 
@@ -47,7 +47,7 @@ const NavLink: React.FC<{ to: string; icon: React.ReactNode; text: string; onCli
 }
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { logout, user, activeClub, clubs, syncStatus, lastSyncTime, people, sessions, clubSettings } = useAppStore();
+  const { logout, user, activeClub, clubs, syncStatus, people, sessions, clubSettings } = useAppStore();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -109,7 +109,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <NavLink to="/app/manage" icon={<LayoutGrid size={20} />} text="ניהול חוג" className="p-4" />
             <NavLink to="/app/manage?view=PEOPLE" icon={<Users size={20} />} text="רשימת משתתפים" className="p-4" />
             <NavLink to="/app/manage?view=INVENTORY" icon={<Ship size={20} />} text="ניהול ציוד" className="p-4" />
-            <NavLink to="/app/manage?view=SNAPSHOTS" icon={<HistoryIcon size={20} />} text="היסטוריית קבוצות" className="p-4" />
             
             {user?.isAdmin && (
                 <>
@@ -149,46 +148,26 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               >
                 {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
               </button>
-              <div className="hidden lg:flex space-x-4 space-x-reverse mr-2">
-                <NavLink to="/app" icon={<Calendar size={18} />} text="אימון" className="px-3 py-2 text-sm" />
-                <NavLink to="/app/manage" icon={<LayoutGrid size={18} />} text="ניהול" className="px-3 py-2 text-sm" />
-              </div>
             </div>
             
-            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30">
-               <button onClick={() => navigate('/app')} className="flex flex-col items-center hover:opacity-80 transition-opacity">
+            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 text-center">
                  <div className="flex items-center gap-2">
                     {activeClub === 'SAILING' ? <Ship className="text-sky-600" size={20} /> : <Waves className="text-brand-600" size={20} />}
                     <span className="font-bold text-sm md:text-lg text-slate-800 whitespace-nowrap">
                         {currentClub ? currentClub.label : 'TeamPlaner'}
                     </span>
                  </div>
-                 <div className="flex flex-col items-center mt-0.5">
-                    <div className="flex items-center gap-1">
-                        {syncStatus === 'SYNCING' && <RefreshCw size={10} className="text-brand-500 animate-spin" />}
-                        {syncStatus === 'SYNCED' && <Cloud size={10} className="text-green-500" />}
-                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
-                            {syncStatus === 'SYNCED' ? 'Cloud Saved' : syncStatus === 'SYNCING' ? 'Syncing...' : 'Local'}
-                        </span>
-                    </div>
-                    {lastSyncTime && syncStatus === 'SYNCED' && (
-                        <div className="text-[7px] text-slate-300 font-medium flex items-center gap-0.5">
-                            <Clock size={8} /> {new Date(lastSyncTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                    )}
+                 <div className="flex items-center justify-center gap-1 mt-0.5">
+                    {syncStatus === 'SYNCING' && <RefreshCw size={10} className="text-brand-500 animate-spin" />}
+                    {syncStatus === 'SYNCED' && <Cloud size={10} className="text-green-500" />}
+                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
+                        {syncStatus === 'SYNCED' ? 'Cloud Saved' : syncStatus === 'SYNCING' ? 'Syncing...' : 'Local'}
+                    </span>
                  </div>
-               </button>
             </div>
 
             <div className="flex items-center gap-3 z-20">
-              {user?.photoURL ? (
-                  <img src={user.photoURL} alt="User" className="w-8 h-8 rounded-full border border-slate-200" />
-              ) : (
-                  <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 text-xs font-bold border border-slate-200">
-                      {user?.email?.charAt(0).toUpperCase()}
-                  </div>
-              )}
-              <button onClick={handleLogout} className="text-slate-400 hover:text-red-500 p-2 hidden sm:block"><LogOut size={20} /></button>
+              <button onClick={handleLogout} className="text-slate-400 hover:text-red-500 p-2"><LogOut size={20} /></button>
             </div>
           </div>
         </div>
@@ -207,13 +186,18 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const App: React.FC = () => {
+  useEffect(() => {
+    // Critical: Fetch global config from DB on app startup to resolve permissions.
+    fetchGlobalConfig();
+  }, []);
+
   return (
     <Router>
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/share" element={<PublicPairingView />} />
-        <Route path="/super-admin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />
+        <Route path="/super-admin" element={<SuperAdminRoute><Layout><SuperAdminDashboard /></Layout></SuperAdminRoute>} />
         <Route path="/app" element={<ProtectedAppRoute><Layout><SessionManager /></Layout></ProtectedAppRoute>} />
         <Route path="/app/manage" element={<ProtectedAppRoute><Layout><Dashboard /></Layout></ProtectedAppRoute>} />
         <Route path="*" element={<Navigate to="/" />} />

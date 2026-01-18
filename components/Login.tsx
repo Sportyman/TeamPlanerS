@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAppStore, ROOT_ADMIN_EMAIL } from '../store';
+import { useAppStore } from '../store';
 import { ShieldCheck, Mail, Zap, AlertTriangle, ArrowRight, Loader2 } from 'lucide-react';
 import { APP_VERSION } from '../types';
 
@@ -16,21 +16,30 @@ export const Login: React.FC = () => {
   const isAdminLogin = searchParams.get('admin') === 'true';
   const currentClubLabel = activeClub ? clubs.find(c => c.id === activeClub)?.label : '';
 
+  // Improved Redirect Logic based on dynamic isAdmin flag
   useEffect(() => {
     if (user) {
-      const timer = setTimeout(() => {
-          if (isAdminLogin && user.isAdmin) {
+      if (isAdminLogin) {
+          if (user.isAdmin) {
               navigate('/super-admin');
           } else {
-              navigate('/app');
+              setErrorMsg('אינך מורשה לגשת למערכת הניהול הראשי.');
+              setIsRedirecting(false);
           }
-      }, 500);
-      return () => clearTimeout(timer);
+      } else {
+          // Standard club login
+          if (activeClub) {
+             navigate('/app');
+          } else {
+             navigate('/');
+          }
+      }
     }
-  }, [user, navigate, isAdminLogin]);
+  }, [user, navigate, isAdminLogin, activeClub]);
 
   const handleGoogleLogin = async () => {
       setIsRedirecting(true);
+      setErrorMsg('');
       const success = await loginWithGoogle();
       if (!success) {
           setIsRedirecting(false);
@@ -40,15 +49,18 @@ export const Login: React.FC = () => {
 
   const handleDevLogin = (e: React.FormEvent) => {
       e.preventDefault();
-      const success = loginDev(emailInput.trim());
-      if (success) {
-          setIsRedirecting(true);
-      } else {
-          setErrorMsg('אימייל זה אינו מורשה.');
+      setErrorMsg('');
+      setIsRedirecting(true);
+      
+      // Free dev login: if they are in admin mode, we grant them admin status for development.
+      const success = loginDev(emailInput.trim(), isAdminLogin);
+      if (!success) {
+          setIsRedirecting(false);
+          setErrorMsg('שגיאה בתהליך ההתחברות.');
       }
   };
 
-  if (isRedirecting) {
+  if (isRedirecting && !errorMsg) {
       return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
               <div className="bg-white p-8 rounded-2xl shadow-xl flex flex-col items-center animate-in fade-in zoom-in duration-300">
@@ -92,7 +104,6 @@ export const Login: React.FC = () => {
             </div>
         )}
 
-        {/* GOOGLE LOGIN BUTTON - BRANDED STYLE */}
         <button
             onClick={handleGoogleLogin}
             className="w-full flex items-center justify-center gap-4 bg-white border border-slate-200 hover:border-brand-300 hover:bg-slate-50 text-slate-700 font-bold py-3.5 rounded-xl transition-all shadow-sm hover:shadow-md group"
@@ -113,18 +124,17 @@ export const Login: React.FC = () => {
               <div className="w-full border-t border-slate-100"></div>
             </div>
             <div className="relative flex justify-center text-xs">
-              <span className="px-4 bg-white text-slate-400 font-bold uppercase tracking-widest">או כניסה מהירה</span>
+              <span className="px-4 bg-white text-slate-400 font-bold uppercase tracking-widest">או כניסה חופשית למפתחים</span>
             </div>
         </div>
 
-        {/* Dev Mode Form */}
         <form onSubmit={handleDevLogin} className="space-y-4">
             <div className="relative group">
                 <Mail className="absolute right-4 top-3.5 text-slate-400 group-focus-within:text-brand-500 transition-colors" size={20} />
                 <input 
                     type="email" 
                     className="w-full pr-12 pl-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
-                    placeholder="הכנס אימייל מורשה..."
+                    placeholder="אימייל (אופציונלי)..."
                     value={emailInput}
                     onChange={e => setEmailInput(e.target.value)}
                     dir="ltr"
@@ -135,7 +145,7 @@ export const Login: React.FC = () => {
                 className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-xl transition-all shadow-sm active:scale-95"
             >
                 <Zap size={18} className="text-yellow-400 fill-current" />
-                כניסה למפתחים
+                כניסה מהירה
             </button>
         </form>
 

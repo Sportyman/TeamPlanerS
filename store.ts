@@ -10,8 +10,6 @@ import { DEFAULT_CLUBS, INITIAL_PEOPLE, KAYAK_DEFINITIONS, SAILING_DEFINITIONS }
 import { auth, googleProvider } from './firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
 
-export const ROOT_ADMIN_EMAIL = 'shaykashay@gmail.com';
-
 const createInventoryFromDefs = (defs: BoatDefinition[]): BoatInventory => {
     const inv: BoatInventory = {};
     defs.forEach(d => inv[d.id] = d.defaultCount);
@@ -25,10 +23,10 @@ interface AppState {
   activeClub: ClubID | null;
   pairingDirty: boolean; 
   syncStatus: SyncStatus;
-  lastSyncTime: string | null;
   
   clubs: Club[];
   superAdmins: string[]; 
+  protectedAdmins: string[]; // Emails that cannot be removed via UI
   permissions: UserPermission[];
   
   people: Person[];
@@ -40,10 +38,11 @@ interface AppState {
   
   // Actions
   loginWithGoogle: () => Promise<boolean>;
-  loginDev: (email: string) => boolean;
+  loginDev: (email: string, forceAdmin?: boolean) => boolean;
   logout: () => Promise<void>;
   setActiveClub: (clubId: ClubID) => void;
   setSyncStatus: (status: SyncStatus) => void;
+  setGlobalConfig: (config: { superAdmins: string[], protectedAdmins?: string[] }) => void;
   
   // Super Admin Actions
   addClub: (label: string) => void;
@@ -55,7 +54,7 @@ interface AppState {
   removePermission: (email: string, clubId: ClubID) => void;
   
   // Data actions
-  setCloudData: (data: { people: Person[], sessions: Record<ClubID, SessionState>, settings: Record<ClubID, ClubSettings>, snapshots?: Record<ClubID, PersonSnapshot[]>, lastUpdated?: string }) => void;
+  setCloudData: (data: { people: Person[], sessions: Record<ClubID, SessionState>, settings: Record<ClubID, ClubSettings>, snapshots?: Record<ClubID, PersonSnapshot[]> }) => void;
   addPerson: (person: Omit<Person, 'clubId'>) => void;
   updatePerson: (person: Person) => void;
   removePerson: (id: string) => void;
@@ -105,10 +104,10 @@ export const useAppStore = create<AppState>()(
       activeClub: null,
       pairingDirty: false,
       syncStatus: 'OFFLINE',
-      lastSyncTime: null,
       
       clubs: DEFAULT_CLUBS,
-      superAdmins: [ROOT_ADMIN_EMAIL],
+      superAdmins: [],
+      protectedAdmins: [], // Loaded from Firestore
       permissions: [], 
       people: INITIAL_PEOPLE,
       
@@ -128,14 +127,19 @@ export const useAppStore = create<AppState>()(
 
       setActiveClub: (clubId) => set({ activeClub: clubId }),
       setSyncStatus: (status) => set({ syncStatus: status }),
+      
+      setGlobalConfig: (config) => set({ 
+          superAdmins: config.superAdmins.map(a => a.toLowerCase().trim()),
+          protectedAdmins: (config.protectedAdmins || []).map(a => a.toLowerCase().trim())
+      }),
 
       loginWithGoogle: async () => {
         try {
           const result = await signInWithPopup(auth, googleProvider);
-          const email = result.user.email?.toLowerCase() || '';
+          const email = result.user.email?.toLowerCase().trim() || '';
           const { activeClub, permissions, superAdmins } = get();
 
-          const isSuperAdmin = email === ROOT_ADMIN_EMAIL.toLowerCase() || superAdmins.some(a => a.toLowerCase() === email);
+          const isSuperAdmin = superAdmins.some(a => a.toLowerCase() === email);
           const userPerm = permissions.find(p => p.email.toLowerCase() === email);
           const hasClubAccess = userPerm && activeClub && userPerm.allowedClubs.includes(activeClub);
 
@@ -145,7 +149,6 @@ export const useAppStore = create<AppState>()(
           }
           
           await signOut(auth);
-          alert('אין לך הרשאות גישה למועדון זה.');
           return false;
         } catch (error) {
           console.error("Login error:", error);
@@ -153,10 +156,15 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      loginDev: (email) => {
-        const normalizedEmail = email.toLowerCase().trim();
-        const { superAdmins } = get();
-        const isSuperAdmin = normalizedEmail === ROOT_ADMIN_EMAIL.toLowerCase() || superAdmins.some(a => a.toLowerCase() === normalizedEmail);
+      loginDev: (email, forceAdmin = false) => {
+        const normalizedEmail = email.trim().toLowerCase() || 'developer@internal.dev';
+        const { superAdmins, protectedAdmins } = get();
+        
+        // Root dev access: If forced from ?admin=true OR if in the superAdmins list
+        const isSuperAdmin = forceAdmin || 
+                             superAdmins.some(a => a.toLowerCase() === normalizedEmail) ||
+                             protectedAdmins.some(a => a.toLowerCase() === normalizedEmail);
+        
         set({ user: { email: normalizedEmail, isAdmin: isSuperAdmin } });
         return true;
       },
@@ -171,7 +179,6 @@ export const useAppStore = create<AppState>()(
         sessions: { ...state.sessions, ...data.sessions },
         clubSettings: { ...state.clubSettings, ...data.settings },
         snapshots: data.snapshots ? { ...state.snapshots, ...data.snapshots } : state.snapshots,
-        lastSyncTime: data.lastUpdated || state.lastSyncTime,
         syncStatus: 'SYNCED'
       })),
 
@@ -195,14 +202,23 @@ export const useAppStore = create<AppState>()(
           };
       }),
 
-      addSuperAdmin: (email) => set(state => ({
-          superAdmins: [...state.superAdmins, email.trim()]
-      })),
+      addSuperAdmin: (email) => set(state => {
+          const normalized = email.toLowerCase().trim();
+          if (state.superAdmins.includes(normalized)) return state;
+          return {
+              superAdmins: [...state.superAdmins, normalized]
+          };
+      }),
 
       removeSuperAdmin: (email) => set(state => {
-          if (email.toLowerCase() === ROOT_ADMIN_EMAIL.toLowerCase()) return state;
+          const normalized = email.toLowerCase().trim();
+          // Cannot remove protected admins
+          if (state.protectedAdmins.includes(normalized)) {
+              alert('חשבון זה מוגדר כחשבון שורשי (Root) ולא ניתן להסרה.');
+              return state;
+          }
           return {
-              superAdmins: state.superAdmins.filter(a => a.toLowerCase() !== email.toLowerCase())
+              superAdmins: state.superAdmins.filter(a => a.toLowerCase() !== normalized)
           };
       }),
 
@@ -230,11 +246,7 @@ export const useAppStore = create<AppState>()(
 
       addPerson: (personData) => set((state) => {
         if (!state.activeClub) return state;
-        const newPerson: Person = { 
-            ...personData, 
-            clubId: state.activeClub,
-            createdAt: new Date().toISOString()
-        };
+        const newPerson: Person = { ...personData, clubId: state.activeClub };
         return { 
           people: [...state.people, newPerson],
           pairingDirty: true 
@@ -281,10 +293,7 @@ export const useAppStore = create<AppState>()(
           const clubId = state.activeClub;
           if (!clubId) return state;
           const otherPeople = state.people.filter(p => p.clubId !== clubId);
-          const demoPeople = INITIAL_PEOPLE.filter(p => p.clubId === clubId).map(p => ({
-              ...p,
-              createdAt: new Date().toISOString()
-          }));
+          const demoPeople = INITIAL_PEOPLE.filter(p => p.clubId === clubId);
           return {
               people: [...otherPeople, ...demoPeople],
               pairingDirty: true
@@ -359,14 +368,7 @@ export const useAppStore = create<AppState>()(
         const currentSession = state.sessions[activeClub];
         const isPresent = currentSession.presentPersonIds.includes(id);
         const newPresent = isPresent ? currentSession.presentPersonIds.filter(pid => pid !== id) : [...currentSession.presentPersonIds, id];
-        
-        // Update last participation date for analytics
-        const newPeople = state.people.map(p => p.id === id ? { ...p, lastParticipation: new Date().toISOString() } : p);
-
-        return { 
-            people: newPeople,
-            sessions: { ...state.sessions, [activeClub]: { ...currentSession, presentPersonIds: newPresent } } 
-        };
+        return { sessions: { ...state.sessions, [activeClub]: { ...currentSession, presentPersonIds: newPresent } } };
       }),
 
       setBulkAttendance: (ids) => set((state) => {
@@ -498,8 +500,7 @@ export const useAppStore = create<AppState>()(
             rank: 1,
             gender: Gender.MALE,
             tags: [],
-            notes: 'הוסף ידנית',
-            createdAt: new Date().toISOString()
+            notes: 'הוסף ידנית'
         };
         const newTeams = currentSession.teams.map(t => t.id === teamId ? { ...t, members: [...t.members, newGuest] } : t);
         set((state) => ({
@@ -619,7 +620,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'etgarim-storage',
-      version: 22.0, 
+      version: 25.0, 
       partialize: (state) => ({
         user: state.user,
         people: state.people,
@@ -628,9 +629,9 @@ export const useAppStore = create<AppState>()(
         permissions: state.permissions,
         clubs: state.clubs,
         superAdmins: state.superAdmins,
+        protectedAdmins: state.protectedAdmins,
         pairingDirty: state.pairingDirty,
-        snapshots: state.snapshots,
-        lastSyncTime: state.lastSyncTime
+        snapshots: state.snapshots
       })
     }
   )

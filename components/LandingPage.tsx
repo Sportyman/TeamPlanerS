@@ -2,7 +2,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
-import { ClubID, APP_VERSION } from '../types';
+import { ClubID } from '../types';
 import { Waves, Ship, Settings, Anchor } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
@@ -68,12 +68,9 @@ export const LandingPage: React.FC = () => {
           </div>
       </div>
       
-      {/* Credits Footer with Version */}
-      <footer className="w-full py-8 text-center" dir="ltr">
-         <div className="text-xs text-slate-400 opacity-70">Built by Shay Kalimi - @Shay.A.i</div>
-         <div className="text-[10px] font-bold text-slate-300 mt-1.5 uppercase tracking-[0.2em]">
-            v{APP_VERSION}
-         </div>
+      {/* Credits Footer */}
+      <footer className="w-full py-4 text-center text-xs text-slate-400 opacity-60" dir="ltr">
+         Built by Shay Kalimi - @Shay.A.i
       </footer>
     </div>
   );
