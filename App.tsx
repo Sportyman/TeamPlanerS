@@ -11,7 +11,7 @@ import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { PublicPairingView } from './components/PublicPairingView';
 import { ProfileSetup } from './components/profile/ProfileSetup';
 import { InviteLanding } from './components/invites/InviteLanding';
-import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw, LayoutGrid, History as HistoryIcon, Clock, ChevronLeft, Home, Shield, Loader2, Sparkles, FileText } from 'lucide-react';
+import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw, LayoutGrid, History as HistoryIcon, Clock, ChevronLeft, Home, Shield, Loader2, Sparkles, FileText, AlertOctagon } from 'lucide-react';
 import { APP_VERSION, Role } from './types';
 import { triggerCloudSync, fetchFromCloud, fetchGlobalConfig, addLog } from './services/syncService';
 import { auth } from './firebase';
@@ -81,26 +81,22 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Use a ref to prevent re-triggering sync when the effect itself runs
   const lastObservedHash = useRef<string>('');
 
+  // Sync Observer - Optimized to prevent Feedback Loops
   useEffect(() => {
+    // Only trigger sync if NOT in Error state (Fatal Lock)
     if (user && activeClub && !user.isDev && syncStatus !== 'ERROR') {
       const currentPeople = people.filter(p => p.clubId === activeClub);
-      // Data hash for observation
-      const hash = JSON.stringify({ 
-        p_ids: currentPeople.map(p => p.id).sort(), 
-        s_pres: (sessions[activeClub]?.presentPersonIds || []).sort(),
-        s_teams: (sessions[activeClub]?.teams || []).length,
-        st_defs: (clubSettings[activeClub]?.boatDefinitions || []).length
-      });
+      // Create a stable minimal hash for comparison
+      const hash = `${currentPeople.length}-${(sessions[activeClub]?.presentPersonIds || []).length}-${(sessions[activeClub]?.teams || []).length}`;
 
       if (hash !== lastObservedHash.current) {
         lastObservedHash.current = hash;
         triggerCloudSync(activeClub);
       }
     }
-  }, [people, sessions, clubSettings, user, activeClub, syncStatus]);
+  }, [people, sessions, clubSettings, user, activeClub]); // REMOVED syncStatus from dependencies to prevent loops
 
   useEffect(() => {
     if (user && activeClub && !user.isDev) {
@@ -201,10 +197,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     <div className="w-4 flex items-center justify-center">
                         {syncStatus === 'SYNCING' && <RefreshCw size={10} className="text-brand-500 animate-spin" />}
                         {syncStatus === 'SYNCED' && <Cloud size={10} className="text-green-500" />}
-                        {syncStatus === 'ERROR' && <CloudOff size={10} className="text-red-500" />}
+                        {syncStatus === 'ERROR' && <AlertOctagon size={10} className="text-red-500 animate-pulse" />}
                     </div>
                     <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter ml-1">
-                        {syncStatus === 'SYNCED' ? 'Cloud Saved' : syncStatus === 'SYNCING' ? 'Syncing...' : syncStatus === 'ERROR' ? 'Sync Paused' : 'Local'}
+                        {syncStatus === 'SYNCED' ? 'Cloud Saved' : syncStatus === 'SYNCING' ? 'Syncing...' : syncStatus === 'ERROR' ? 'FATAL LOCK - REFRESH F5' : 'Local'}
                     </span>
                  </div>
             </div>
@@ -212,7 +208,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <div className="flex items-center gap-3 z-20">
               {syncStatus === 'ERROR' && (
                   <button 
-                    // Fix: Casting window to any to access exportLogs property defined in syncService.ts
                     onClick={() => { if((window as any).exportLogs) (window as any).exportLogs(); }} 
                     className="p-2 text-red-500 hover:bg-red-50 rounded-lg animate-pulse"
                     title="ייצוא לוגים לניתוח"
@@ -249,18 +244,21 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 const App: React.FC = () => {
   const { loadUserResources, setAuthInitialized, superAdmins, protectedAdmins, permissions, setAuthError } = useAppStore();
+  const initializedRef = useRef(false); // PREVENTS MOUNTING LOOP
 
   useEffect(() => {
+    // CRITICAL FIX: Ensure effect runs exactly ONCE per session
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
     fetchGlobalConfig();
     addLog("System starting...");
     
-    // Auth Listener with Gatekeeper logic
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         const state = useAppStore.getState();
         const currentUser = state.user;
-        const currentPath = window.location.hash; // Using HashRouter
+        const currentPath = window.location.hash; 
         
-        // Prevent dev user from being cleared
         if (currentUser && currentUser.isDev) {
             setAuthInitialized(true);
             return;
@@ -271,22 +269,16 @@ const App: React.FC = () => {
             const isSuperAdmin = state.superAdmins.some(a => a.toLowerCase() === email) || 
                                state.protectedAdmins.some(a => a.toLowerCase() === email);
             
-            // Check if user is in Whitelist (Super Admin or defined in Permissions)
             const isStaff = state.permissions.some(p => p.email.toLowerCase() === email);
             const isAuthorized = isSuperAdmin || isStaff;
-
-            // GATEKEEPER: If not authorized AND NOT on an invite link -> KICK OUT
             const isInvitePath = currentPath.includes('/join/');
             
             if (!isAuthorized && !isInvitePath) {
-                console.warn("Unauthorized access attempt from main page:", email);
-                addLog(`Gatekeeper blocked entry for: ${email}`);
+                addLog(`CRITICAL: Unauthorized access blocked for: ${email}`);
                 setAuthError("הגישה למנהלים מורשים בלבד. אם ברצונך להצטרף כחבר, אנא השתמש בלינק הזמנה.");
                 await signOut(auth);
                 useAppStore.setState({ user: null, userProfile: null, memberships: [] });
             } else {
-                // Authorized or on Invite Path
-                addLog(`Auth successful for: ${email}`);
                 useAppStore.setState({ 
                     user: { 
                         uid: firebaseUser.uid, 
@@ -308,7 +300,7 @@ const App: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [superAdmins, protectedAdmins, permissions]);
+  }, []); // Empty dependencies + initializedRef = Guaranteed single run
 
   return (
     <Router>
