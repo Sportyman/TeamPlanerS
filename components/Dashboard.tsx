@@ -2,12 +2,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
 import { Role, getRoleLabel, Person, Gender, GenderLabel, BoatDefinition, GenderPrefType, GenderPrefLabels, ConstraintStrength, APP_VERSION } from '../types';
-import { Trash2, UserPlus, Star, Edit, X, Save, ArrowRight, Tag, Database, Ship, Users, Calendar, Plus, Anchor, Wind, Users2, ShieldAlert, AlertOctagon, Heart, Ban, Shield, ShipWheel, Download, Upload, Clock, CheckCircle } from 'lucide-react';
+import { Trash2, UserPlus, Star, Edit, X, Save, ArrowRight, Tag, Database, Ship, Users, Calendar, Plus, Anchor, Wind, Users2, ShieldAlert, AlertOctagon, Heart, Ban, Shield, ShipWheel, Download, Upload, Clock, CheckCircle, Sparkles } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import { InviteManager } from './invites/InviteManager';
 
-type ViewMode = 'MENU' | 'PEOPLE' | 'INVENTORY' | 'MEMBERSHIPS';
+type ViewMode = 'MENU' | 'PEOPLE' | 'INVENTORY' | 'MEMBERSHIPS' | 'INVITES';
 
 const PHONE_REGEX = /^05\d-?\d{7}$/;
 
@@ -187,6 +188,7 @@ export const Dashboard: React.FC = () => {
     if (viewParam === 'PEOPLE') setView('PEOPLE');
     else if (viewParam === 'INVENTORY') setView('INVENTORY');
     else if (viewParam === 'MEMBERSHIPS') setView('MEMBERSHIPS');
+    else if (viewParam === 'INVITES') setView('INVITES');
     else setView('MENU');
   }, [searchParams]);
 
@@ -615,10 +617,23 @@ export const Dashboard: React.FC = () => {
                   </button>
 
                   <button 
-                    onClick={() => navigate('/app/manage?view=PEOPLE')}
+                    onClick={() => navigate('/app/manage?view=INVITES')}
                     className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-lg hover:border-brand-300 transition-all group flex flex-col items-center gap-4"
                   >
                       <div className="bg-brand-50 text-brand-600 p-4 rounded-full group-hover:scale-110 transition-transform">
+                          <Sparkles size={32} />
+                      </div>
+                      <div className="text-center">
+                          <h3 className="font-bold text-lg text-slate-800">לינקים וצירוף חברים</h3>
+                          <p className="text-sm text-slate-500 mt-1">ניהול הזמנות חדשות</p>
+                      </div>
+                  </button>
+
+                  <button 
+                    onClick={() => navigate('/app/manage?view=PEOPLE')}
+                    className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-lg hover:border-brand-300 transition-all group flex flex-col items-center gap-4"
+                  >
+                      <div className="bg-slate-50 text-slate-600 p-4 rounded-full group-hover:scale-110 transition-transform">
                           <Users size={32} />
                       </div>
                       <div className="text-center">
@@ -665,6 +680,17 @@ export const Dashboard: React.FC = () => {
       );
   }
 
+  if (view === 'INVITES') {
+      return (
+        <div className="max-w-4xl mx-auto py-6 px-4">
+            <button onClick={() => navigate('/app/manage')} className="flex items-center gap-2 text-slate-500 hover:text-brand-600 mb-6 font-medium">
+                  <ArrowRight size={20} /> חזרה לתפריט
+            </button>
+            <InviteManager />
+        </div>
+      );
+  }
+
   if (view === 'MEMBERSHIPS') {
     return (
         <div className="max-w-4xl mx-auto py-6 px-4">
@@ -692,6 +718,7 @@ export const Dashboard: React.FC = () => {
                                         <span className="text-[10px] bg-white border px-2 py-0.5 rounded-full font-bold">{getRoleLabel(m.role || Role.MEMBER, m.profile?.gender || Gender.MALE)}</span>
                                         <span className="text-[10px] bg-white border px-2 py-0.5 rounded-full font-bold">דירוג: {m.rank || 3}</span>
                                         {m.profile?.isSkipper && <span className="text-[10px] bg-blue-100 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-bold">סקיפר</span>}
+                                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${m.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{m.status === 'ACTIVE' ? 'מאושר' : 'ממתין'}</span>
                                     </div>
                                 </div>
                                 <button 

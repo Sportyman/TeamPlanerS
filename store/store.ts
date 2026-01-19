@@ -5,10 +5,11 @@ import { createAuthSlice, AuthSlice } from './slices/createAuthSlice';
 import { createGlobalSlice, GlobalSlice } from './slices/createGlobalSlice';
 import { createSessionSlice, SessionSlice } from './slices/createSessionSlice';
 import { createPairingSlice, PairingSlice } from './slices/createPairingSlice';
+import { createInviteSlice, InviteSlice } from './slices/createInviteSlice';
 import { BoatDefinition, BoatInventory } from '../types';
 import { KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from '../mockData';
 
-export type AppState = AuthSlice & GlobalSlice & SessionSlice & PairingSlice;
+export type AppState = AuthSlice & GlobalSlice & SessionSlice & PairingSlice & InviteSlice;
 
 export const EMPTY_SESSION = { inventory: {}, presentPersonIds: [], teams: [] };
 
@@ -25,10 +26,11 @@ export const useAppStore = create<AppState>()(
       ...createGlobalSlice(...args),
       ...createSessionSlice(...args),
       ...createPairingSlice(...args),
+      ...createInviteSlice(...args),
     }),
     {
       name: 'etgarim-storage',
-      version: 44.0, 
+      version: 45.0, 
       partialize: (state) => ({
         user: state.user,
         userProfile: state.userProfile,
@@ -41,7 +43,8 @@ export const useAppStore = create<AppState>()(
         superAdmins: state.superAdmins,
         protectedAdmins: state.protectedAdmins,
         pairingDirty: state.pairingDirty,
-        snapshots: state.snapshots
+        snapshots: state.snapshots,
+        invites: state.invites
       })
     }
   )

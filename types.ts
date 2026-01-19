@@ -61,6 +61,18 @@ export interface ClubMembership {
   clubSpecificNotes?: string;
 }
 
+export interface ClubInvite {
+  id: string;
+  clubId: ClubID;
+  role: Role;
+  autoApprove: boolean;
+  token: string;
+  usageCount: number;
+  createdAt: string;
+  createdBy: string; // UID
+  isActive: boolean;
+}
+
 export const getRoleLabel = (role: Role, gender: Gender): string => {
     const labels: Record<Role, { [key in Gender]: string }> = {
         [Role.INSTRUCTOR]: { [Gender.MALE]: 'מדריך', [Gender.FEMALE]: 'מדריכה' },
@@ -128,7 +140,7 @@ export interface UserPermission {
   allowedClubs: ClubID[];
 }
 
-export const APP_VERSION = '4.1.0'; // Updated for split name and certifications logic
+export const APP_VERSION = '4.2.0'; 
 
 export const TEAM_COLORS = [
   'bg-blue-50 border-blue-200',      

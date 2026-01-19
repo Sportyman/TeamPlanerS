@@ -10,14 +10,15 @@ import { LandingPage } from './components/LandingPage';
 import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { PublicPairingView } from './components/PublicPairingView';
 import { ProfileSetup } from './components/profile/ProfileSetup';
-import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw, LayoutGrid, History as HistoryIcon, Clock, ChevronLeft, Home, Shield, Loader2 } from 'lucide-react';
+import { InviteLanding } from './components/invites/InviteLanding';
+import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw, LayoutGrid, History as HistoryIcon, Clock, ChevronLeft, Home, Shield, Loader2, Sparkles } from 'lucide-react';
 import { APP_VERSION } from './types';
 import { triggerCloudSync, fetchFromCloud, fetchGlobalConfig } from './services/syncService';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
 const ProtectedAppRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, userProfile, activeClub, clubs, authInitialized } = useAppStore();
+  const { user, userProfile, activeClub, clubs, authInitialized, memberships } = useAppStore();
   const location = useLocation();
 
   if (!authInitialized) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-brand-600" size={48} /></div>;
@@ -27,8 +28,14 @@ const ProtectedAppRoute: React.FC<{ children: React.ReactNode }> = ({ children }
       return <Navigate to="/profile-setup" />;
   }
 
+  // If user is not Super Admin, they MUST have a membership in the activeClub to access /app
   const clubExists = clubs.some(c => c.id === activeClub);
-  if (!activeClub || !clubExists) return <Navigate to="/" />;
+  const hasMembership = memberships.some(m => m.clubId === activeClub && m.status !== 'INACTIVE');
+  
+  if (!activeClub || !clubExists || (!user.isAdmin && !hasMembership)) {
+      return <Navigate to="/" />;
+  }
+  
   return <>{children}</>;
 };
 
@@ -123,7 +130,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <NavLink to="/app" icon={<Calendar size={20} />} text="ניהול אימון" className="p-4" />
             <NavLink to="/app/manage" icon={<LayoutGrid size={20} />} text="ניהול חוג" className="p-4" />
             <NavLink to="/app/manage?view=PEOPLE" icon={<Users size={20} />} text="רשימת משתתפים" className="p-4" />
-            <NavLink to="/app/manage?view=INVENTORY" icon={<Ship size={20} />} text="ניהול ציוד" className="p-4" />
+            <NavLink to="/app/manage?view=INVITES" icon={<Sparkles size={20} />} text="לינקים וצירוף חברים" className="p-4" />
             
             {user?.isAdmin && (
                 <>
@@ -244,6 +251,7 @@ const App: React.FC = () => {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/join/:token" element={<InviteLanding />} />
         <Route path="/share" element={<PublicPairingView />} />
         <Route path="/profile-setup" element={<ProfileSetup />} />
         <Route path="/super-admin" element={<SuperAdminRoute><Layout><SuperAdminDashboard /></Layout></SuperAdminRoute>} />
