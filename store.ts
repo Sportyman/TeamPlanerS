@@ -13,7 +13,6 @@ import { getUserProfile, getUserMemberships } from './services/profileService';
 
 const EMPTY_SESSION = { inventory: {}, presentPersonIds: [], teams: [] };
 
-// תיקון סופי לממשק - הותאם במדויק לרכיבים הישנים
 interface AppState {
   // --- Auth & User ---
   user: { uid: string; email: string; isAdmin: boolean; photoURL?: string } | null;
@@ -78,14 +77,11 @@ interface AppState {
   addGuestToTeam: (teamId: string, guestName: string) => void;
   assignMemberToTeam: (personId: string, teamId: string) => void;
   removeMemberFromTeam: (teamId: string, memberId: string) => void;
-  
-  // תוקן: מקבל 4 פרמטרים כדי להתאים ל-PairingBoard.tsx
   swapMembers: (teamId: string, index: number, targetTeamId: string, targetIndex: number) => void;
   reorderSessionMembers: (sId: string, sIdx: number, dId: string, dIdx: number) => void;
   updateTeamBoatType: (teamId: string, boatType: string) => void;
 
   // --- History ---
-  // תוקן: הוגדר כמילון ולא כמערך שטוח כדי למנוע את שגיאת TS7015
   histories: Record<string, any[]>;
   futures: Record<string, any[]>;
   undo: () => void;
@@ -110,10 +106,7 @@ export const useAppStore = create<AppState>()(
         'SAILING': { boatDefinitions: SAILING_DEFINITIONS },
       },
       pairingDirty: false,
-      
-      // תוקן: אתחול כאובייקט ריק
-      histories: {}, 
-      futures: {},
+      histories: {}, futures: {},
 
       // --- Auth Actions ---
       setAuthInitialized: (val) => set({ authInitialized: val }),
@@ -123,12 +116,37 @@ export const useAppStore = create<AppState>()(
           const result = await signInWithPopup(auth, googleProvider);
           const email = result.user.email?.toLowerCase().trim() || '';
           const uid = result.user.uid;
-          const { superAdmins, protectedAdmins } = get();
-          const isSuper = superAdmins.some(a => a.toLowerCase() === email) || protectedAdmins.some(a => a.toLowerCase() === email);
-          set({ user: { uid, email, isAdmin: isSuper, photoURL: result.user.photoURL || undefined } });
+          
+          // שלב 1: טעינת נתונים כדי לבדוק מי המשתמש
           await get().loadUserResources(uid);
+          
+          // שלב 2: בדיקת הרשאות (Security Gate)
+          const { superAdmins, protectedAdmins, permissions } = get();
+          
+          const isSuperAdmin = superAdmins.some(a => a.toLowerCase() === email) || 
+                               protectedAdmins.some(a => a.toLowerCase() === email);
+          
+          const hasClubPermissions = permissions.some(p => p.email.toLowerCase() === email);
+          
+          // משתמש מורשה הוא: מנהל על, או מנהל מועדון.
+          // אם נרצה בעתיד שגם חניכים ייכנסו, נוסיף כאן בדיקה שיש לו userProfile
+          const isAuthorized = isSuperAdmin || hasClubPermissions;
+
+          if (!isAuthorized) {
+            console.error("Access Denied: User not in admin/permission list", email);
+            await signOut(auth); // ניתוק מיידי מגוגל
+            set({ user: null, userProfile: null, memberships: [] });
+            alert("הגישה למערכת מוגבלת למנהלים מורשים בלבד.\nאנא פנה למנהל המערכת להוספת הרשאה.");
+            return false;
+          }
+
+          // אם עבר את הבדיקה - נכנסים
+          set({ user: { uid, email, isAdmin: isSuperAdmin, photoURL: result.user.photoURL || undefined } });
           return true;
-        } catch (error) { return false; }
+        } catch (error) { 
+          console.error("Login Error:", error);
+          return false; 
+        }
       },
 
       loginDev: async (email = 'dev@local', isAdmin = true) => { 
@@ -154,6 +172,7 @@ export const useAppStore = create<AppState>()(
       logout: async () => {
         await signOut(auth);
         set({ user: null, userProfile: null, memberships: [], activeClub: null });
+        window.location.href = '/'; // רענון הדף כדי לנקות הכל
       },
 
       // --- Global Actions ---
@@ -278,7 +297,6 @@ export const useAppStore = create<AppState>()(
       assignMemberToTeam: (personId, teamId) => { /* Placeholder */ },
       removeMemberFromTeam: (teamId, memberId) => { /* Placeholder */ },
       
-      // תוקן: טיפול בארבעה פרמטרים (אינדקסים) במקום שניים (ID)
       swapMembers: (tId, tIdx, dId, dIdx) => set(state => {
          const { activeClub, sessions } = state;
          if (!activeClub) return {};
@@ -291,15 +309,10 @@ export const useAppStore = create<AppState>()(
          if(sTeam && dTeam) {
              const memberA = sTeam.members[tIdx];
              const memberB = dTeam.members[dIdx];
-             
-             // החלפה
              sTeam.members[tIdx] = memberB;
              dTeam.members[dIdx] = memberA;
-             
-             // אם אחד מהם null (למשל בהעברה למקום ריק), מסננים
              sTeam.members = sTeam.members.filter((m:any) => m);
              dTeam.members = dTeam.members.filter((m:any) => m);
-             
              return { sessions: { ...state.sessions, [activeClub]: { ...session, teams: newTeams } } };
          }
          return {};
@@ -327,13 +340,12 @@ export const useAppStore = create<AppState>()(
          set(state => ({ sessions: { ...state.sessions, [activeClub]: { ...session, teams: newTeams } } }));
       },
 
-      // --- Undo/Redo ---
       undo: () => {},
       redo: () => {},
     }),
     {
       name: 'etgarim-storage',
-      version: 44.0,
+      version: 45.0, // הקפצת גרסה כדי לוודא רענון נתונים
       partialize: (state) => ({
         user: state.user, userProfile: state.userProfile, memberships: state.memberships,
         people: state.people, snapshots: state.snapshots, sessions: state.sessions, clubSettings: state.clubSettings,

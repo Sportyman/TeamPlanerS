@@ -1,77 +1,148 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { Role, getRoleLabel, Person, Gender, BoatDefinition, APP_VERSION } from '../types';
-import { Trash2, UserPlus, Star, Edit, X, Save, ArrowRight, Ship, Users, Download, Upload, Clock } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { InviteManager } from './registration/InviteManager';
+import { SessionManager } from './SessionManager';
+import { SuperAdminDashboard } from './SuperAdminDashboard';
+import { InviteManager } from './registration/InviteManager'; 
+import { LogOut, Settings, Users, Link as LinkIcon, Sailboat } from 'lucide-react';
 
-type ViewMode = 'PEOPLE' | 'INVENTORY' | 'INVITES' | 'MEMBERSHIPS';
-
+// שינוי קריטי: הוספנו 'export' גם כאן כדי לתמוך בייבוא עם סוגריים {}
 export const Dashboard: React.FC = () => {
-  const { people, activeClub, clubs, addPerson, updatePerson, removePerson, clubSettings, saveBoatDefinitions } = useAppStore();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [view, setView] = useState<ViewMode>('PEOPLE');
+  const { 
+    user, 
+    activeClub, 
+    clubs, 
+    setActiveClub, 
+    isManagerOf,
+    logout 
+  } = useAppStore();
 
-  useEffect(() => {
-    const v = searchParams.get('view') as ViewMode;
-    if (['PEOPLE', 'INVENTORY', 'INVITES', 'MEMBERSHIPS'].includes(v)) setView(v);
-  }, [searchParams]);
+  const [currentTab, setCurrentTab] = useState<'SESSION' | 'ADMIN' | 'INVITES'>('SESSION');
 
-  if (!activeClub) return null;
-  const clubLabel = clubs.find(c => c.id === activeClub)?.label || '';
-  const clubPeople = people.filter(p => p.clubId === activeClub);
+  if (!user) return null;
+
+  const handleLogout = async () => {
+    if (window.confirm('האם אתה בטוח שברצונך להתנתק?')) {
+      await logout();
+      window.location.href = '/';
+    }
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <h2 className="text-2xl font-bold text-slate-800">ניהול חוג: {clubLabel}</h2>
-          <div className="flex bg-white p-1 rounded-xl shadow-sm border border-slate-200">
-              <button onClick={() => navigate('?view=PEOPLE')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'PEOPLE' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>משתתפים</button>
-              <button onClick={() => navigate('?view=INVITES')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'INVITES' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>הזמנות</button>
-              <button onClick={() => navigate('?view=INVENTORY')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'INVENTORY' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>ציוד</button>
-          </div>
-      </div>
+    <div className="min-h-screen bg-gray-50 text-right" dir="rtl">
+      {/* Header */}
+      <header className="bg-white shadow-sm sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16 items-center">
+            
+            {/* צד ימין - לוגו ובחירת מועדון */}
+            <div className="flex items-center gap-4">
+              <div className="flex-shrink-0 flex items-center gap-2">
+                <Sailboat className="h-8 w-8 text-blue-600" />
+                <span className="font-bold text-xl text-gray-800 hidden sm:block">TeamPlaner</span>
+              </div>
+              
+              <select
+                value={activeClub || ''}
+                onChange={(e) => setActiveClub(e.target.value)}
+                className="block w-40 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+              >
+                <option value="" disabled>בחר מועדון...</option>
+                {clubs.filter(c => isManagerOf(c.id)).map((club) => (
+                  <option key={club.id} value={club.id}>
+                    {club.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-      <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-          {view === 'INVITES' && <InviteManager />}
-          {view === 'PEOPLE' && <PeopleList people={clubPeople} />}
-          {view === 'INVENTORY' && <div className="p-8 text-center text-slate-400">ניהול ציוד - בפיתוח...</div>}
-      </div>
+            {/* צד שמאל - תפריט משתמש */}
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-gray-500 hidden sm:flex flex-col items-end">
+                <span className="font-medium text-gray-900">{user.email}</span>
+                <span className="text-xs">{user.isAdmin ? 'מנהל מערכת' : 'מנהל חוג'}</span>
+              </div>
+              
+              {user.photoURL ? (
+                <img src={user.photoURL} alt="" className="h-8 w-8 rounded-full" />
+              ) : (
+                <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
+                  {user.email[0].toUpperCase()}
+                </div>
+              )}
+
+              <button 
+                onClick={handleLogout}
+                className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                title="התנתק"
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Navigation Tabs */}
+          <div className="flex gap-6 mt-2 overflow-x-auto">
+            <button
+              onClick={() => setCurrentTab('SESSION')}
+              className={`pb-3 px-1 border-b-2 font-medium text-sm flex items-center gap-2 whitespace-nowrap ${
+                currentTab === 'SESSION'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Users className="h-4 w-4" />
+              ניהול משמרת
+            </button>
+
+            <button
+              onClick={() => setCurrentTab('INVITES')}
+              className={`pb-3 px-1 border-b-2 font-medium text-sm flex items-center gap-2 whitespace-nowrap ${
+                currentTab === 'INVITES'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <LinkIcon className="h-4 w-4" />
+              קישורי הרשמה
+            </button>
+
+            {/* טאב ניהול מערכת - רק למנהל על! */}
+            {user.isAdmin && (
+              <button
+                onClick={() => setCurrentTab('ADMIN')}
+                className={`pb-3 px-1 border-b-2 font-medium text-sm flex items-center gap-2 whitespace-nowrap ${
+                  currentTab === 'ADMIN'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Settings className="h-4 w-4" />
+                ניהול מערכת
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {!activeClub && currentTab !== 'ADMIN' ? (
+          <div className="text-center py-12 bg-white rounded-lg shadow">
+            <Sailboat className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">לא נבחר מועדון</h3>
+            <p className="mt-1 text-sm text-gray-500">אנא בחר מועדון מהתפריט העליון כדי להתחיל לנהל.</p>
+          </div>
+        ) : (
+          <>
+            {currentTab === 'SESSION' && activeClub && <SessionManager />}
+            {currentTab === 'INVITES' && activeClub && <InviteManager />}
+            {currentTab === 'ADMIN' && user.isAdmin && <SuperAdminDashboard />}
+          </>
+        )}
+      </main>
     </div>
   );
 };
 
-// Internal People List Component
-const PeopleList: React.FC<{ people: Person[] }> = ({ people }) => {
-    return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
-                <h3 className="font-bold flex items-center gap-2"><Users size={18}/> רשימת משתתפים ({people.length})</h3>
-                <button className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2"><UserPlus size={16}/> הוסף ידני</button>
-            </div>
-            <table className="w-full text-right">
-                <thead>
-                    <tr className="text-slate-500 text-sm border-b">
-                        <th className="p-4">שם</th>
-                        <th className="p-4 hidden md:table-cell">תפקיד</th>
-                        <th className="p-4">פעולות</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y">
-                    {people.map(p => (
-                        <tr key={p.id} className="hover:bg-slate-50">
-                            <td className="p-4 font-bold">{p.name}</td>
-                            <td className="p-4 hidden md:table-cell text-sm">{getRoleLabel(p.role, p.gender)}</td>
-                            <td className="p-4 flex gap-2">
-                                <button className="p-2 text-slate-400 hover:text-brand-600"><Edit size={18}/></button>
-                                <button className="p-2 text-slate-400 hover:text-red-500"><Trash2 size={18}/></button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    );
-}
+// השארנו גם את זה לתמיכה לאחור
+export default Dashboard;
