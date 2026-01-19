@@ -1,97 +1,248 @@
 
-import React, { useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { HashRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from './store';
-import { AdminGuard } from './components/guards/AdminGuard';
 import { Dashboard } from './components/Dashboard';
 import { SessionManager } from './components/SessionManager';
 import { Login } from './components/Login';
 import { LandingPage } from './components/LandingPage';
 import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { PublicPairingView } from './components/PublicPairingView';
-import { RegistrationForm } from './components/registration/RegistrationForm';
-import { RegistrationSuccess } from './components/registration/RegistrationSuccess';
-import { Waves, LogOut, Menu, X, Ship, Users, ShipWheel, Settings, ChevronLeft, Home, Shield, Loader2, Calendar, LayoutGrid } from 'lucide-react';
+import { ProfileSetup } from './components/profile/ProfileSetup';
+import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw, LayoutGrid, History as HistoryIcon, Clock, ChevronLeft, Home, Shield, Loader2 } from 'lucide-react';
+import { APP_VERSION } from './types';
+import { triggerCloudSync, fetchFromCloud, fetchGlobalConfig } from './services/syncService';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { fetchGlobalConfig } from './services/syncService';
 
-// Layout Split Components
-const SidebarLink: React.FC<{ to: string; icon: React.ReactNode; text: string; active?: boolean }> = ({ to, icon, text, active }) => (
-    <a href={`#${to}`} className={`rounded-lg font-bold flex items-center gap-3 p-4 transition-all ${active ? 'text-brand-600 bg-brand-50' : 'text-slate-600 hover:text-brand-600 hover:bg-slate-50'}`}>
-        <div className={active ? 'text-brand-600' : 'text-slate-400'}>{icon}</div>
-        <span>{text}</span>
-        {active && <ChevronLeft size={14} className="mr-auto" />}
-    </a>
-);
+const ProtectedAppRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, userProfile, activeClub, clubs, authInitialized } = useAppStore();
+  const location = useLocation();
 
-const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { logout, activeClub, clubs } = useAppStore();
+  if (!authInitialized) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-brand-600" size={48} /></div>;
+  if (!user) return <Navigate to="/login" />;
+  
+  if (!userProfile && location.pathname !== '/profile-setup') {
+      return <Navigate to="/profile-setup" />;
+  }
+
+  const clubExists = clubs.some(c => c.id === activeClub);
+  if (!activeClub || !clubExists) return <Navigate to="/" />;
+  return <>{children}</>;
+};
+
+const SuperAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { user, userProfile, authInitialized } = useAppStore();
     const location = useLocation();
-    const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-    const club = clubs.find(c => c.id === activeClub);
 
-    return (
-        <div className="min-h-screen bg-slate-50 flex flex-col">
-            {isMenuOpen && <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50" onClick={() => setIsMenuOpen(false)} />}
-            <aside className={`fixed top-0 right-0 h-full w-72 bg-white shadow-2xl z-[60] transition-transform duration-300 ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-                <div className="p-6 border-b flex justify-between items-center bg-slate-50">
-                    <div className="font-black text-slate-800">אתגרים | {club?.label || 'מערכת'}</div>
-                    <button onClick={() => setIsMenuOpen(false)}><X size={24} /></button>
-                </div>
-                <div className="p-4 space-y-2">
-                    <SidebarLink to="/app" icon={<Calendar size={20}/>} text="ניהול אימון" active={location.pathname === '/app'} />
-                    <SidebarLink to="/app/manage" icon={<LayoutGrid size={20}/>} text="ניהול חוג" active={location.pathname.includes('/manage')} />
-                    <SidebarLink to="/super-admin" icon={<Shield size={20}/>} text="ניהול על" active={location.pathname === '/super-admin'} />
-                    <div className="h-px bg-slate-100 my-4" />
-                    <button onClick={logout} className="w-full flex items-center gap-3 p-4 text-red-500 font-bold hover:bg-red-50 rounded-lg"><LogOut size={20}/> התנתקות</button>
-                </div>
-            </aside>
-            <nav className="bg-white border-b sticky top-0 z-40 px-4 h-16 flex items-center justify-between shadow-sm">
-                <button onClick={() => setIsMenuOpen(true)} className="p-2"><Menu size={28} /></button>
-                <div className="font-bold">{club?.label || 'TeamPlaner'}</div>
-                <div className="w-10 h-10 bg-brand-600 rounded-lg flex items-center justify-center text-white"><Waves size={20}/></div>
-            </nav>
-            <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">{children}</main>
+    if (!authInitialized) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-brand-600" size={48} /></div>;
+    if (!user || !user.isAdmin) return <Navigate to="/" />; 
+    if (!userProfile && location.pathname !== '/profile-setup') {
+        return <Navigate to="/profile-setup" />;
+    }
+    return <>{children}</>;
+};
+
+const NavLink: React.FC<{ to: string; icon: React.ReactNode; text: string; onClick?: () => void; className?: string }> = ({ to, icon, text, onClick, className }) => {
+  const location = useLocation();
+  const isActive = location.pathname + location.search === to;
+  return (
+    <Link 
+      to={to} 
+      onClick={onClick}
+      className={`rounded-lg font-bold flex items-center gap-3 transition-all ${className} ${
+        isActive 
+          ? 'text-brand-600 bg-brand-50 shadow-sm' 
+          : 'text-slate-600 hover:text-brand-600 hover:bg-slate-50'
+      }`}
+    >
+      <div className={`${isActive ? 'text-brand-600' : 'text-slate-400'}`}>{icon}</div>
+      <span>{text}</span>
+      {isActive && <ChevronLeft size={14} className="mr-auto" />}
+    </Link>
+  );
+}
+
+const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { logout, user, activeClub, clubs, syncStatus, people, sessions, clubSettings } = useAppStore();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (user && activeClub) {
+      triggerCloudSync(activeClub);
+    }
+  }, [people, sessions, clubSettings, user, activeClub]);
+
+  useEffect(() => {
+    if (user && activeClub) {
+        fetchFromCloud(activeClub);
+    }
+  }, [user, activeClub]);
+
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [location]);
+
+  const handleLogout = () => {
+      logout();
+      navigate('/');
+  };
+
+  const currentClub = clubs.find(c => c.id === activeClub);
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      {isMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 animate-in fade-in duration-300"
+          onClick={() => setIsMenuOpen(false)}
+        />
+      )}
+
+      <aside className={`fixed top-0 right-0 h-full w-72 bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out flex flex-col ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+            <div className="flex items-center gap-3">
+                 <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center text-white shadow-lg">
+                    {activeClub === 'SAILING' ? <Ship size={20} /> : <Waves size={20} />}
+                 </div>
+                 <div className="font-black text-slate-800 leading-tight">
+                    <div>אתגרים</div>
+                    <div className="text-[10px] text-slate-400 uppercase tracking-widest">{currentClub?.label}</div>
+                 </div>
+            </div>
+            <button onClick={() => setIsMenuOpen(false)} className="p-2 text-slate-400 hover:text-slate-800 rounded-full hover:bg-slate-100 transition-colors">
+                <X size={24} />
+            </button>
         </div>
-    );
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-3 mb-2">תפריט ראשי</div>
+            <NavLink to="/app" icon={<Calendar size={20} />} text="ניהול אימון" className="p-4" />
+            <NavLink to="/app/manage" icon={<LayoutGrid size={20} />} text="ניהול חוג" className="p-4" />
+            <NavLink to="/app/manage?view=PEOPLE" icon={<Users size={20} />} text="רשימת משתתפים" className="p-4" />
+            <NavLink to="/app/manage?view=INVENTORY" icon={<Ship size={20} />} text="ניהול ציוד" className="p-4" />
+            
+            {user?.isAdmin && (
+                <>
+                    <div className="h-px bg-slate-100 my-4" />
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-3 mb-2">ניהול על</div>
+                    <NavLink to="/super-admin" icon={<Shield size={20} />} text="ניהול מערכת" className="p-4" />
+                </>
+            )}
+        </div>
+
+        <div className="p-4 border-t border-slate-100 bg-slate-50">
+            <button 
+                onClick={() => navigate('/')}
+                className="w-full flex items-center gap-3 p-4 text-slate-600 hover:text-brand-600 font-bold transition-all rounded-lg mb-2"
+            >
+                <Home size={20} />
+                <span>חזרה לדף הבית</span>
+            </button>
+            <button 
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 p-4 text-red-500 hover:bg-red-50 font-bold transition-all rounded-lg"
+            >
+                <LogOut size={20} />
+                <span>התנתקות מהמערכת</span>
+            </button>
+        </div>
+      </aside>
+
+      <nav className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="relative flex justify-between h-16 items-center">
+            <div className="flex items-center gap-4 z-20">
+              <button 
+                onClick={() => setIsMenuOpen(!isMenuOpen)} 
+                className={`p-2 rounded-xl transition-all ${isMenuOpen ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
+              >
+                {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
+              </button>
+            </div>
+            
+            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 text-center">
+                 <div className="flex items-center gap-2">
+                    {activeClub === 'SAILING' ? <Ship className="text-sky-600" size={20} /> : <Waves className="text-brand-600" size={20} />}
+                    <span className="font-bold text-sm md:text-lg text-slate-800 whitespace-nowrap">
+                        {currentClub ? currentClub.label : 'TeamPlaner'}
+                    </span>
+                 </div>
+                 <div className="flex items-center justify-center gap-1 mt-0.5">
+                    {syncStatus === 'SYNCING' && <RefreshCw size={10} className="text-brand-500 animate-spin" />}
+                    {syncStatus === 'SYNCED' && <Cloud size={10} className="text-green-500" />}
+                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
+                        {syncStatus === 'SYNCED' ? 'Cloud Saved' : syncStatus === 'SYNCING' ? 'Syncing...' : 'Local'}
+                    </span>
+                 </div>
+            </div>
+
+            <div className="flex items-center gap-3 z-20">
+              <button onClick={handleLogout} className="text-slate-400 hover:text-red-500 p-2"><LogOut size={20} /></button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-8">
+        {children}
+      </main>
+
+      <footer className="py-8 text-center border-t border-slate-100 mt-auto bg-white/50" dir="ltr">
+         <div className="text-xs text-slate-400 opacity-70 font-medium">Built by Shay Kalimi - @Shay.A.i</div>
+         <div className="text-[10px] font-black text-slate-300 mt-2 uppercase tracking-[0.3em]">v{APP_VERSION}</div>
+      </footer>
+    </div>
+  );
 };
 
 const App: React.FC = () => {
-    const { loadUserResources, setAuthInitialized } = useAppStore();
+  const { loadUserResources, setAuthInitialized, superAdmins, protectedAdmins } = useAppStore();
 
-    useEffect(() => {
-        fetchGlobalConfig();
-        const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-            if (fbUser) {
-                useAppStore.setState({ user: { uid: fbUser.uid, email: fbUser.email!, isAdmin: false, photoURL: fbUser.photoURL || undefined } });
-                await loadUserResources(fbUser.uid);
-            } else {
-                useAppStore.setState({ user: null, userProfile: null, memberships: [] });
-            }
-            setAuthInitialized(true);
-        });
-        return () => unsubscribe();
-    }, []);
+  useEffect(() => {
+    fetchGlobalConfig();
+    
+    // Auth Listener with background resource loading
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (firebaseUser) {
+            const email = firebaseUser.email?.toLowerCase().trim() || '';
+            const isSuperAdmin = superAdmins.some(a => a.toLowerCase() === email) || 
+                               protectedAdmins.some(a => a.toLowerCase() === email);
+                               
+            useAppStore.setState({ 
+                user: { 
+                    uid: firebaseUser.uid, 
+                    email: email, 
+                    isAdmin: isSuperAdmin, 
+                    photoURL: firebaseUser.photoURL || undefined 
+                } 
+            });
+            await loadUserResources(firebaseUser.uid);
+        } else {
+            // Explicitly logged out, clear store
+            useAppStore.setState({ user: null, userProfile: null, memberships: [] });
+        }
+        setAuthInitialized(true);
+    });
 
-    return (
-        <Router>
-            <Routes>
-                {/* Public & Registration Routes */}
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register/:clubId" element={<RegistrationForm />} />
-                <Route path="/registration-success" element={<RegistrationSuccess />} />
-                <Route path="/share" element={<PublicPairingView />} />
+    return () => unsubscribe();
+  }, [superAdmins, protectedAdmins]);
 
-                {/* Protected Admin App Routes */}
-                <Route path="/app" element={<AdminGuard><AppLayout><SessionManager /></AppLayout></AdminGuard>} />
-                <Route path="/app/manage" element={<AdminGuard><AppLayout><Dashboard /></AppLayout></AdminGuard>} />
-                <Route path="/super-admin" element={<AdminGuard><AppLayout><SuperAdminDashboard /></AppLayout></AdminGuard>} />
-                
-                <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
-        </Router>
-    );
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/share" element={<PublicPairingView />} />
+        <Route path="/profile-setup" element={<ProfileSetup />} />
+        <Route path="/super-admin" element={<SuperAdminRoute><Layout><SuperAdminDashboard /></Layout></SuperAdminRoute>} />
+        <Route path="/app" element={<ProtectedAppRoute><Layout><SessionManager /></Layout></ProtectedAppRoute>} />
+        <Route path="/app/manage" element={<ProtectedAppRoute><Layout><Dashboard /></Layout></ProtectedAppRoute>} />
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </Router>
+  );
 };
 export default App;
