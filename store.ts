@@ -13,7 +13,7 @@ import { getUserProfile, getUserMemberships } from './services/profileService';
 
 const EMPTY_SESSION = { inventory: {}, presentPersonIds: [], teams: [] };
 
-// הגדרה מדויקת יותר כדי למנוע שגיאות TS ברכיבים הישנים
+// תיקון סופי לממשק - הותאם במדויק לרכיבים הישנים
 interface AppState {
   // --- Auth & User ---
   user: { uid: string; email: string; isAdmin: boolean; photoURL?: string } | null;
@@ -38,7 +38,7 @@ interface AppState {
 
   // --- Actions: Auth ---
   loginWithGoogle: () => Promise<boolean>;
-  loginDev: (email?: string, isAdmin?: boolean) => Promise<void>; // תוקן לקבלת פרמטרים
+  loginDev: (email?: string, isAdmin?: boolean) => Promise<void>; 
   logout: () => Promise<void>;
   loadUserResources: (uid: string) => Promise<void>;
   setAuthInitialized: (isAuth: boolean) => void;
@@ -54,7 +54,7 @@ interface AppState {
   // --- Actions: Permissions & Admin ---
   addPermission: (email: string, clubId: ClubID) => void;
   removePermission: (email: string, clubId: ClubID) => void;
-  addClub: (name: string, id?: string) => void; // תוקן: id אופציונלי
+  addClub: (name: string, id?: string) => void;
   removeClub: (id: string) => void;
   addSuperAdmin: (email: string) => void;
   removeSuperAdmin: (email: string) => void;
@@ -67,7 +67,7 @@ interface AppState {
   // --- Actions: Session & Inventory ---
   toggleAttendance: (id: string) => void;
   setBulkAttendance: (ids: string[]) => void;
-  updateInventory: (inventoryOrType: any, count?: number) => void; // תוקן: תמיכה בשתי השיטות
+  updateInventory: (inventoryOrType: any, count?: number) => void;
   saveBoatDefinitions: (defs: BoatDefinition[]) => void;
   resetSession: () => void;
   
@@ -78,13 +78,16 @@ interface AppState {
   addGuestToTeam: (teamId: string, guestName: string) => void;
   assignMemberToTeam: (personId: string, teamId: string) => void;
   removeMemberFromTeam: (teamId: string, memberId: string) => void;
-  swapMembers: (teamId: string, memberId: string, targetTeamId: string) => void;
+  
+  // תוקן: מקבל 4 פרמטרים כדי להתאים ל-PairingBoard.tsx
+  swapMembers: (teamId: string, index: number, targetTeamId: string, targetIndex: number) => void;
   reorderSessionMembers: (sId: string, sIdx: number, dId: string, dIdx: number) => void;
   updateTeamBoatType: (teamId: string, boatType: string) => void;
 
-  // --- History (Dummy for compatibility) ---
-  histories: any[];
-  futures: any[];
+  // --- History ---
+  // תוקן: הוגדר כמילון ולא כמערך שטוח כדי למנוע את שגיאת TS7015
+  histories: Record<string, any[]>;
+  futures: Record<string, any[]>;
   undo: () => void;
   redo: () => void;
 }
@@ -107,7 +110,10 @@ export const useAppStore = create<AppState>()(
         'SAILING': { boatDefinitions: SAILING_DEFINITIONS },
       },
       pairingDirty: false,
-      histories: [], futures: [],
+      
+      // תוקן: אתחול כאובייקט ריק
+      histories: {}, 
+      futures: {},
 
       // --- Auth Actions ---
       setAuthInitialized: (val) => set({ authInitialized: val }),
@@ -182,7 +188,7 @@ export const useAppStore = create<AppState>()(
       addClub: (nameOrId, optionalId) => set(state => {
           const id = optionalId || nameOrId.toUpperCase().replace(/\s+/g, '_');
           const name = optionalId ? nameOrId : nameOrId; 
-          return { clubs: [...state.clubs, { id, name, label: name }] }; // הוספנו label
+          return { clubs: [...state.clubs, { id, name, label: name }] };
       }),
 
       removeClub: (id) => set(state => ({ clubs: state.clubs.filter(c => c.id !== id) })),
@@ -212,17 +218,14 @@ export const useAppStore = create<AppState>()(
          return { sessions: { ...state.sessions, [activeClub]: { ...state.sessions[activeClub], presentPersonIds: ids } } };
       }),
 
-      // תיקון קריטי: תמיכה גם באובייקט מלא וגם ב-(type, count)
       updateInventory: (inventoryOrType, count) => set(state => {
         const { activeClub } = state;
         if (!activeClub) return {};
         
         let newInventory;
         if (typeof inventoryOrType === 'object') {
-             // הרכיב שלח אובייקט מלא
              newInventory = inventoryOrType;
         } else {
-             // הרכיב שלח type, count
              newInventory = { ...state.sessions[activeClub].inventory, [inventoryOrType]: count };
         }
 
@@ -259,7 +262,6 @@ export const useAppStore = create<AppState>()(
       addManualTeam: () => set(state => {
         const { activeClub } = state;
         if (!activeClub) return {};
-        // הוספנו boatCount: 1 כדי למנוע קריסה
         const newTeam: Team = { id: crypto.randomUUID(), boatType: 'MANUAL', members: [], boatCount: 1 };
         const session = state.sessions[activeClub];
         return { sessions: { ...state.sessions, [activeClub]: { ...session, teams: [...session.teams, newTeam] } } };
@@ -275,7 +277,33 @@ export const useAppStore = create<AppState>()(
       addGuestToTeam: (teamId, guestName) => { /* Placeholder */ },
       assignMemberToTeam: (personId, teamId) => { /* Placeholder */ },
       removeMemberFromTeam: (teamId, memberId) => { /* Placeholder */ },
-      swapMembers: (t1, m1, t2) => { /* Placeholder */ },
+      
+      // תוקן: טיפול בארבעה פרמטרים (אינדקסים) במקום שניים (ID)
+      swapMembers: (tId, tIdx, dId, dIdx) => set(state => {
+         const { activeClub, sessions } = state;
+         if (!activeClub) return {};
+         const session = sessions[activeClub];
+         
+         const newTeams = JSON.parse(JSON.stringify(session.teams));
+         const sTeam = newTeams.find((t:any) => t.id === tId);
+         const dTeam = newTeams.find((t:any) => t.id === dId);
+         
+         if(sTeam && dTeam) {
+             const memberA = sTeam.members[tIdx];
+             const memberB = dTeam.members[dIdx];
+             
+             // החלפה
+             sTeam.members[tIdx] = memberB;
+             dTeam.members[dIdx] = memberA;
+             
+             // אם אחד מהם null (למשל בהעברה למקום ריק), מסננים
+             sTeam.members = sTeam.members.filter((m:any) => m);
+             dTeam.members = dTeam.members.filter((m:any) => m);
+             
+             return { sessions: { ...state.sessions, [activeClub]: { ...session, teams: newTeams } } };
+         }
+         return {};
+      }),
 
       reorderSessionMembers: (sId, sIdx, dId, dIdx) => {
          const { activeClub, sessions } = get();
@@ -305,7 +333,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'etgarim-storage',
-      version: 43.0,
+      version: 44.0,
       partialize: (state) => ({
         user: state.user, userProfile: state.userProfile, memberships: state.memberships,
         people: state.people, snapshots: state.snapshots, sessions: state.sessions, clubSettings: state.clubSettings,
