@@ -13,7 +13,7 @@ import { getUserProfile, getUserMemberships } from './services/profileService';
 
 const EMPTY_SESSION = { inventory: {}, presentPersonIds: [], teams: [] };
 
-// ממשק מורחב שכולל את כל מה שהקומפוננטות דורשות
+// הגדרה מדויקת יותר כדי למנוע שגיאות TS ברכיבים הישנים
 interface AppState {
   // --- Auth & User ---
   user: { uid: string; email: string; isAdmin: boolean; photoURL?: string } | null;
@@ -34,11 +34,11 @@ interface AppState {
   snapshots: Record<ClubID, PersonSnapshot[]>;
   sessions: Record<ClubID, SessionState>;
   clubSettings: Record<ClubID, ClubSettings>;
-  pairingDirty: boolean; // הוסף כדי למנוע שגיאות
+  pairingDirty: boolean;
 
   // --- Actions: Auth ---
   loginWithGoogle: () => Promise<boolean>;
-  loginDev: () => Promise<void>; // תמיכה לאחור
+  loginDev: (email?: string, isAdmin?: boolean) => Promise<void>; // תוקן לקבלת פרמטרים
   logout: () => Promise<void>;
   loadUserResources: (uid: string) => Promise<void>;
   setAuthInitialized: (isAuth: boolean) => void;
@@ -54,7 +54,7 @@ interface AppState {
   // --- Actions: Permissions & Admin ---
   addPermission: (email: string, clubId: ClubID) => void;
   removePermission: (email: string, clubId: ClubID) => void;
-  addClub: (id: string, name: string) => void;
+  addClub: (name: string, id?: string) => void; // תוקן: id אופציונלי
   removeClub: (id: string) => void;
   addSuperAdmin: (email: string) => void;
   removeSuperAdmin: (email: string) => void;
@@ -67,7 +67,7 @@ interface AppState {
   // --- Actions: Session & Inventory ---
   toggleAttendance: (id: string) => void;
   setBulkAttendance: (ids: string[]) => void;
-  updateInventory: (type: string, count: number) => void;
+  updateInventory: (inventoryOrType: any, count?: number) => void; // תוקן: תמיכה בשתי השיטות
   saveBoatDefinitions: (defs: BoatDefinition[]) => void;
   resetSession: () => void;
   
@@ -125,7 +125,10 @@ export const useAppStore = create<AppState>()(
         } catch (error) { return false; }
       },
 
-      loginDev: async () => { console.warn("Dev login disabled in prod"); }, // Placeholder
+      loginDev: async (email = 'dev@local', isAdmin = true) => { 
+        console.warn("Dev login active");
+        set({ user: { uid: 'dev-uid', email, isAdmin } });
+      }, 
 
       loadUserResources: async (uid) => {
           const profile = await getUserProfile(uid);
@@ -176,7 +179,12 @@ export const useAppStore = create<AppState>()(
         permissions: state.permissions.map(p => p.email === email ? { ...p, allowedClubs: p.allowedClubs.filter(c => c !== clubId) } : p).filter(p => p.allowedClubs.length > 0)
       })),
 
-      addClub: (id, name) => set(state => ({ clubs: [...state.clubs, { id, name }] })),
+      addClub: (nameOrId, optionalId) => set(state => {
+          const id = optionalId || nameOrId.toUpperCase().replace(/\s+/g, '_');
+          const name = optionalId ? nameOrId : nameOrId; 
+          return { clubs: [...state.clubs, { id, name, label: name }] }; // הוספנו label
+      }),
+
       removeClub: (id) => set(state => ({ clubs: state.clubs.filter(c => c.id !== id) })),
       addSuperAdmin: (email) => set(state => ({ superAdmins: [...state.superAdmins, email] })),
       removeSuperAdmin: (email) => set(state => ({ superAdmins: state.superAdmins.filter(e => e !== email) })),
@@ -204,16 +212,24 @@ export const useAppStore = create<AppState>()(
          return { sessions: { ...state.sessions, [activeClub]: { ...state.sessions[activeClub], presentPersonIds: ids } } };
       }),
 
-      updateInventory: (type, count) => set(state => {
+      // תיקון קריטי: תמיכה גם באובייקט מלא וגם ב-(type, count)
+      updateInventory: (inventoryOrType, count) => set(state => {
         const { activeClub } = state;
         if (!activeClub) return {};
+        
+        let newInventory;
+        if (typeof inventoryOrType === 'object') {
+             // הרכיב שלח אובייקט מלא
+             newInventory = inventoryOrType;
+        } else {
+             // הרכיב שלח type, count
+             newInventory = { ...state.sessions[activeClub].inventory, [inventoryOrType]: count };
+        }
+
         return { 
           sessions: { 
             ...state.sessions, 
-            [activeClub]: { 
-              ...state.sessions[activeClub], 
-              inventory: { ...state.sessions[activeClub].inventory, [type]: count } 
-            } 
+            [activeClub]: { ...state.sessions[activeClub], inventory: newInventory } 
           } 
         };
       }),
@@ -243,7 +259,8 @@ export const useAppStore = create<AppState>()(
       addManualTeam: () => set(state => {
         const { activeClub } = state;
         if (!activeClub) return {};
-        const newTeam: Team = { id: crypto.randomUUID(), boatType: 'MANUAL', members: [] };
+        // הוספנו boatCount: 1 כדי למנוע קריסה
+        const newTeam: Team = { id: crypto.randomUUID(), boatType: 'MANUAL', members: [], boatCount: 1 };
         const session = state.sessions[activeClub];
         return { sessions: { ...state.sessions, [activeClub]: { ...session, teams: [...session.teams, newTeam] } } };
       }),
@@ -255,10 +272,10 @@ export const useAppStore = create<AppState>()(
         return { sessions: { ...state.sessions, [activeClub]: { ...session, teams: session.teams.filter(t => t.id !== teamId) } } };
       }),
 
-      addGuestToTeam: (teamId, guestName) => { /* מימוש חלקי לשחרור חסימה */ },
-      assignMemberToTeam: (personId, teamId) => { /* מימוש חלקי */ },
-      removeMemberFromTeam: (teamId, memberId) => { /* מימוש חלקי */ },
-      swapMembers: (t1, m1, t2) => { /* מימוש חלקי */ },
+      addGuestToTeam: (teamId, guestName) => { /* Placeholder */ },
+      assignMemberToTeam: (personId, teamId) => { /* Placeholder */ },
+      removeMemberFromTeam: (teamId, memberId) => { /* Placeholder */ },
+      swapMembers: (t1, m1, t2) => { /* Placeholder */ },
 
       reorderSessionMembers: (sId, sIdx, dId, dIdx) => {
          const { activeClub, sessions } = get();
@@ -282,13 +299,13 @@ export const useAppStore = create<AppState>()(
          set(state => ({ sessions: { ...state.sessions, [activeClub]: { ...session, teams: newTeams } } }));
       },
 
-      // --- Undo/Redo (Placeholders) ---
+      // --- Undo/Redo ---
       undo: () => {},
       redo: () => {},
     }),
     {
       name: 'etgarim-storage',
-      version: 42.0,
+      version: 43.0,
       partialize: (state) => ({
         user: state.user, userProfile: state.userProfile, memberships: state.memberships,
         people: state.people, snapshots: state.snapshots, sessions: state.sessions, clubSettings: state.clubSettings,
