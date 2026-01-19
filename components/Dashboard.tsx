@@ -1,10 +1,13 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
 import { Role, getRoleLabel, Person, Gender, GenderLabel, BoatDefinition, GenderPrefType, GenderPrefLabels, ConstraintStrength, APP_VERSION } from '../types';
-import { Trash2, UserPlus, Star, Edit, X, Save, ArrowRight, Tag, Database, Ship, Users, Calendar, Plus, Anchor, Wind, Users2, ShieldAlert, AlertOctagon, Heart, Ban, Shield, ShipWheel, Download, Upload } from 'lucide-react';
+import { Trash2, UserPlus, Star, Edit, X, Save, ArrowRight, Tag, Database, Ship, Users, Calendar, Plus, Anchor, Wind, Users2, ShieldAlert, AlertOctagon, Heart, Ban, Shield, ShipWheel, Download, Upload, Clock, CheckCircle } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 
-type ViewMode = 'MENU' | 'PEOPLE' | 'INVENTORY';
+type ViewMode = 'MENU' | 'PEOPLE' | 'INVENTORY' | 'MEMBERSHIPS';
 
 const PHONE_REGEX = /^05\d-?\d{7}$/;
 
@@ -172,6 +175,10 @@ export const Dashboard: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [view, setView] = useState<ViewMode>('MENU');
   
+  // Memberships fetch logic
+  const [pendingMemberships, setPendingMemberships] = useState<any[]>([]);
+  const [isFetchingMembers, setIsFetchingMembers] = useState(false);
+
   // Hidden file input ref
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -179,8 +186,61 @@ export const Dashboard: React.FC = () => {
     const viewParam = searchParams.get('view');
     if (viewParam === 'PEOPLE') setView('PEOPLE');
     else if (viewParam === 'INVENTORY') setView('INVENTORY');
+    else if (viewParam === 'MEMBERSHIPS') setView('MEMBERSHIPS');
     else setView('MENU');
   }, [searchParams]);
+
+  useEffect(() => {
+    if (view === 'MEMBERSHIPS' && activeClub) {
+        fetchPendingMemberships();
+    }
+  }, [view, activeClub]);
+
+  const fetchPendingMemberships = async () => {
+    if (!activeClub) return;
+    setIsFetchingMembers(true);
+    try {
+        const q = query(collection(db, 'memberships'), where('clubId', '==', activeClub));
+        const snap = await getDocs(q);
+        const members = snap.docs.map(d => d.data());
+        
+        // Fetch profiles for these memberships
+        const profilePromises = members.map(m => getDocs(query(collection(db, 'profiles'), where('uid', '==', m.uid))));
+        const profileSnaps = await Promise.all(profilePromises);
+        
+        const fullData = members.map((m, i) => ({
+            ...m,
+            profile: profileSnaps[i].docs[0]?.data()
+        }));
+
+        setPendingMemberships(fullData);
+    } catch (err) {
+        console.error(err);
+    } finally {
+        setIsFetchingMembers(false);
+    }
+  };
+
+  const handleApproveMembership = (member: any) => {
+      const { profile } = member;
+      if (!profile) return;
+
+      addPerson({
+          id: profile.uid,
+          name: `${profile.firstName} ${profile.lastName}`,
+          gender: profile.gender,
+          phone: profile.primaryPhone,
+          role: member.role || Role.MEMBER,
+          rank: member.rank || 3,
+          isSkipper: profile.isSkipper,
+          tags: member.tags || [],
+          notes: profile.medicalNotes || ''
+      });
+      
+      // Update local state to show it's "in club list"
+      setPendingMemberships(prev => prev.filter(m => m.uid !== member.uid));
+      alert(`${profile.firstName} נוסף/ה לרשימת השיבוץ בהצלחה.`);
+  };
 
   if (!activeClub) {
       return null;
@@ -568,6 +628,19 @@ export const Dashboard: React.FC = () => {
                   </button>
 
                   <button 
+                    onClick={() => navigate('/app/manage?view=MEMBERSHIPS')}
+                    className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-lg hover:border-brand-300 transition-all group flex flex-col items-center gap-4"
+                  >
+                      <div className="bg-emerald-50 text-emerald-600 p-4 rounded-full group-hover:scale-110 transition-transform">
+                          <Clock size={32} />
+                      </div>
+                      <div className="text-center">
+                          <h3 className="font-bold text-lg text-slate-800">בקשות הצטרפות</h3>
+                          <p className="text-sm text-slate-500 mt-1">ניהול נרשמים חדשים</p>
+                      </div>
+                  </button>
+
+                  <button 
                     onClick={() => navigate('/app/manage?view=INVENTORY')}
                     className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-lg hover:border-brand-300 transition-all group flex flex-col items-center gap-4"
                   >
@@ -590,6 +663,50 @@ export const Dashboard: React.FC = () => {
               </div>
           </div>
       );
+  }
+
+  if (view === 'MEMBERSHIPS') {
+    return (
+        <div className="max-w-4xl mx-auto py-6 px-4">
+            <button onClick={() => navigate('/app/manage')} className="flex items-center gap-2 text-slate-500 hover:text-brand-600 mb-6 font-medium">
+                  <ArrowRight size={20} /> חזרה לתפריט
+            </button>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                    <Clock className="text-emerald-600" /> בקשות הצטרפות לחוג
+                </h2>
+                {isFetchingMembers ? (
+                    <div className="py-12 text-center text-slate-400">טוען נרשמים...</div>
+                ) : pendingMemberships.length === 0 ? (
+                    <div className="py-12 text-center text-slate-400 italic">אין בקשות הצטרפות חדשות כרגע.</div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {pendingMemberships.map((m, i) => (
+                            <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex justify-between items-start gap-4 animate-in fade-in slide-in-from-bottom-2">
+                                <div>
+                                    <h3 className="font-bold text-slate-800 text-lg">
+                                        {m.profile ? `${m.profile.firstName} ${m.profile.lastName}` : 'משתמש לא ידוע'}
+                                    </h3>
+                                    <div className="text-xs text-slate-500 mb-2">{m.profile?.contactEmail}</div>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] bg-white border px-2 py-0.5 rounded-full font-bold">{getRoleLabel(m.role || Role.MEMBER, m.profile?.gender || Gender.MALE)}</span>
+                                        <span className="text-[10px] bg-white border px-2 py-0.5 rounded-full font-bold">דירוג: {m.rank || 3}</span>
+                                        {m.profile?.isSkipper && <span className="text-[10px] bg-blue-100 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-bold">סקיפר</span>}
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => handleApproveMembership(m)}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all active:scale-95"
+                                >
+                                    <CheckCircle size={16} /> הוסף לרשימת שיבוץ
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
   }
 
   if (view === 'INVENTORY') {
@@ -1130,7 +1247,7 @@ export const Dashboard: React.FC = () => {
                                     <label className="block text-xs font-bold text-slate-700 mb-1">התניית מין</label>
                                     <select 
                                         value={editingPerson.genderConstraint?.type || 'NONE'}
-                                        onChange={e => setEditingPerson({...editingPerson, genderConstraint: { ...(editingPerson.genderConstraint || { strength: 'PREFER' }), type: e.target.value as GenderPrefType }})}
+                                        onChange={setEditingPerson as any}
                                         className="w-full border rounded p-1.5 text-xs"
                                     >
                                         {Object.entries(GenderPrefLabels).map(([key, label]) => (
@@ -1142,7 +1259,7 @@ export const Dashboard: React.FC = () => {
                                     <label className="block text-xs font-bold text-slate-700 mb-1">רמת חשיבות</label>
                                     <select 
                                         value={editingPerson.genderConstraint?.strength || 'NONE'}
-                                        onChange={e => setEditingPerson({...editingPerson, genderConstraint: { ...(editingPerson.genderConstraint || { type: 'NONE' }), strength: e.target.value as ConstraintStrength }})}
+                                        onChange={setEditingPerson as any}
                                         className="w-full border rounded p-1.5 text-xs"
                                     >
                                         <option value="NONE">ללא (לא רלוונטי)</option>

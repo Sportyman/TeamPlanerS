@@ -45,6 +45,7 @@ interface AppState {
   loginDev: (email: string, isAdmin: boolean) => boolean;
   logout: () => Promise<void>;
   setUserProfile: (profile: UserProfile) => void;
+  loadUserResources: (uid: string) => Promise<void>;
   refreshMemberships: () => Promise<void>;
   
   setActiveClub: (clubId: ClubID) => void;
@@ -142,20 +143,19 @@ export const useAppStore = create<AppState>()(
           const isSuperAdmin = superAdmins.some(a => a.toLowerCase() === email) || 
                              protectedAdmins.some(a => a.toLowerCase() === email);
 
-          // Set basic auth user first
           set({ user: { uid, email, isAdmin: isSuperAdmin, photoURL: result.user.photoURL || undefined } });
-          
-          // Load global profile and memberships
-          const profile = await getUserProfile(uid);
-          const memberships = await getUserMemberships(uid);
-          
-          set({ userProfile: profile, memberships });
-          
+          await get().loadUserResources(uid);
           return true;
         } catch (error) {
           console.error("Login error:", error);
           return false;
         }
+      },
+
+      loadUserResources: async (uid) => {
+          const profile = await getUserProfile(uid);
+          const memberships = await getUserMemberships(uid);
+          set({ userProfile: profile, memberships });
       },
 
       loginDev: (email, isAdmin) => {
@@ -589,7 +589,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'etgarim-storage',
-      version: 40.0, 
+      version: 41.0, 
       partialize: (state) => ({
         user: state.user,
         userProfile: state.userProfile,

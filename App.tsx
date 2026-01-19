@@ -12,12 +12,14 @@ import { ProfileSetup } from './components/profile/ProfileSetup';
 import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw, LayoutGrid, History as HistoryIcon, Clock, ChevronLeft, Home, Shield } from 'lucide-react';
 import { APP_VERSION } from './types';
 import { triggerCloudSync, fetchFromCloud, fetchGlobalConfig } from './services/syncService';
+import { auth } from './firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const ProtectedAppRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, userProfile, activeClub, clubs } = useAppStore();
   const location = useLocation();
 
-  if (!user) return <Navigate to="/" />;
+  if (!user) return <Navigate to="/login" />;
   
   // If user is logged in but has no profile, redirect to profile setup
   if (!userProfile && location.pathname !== '/profile-setup') {
@@ -196,9 +198,32 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const App: React.FC = () => {
+  const { loadUserResources, superAdmins, protectedAdmins } = useAppStore();
+
   useEffect(() => {
     fetchGlobalConfig();
-  }, []);
+    
+    // Auth Listener to prevent profile loop and sync resources
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        if (firebaseUser) {
+            const email = firebaseUser.email?.toLowerCase().trim() || '';
+            const isSuperAdmin = superAdmins.some(a => a.toLowerCase() === email) || 
+                               protectedAdmins.some(a => a.toLowerCase() === email);
+                               
+            useAppStore.setState({ 
+                user: { 
+                    uid: firebaseUser.uid, 
+                    email: email, 
+                    isAdmin: isSuperAdmin, 
+                    photoURL: firebaseUser.photoURL || undefined 
+                } 
+            });
+            loadUserResources(firebaseUser.uid);
+        }
+    });
+
+    return () => unsubscribe();
+  }, [superAdmins, protectedAdmins]);
 
   return (
     <Router>
