@@ -8,21 +8,35 @@ import { Login } from './components/Login';
 import { LandingPage } from './components/LandingPage';
 import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { PublicPairingView } from './components/PublicPairingView';
+import { ProfileSetup } from './components/profile/ProfileSetup';
 import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw, LayoutGrid, History as HistoryIcon, Clock, ChevronLeft, Home, Shield } from 'lucide-react';
 import { APP_VERSION } from './types';
 import { triggerCloudSync, fetchFromCloud, fetchGlobalConfig } from './services/syncService';
 
 const ProtectedAppRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, activeClub, clubs } = useAppStore();
+  const { user, userProfile, activeClub, clubs } = useAppStore();
+  const location = useLocation();
+
   if (!user) return <Navigate to="/" />;
+  
+  // If user is logged in but has no profile, redirect to profile setup
+  if (!userProfile && location.pathname !== '/profile-setup') {
+      return <Navigate to="/profile-setup" />;
+  }
+
   const clubExists = clubs.some(c => c.id === activeClub);
   if (!activeClub || !clubExists) return <Navigate to="/" />;
   return <>{children}</>;
 };
 
 const SuperAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { user } = useAppStore();
+    const { user, userProfile } = useAppStore();
+    const location = useLocation();
+
     if (!user || !user.isAdmin) return <Navigate to="/" />; 
+    if (!userProfile && location.pathname !== '/profile-setup') {
+        return <Navigate to="/profile-setup" />;
+    }
     return <>{children}</>;
 };
 
@@ -64,7 +78,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     }
   }, [user, activeClub]);
 
-  // Close menu on route change
   useEffect(() => {
     setIsMenuOpen(false);
   }, [location]);
@@ -78,7 +91,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Backdrop for Menu */}
       {isMenuOpen && (
         <div 
           className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 animate-in fade-in duration-300"
@@ -86,7 +98,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         />
       )}
 
-      {/* Sidebar Drawer */}
       <aside className={`fixed top-0 right-0 h-full w-72 bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out flex flex-col ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -137,7 +148,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
       </aside>
 
-      {/* Navigation Bar */}
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative flex justify-between h-16 items-center">
@@ -187,7 +197,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 const App: React.FC = () => {
   useEffect(() => {
-    // Critical: Fetch global config from DB on app startup to resolve permissions.
     fetchGlobalConfig();
   }, []);
 
@@ -197,6 +206,7 @@ const App: React.FC = () => {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/share" element={<PublicPairingView />} />
+        <Route path="/profile-setup" element={<ProfileSetup />} />
         <Route path="/super-admin" element={<SuperAdminRoute><Layout><SuperAdminDashboard /></Layout></SuperAdminRoute>} />
         <Route path="/app" element={<ProtectedAppRoute><Layout><SessionManager /></Layout></ProtectedAppRoute>} />
         <Route path="/app/manage" element={<ProtectedAppRoute><Layout><Dashboard /></Layout></ProtectedAppRoute>} />

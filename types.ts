@@ -1,4 +1,5 @@
 
+
 export enum Role {
   INSTRUCTOR = 'INSTRUCTOR',
   VOLUNTEER = 'VOLUNTEER',
@@ -6,6 +7,61 @@ export enum Role {
   GUEST = 'GUEST',
 }
 
+// Renamed Sex to Gender to fix import errors in Dashboard and PublicPairingView
+export enum Gender {
+  MALE = 'MALE',
+  FEMALE = 'FEMALE',
+}
+
+// Renamed SexLabel to GenderLabel
+export const GenderLabel: Record<Gender, string> = {
+  [Gender.MALE]: 'זכר',
+  [Gender.FEMALE]: 'נקבה',
+};
+
+export enum MembershipStatus {
+  PENDING = 'PENDING',
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+}
+
+export interface EmergencyContact {
+  name: string;
+  phone: string;
+  relation: string;
+}
+
+export interface Certification {
+  id: string;
+  name: string;
+  issuedAt?: string;
+}
+
+export interface UserProfile {
+  uid: string;
+  fullName: string;
+  email: string;
+  photoURL?: string;
+  gender: Gender; // Renamed from sex to gender to match naming conventions
+  birthDate: string; // ISO
+  primaryPhone: string;
+  emergencyContacts: EmergencyContact[];
+  medicalNotes: string;
+  certifications: Certification[];
+  joinedSystemDate: string; // ISO
+}
+
+export interface ClubMembership {
+  uid: string;
+  clubId: ClubID;
+  role: Role;
+  status: MembershipStatus;
+  joinedClubDate: string; // ISO
+  rank: number;
+  clubSpecificNotes?: string;
+}
+
+// Updated to use Gender instead of Sex
 export const getRoleLabel = (role: Role, gender: Gender): string => {
     const labels: Record<Role, { [key in Gender]: string }> = {
         [Role.INSTRUCTOR]: { [Gender.MALE]: 'מדריך', [Gender.FEMALE]: 'מדריכה' },
@@ -14,16 +70,6 @@ export const getRoleLabel = (role: Role, gender: Gender): string => {
         [Role.GUEST]: { [Gender.MALE]: 'אורח', [Gender.FEMALE]: 'אורחת' },
     };
     return labels[role][gender] || labels[role][Gender.MALE];
-};
-
-export enum Gender {
-  MALE = 'MALE',
-  FEMALE = 'FEMALE',
-}
-
-export const GenderLabel: Record<Gender, string> = {
-  [Gender.MALE]: 'זכר',
-  [Gender.FEMALE]: 'נקבה',
 };
 
 export type GenderPrefType = 'NONE' | 'MALE' | 'FEMALE';
@@ -83,7 +129,7 @@ export interface UserPermission {
   allowedClubs: ClubID[];
 }
 
-export const APP_VERSION = '3.0.0'; // Major version bump for Hybrid Sync
+export const APP_VERSION = '4.0.0'; // Infrastructure Update: Global User Profiles
 
 export const TEAM_COLORS = [
   'bg-blue-50 border-blue-200',      
@@ -110,7 +156,7 @@ export interface Person {
   id: string;
   clubId: ClubID;
   name: string;
-  gender: Gender;
+  gender: Gender; // Renamed from sex to gender to match naming conventions
   tags?: string[];
   phone?: string;
   role: Role;
@@ -124,7 +170,6 @@ export interface Person {
   cannotPairWith?: string[]; 
 }
 
-// Added missing PersonSnapshot interface used in store.ts and syncService.ts
 export interface PersonSnapshot {
   id: string;
   name: string;

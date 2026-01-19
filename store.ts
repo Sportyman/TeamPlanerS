@@ -1,14 +1,17 @@
 
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { 
   Person, Role, SessionState, Team, BoatInventory, BoatType, ClubID, UserPermission, 
-  Gender, DefaultBoatTypes, ClubSettings, BoatDefinition, Club, SyncStatus, PersonSnapshot 
+  Gender, DefaultBoatTypes, ClubSettings, BoatDefinition, Club, SyncStatus, PersonSnapshot,
+  UserProfile, ClubMembership
 } from './types';
 import { generateSmartPairings } from './services/pairingLogic';
 import { DEFAULT_CLUBS, INITIAL_PEOPLE, KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from './mockData';
 import { auth, googleProvider } from './firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
+import { getUserProfile, getUserMemberships } from './services/profileService';
 
 const createInventoryFromDefs = (defs: BoatDefinition[]): BoatInventory => {
     const inv: BoatInventory = {};
@@ -19,14 +22,16 @@ const createInventoryFromDefs = (defs: BoatDefinition[]): BoatInventory => {
 const EMPTY_SESSION = { inventory: {}, presentPersonIds: [], teams: [] };
 
 interface AppState {
-  user: { email: string; isAdmin: boolean; photoURL?: string } | null;
+  user: { uid: string; email: string; isAdmin: boolean; photoURL?: string } | null;
+  userProfile: UserProfile | null;
+  memberships: ClubMembership[];
   activeClub: ClubID | null;
   pairingDirty: boolean; 
   syncStatus: SyncStatus;
   
   clubs: Club[];
   superAdmins: string[]; 
-  protectedAdmins: string[]; // Emails that cannot be removed via UI
+  protectedAdmins: string[]; 
   permissions: UserPermission[];
   
   people: Person[];
@@ -36,20 +41,21 @@ interface AppState {
   histories: Record<ClubID, Team[][]>;
   futures: Record<ClubID, Team[][]>;
   
-  // Actions
+  // Auth Actions
   loginWithGoogle: () => Promise<boolean>;
-  loginDev: (email: string, forceAdmin?: boolean) => boolean;
   logout: () => Promise<void>;
+  setUserProfile: (profile: UserProfile) => void;
+  refreshMemberships: () => Promise<void>;
+  
   setActiveClub: (clubId: ClubID) => void;
   setSyncStatus: (status: SyncStatus) => void;
   setGlobalConfig: (config: { superAdmins: string[], protectedAdmins?: string[] }) => void;
   
-  // Super Admin Actions
+  // Club Actions
   addClub: (label: string) => void;
   removeClub: (id: string) => void;
   addSuperAdmin: (email: string) => void;
   removeSuperAdmin: (email: string) => void;
-  
   addPermission: (email: string, clubId: ClubID) => void;
   removePermission: (email: string, clubId: ClubID) => void;
   
@@ -60,7 +66,6 @@ interface AppState {
   removePerson: (id: string) => void;
   clearClubPeople: () => void;
   restoreDemoData: () => void;
-  loadDemoForActiveClub: () => void;
   importClubData: (data: any) => void;
   
   // Snapshots
@@ -101,13 +106,15 @@ export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
       user: null,
+      userProfile: null,
+      memberships: [],
       activeClub: null,
       pairingDirty: false,
       syncStatus: 'OFFLINE',
       
       clubs: DEFAULT_CLUBS,
       superAdmins: [],
-      protectedAdmins: [], // Loaded from Firestore
+      protectedAdmins: [], 
       permissions: [], 
       people: INITIAL_PEOPLE,
       
@@ -125,54 +132,54 @@ export const useAppStore = create<AppState>()(
       histories: { 'KAYAK': [], 'SAILING': [] },
       futures: { 'KAYAK': [], 'SAILING': [] },
 
-      setActiveClub: (clubId) => set({ activeClub: clubId }),
-      setSyncStatus: (status) => set({ syncStatus: status }),
-      
-      setGlobalConfig: (config) => set({ 
-          superAdmins: config.superAdmins.map(a => a.toLowerCase().trim()),
-          protectedAdmins: (config.protectedAdmins || []).map(a => a.toLowerCase().trim())
-      }),
-
       loginWithGoogle: async () => {
         try {
           const result = await signInWithPopup(auth, googleProvider);
           const email = result.user.email?.toLowerCase().trim() || '';
-          const { activeClub, permissions, superAdmins } = get();
+          const uid = result.user.uid;
+          const { superAdmins, protectedAdmins } = get();
 
-          const isSuperAdmin = superAdmins.some(a => a.toLowerCase() === email);
-          const userPerm = permissions.find(p => p.email.toLowerCase() === email);
-          const hasClubAccess = userPerm && activeClub && userPerm.allowedClubs.includes(activeClub);
+          const isSuperAdmin = superAdmins.some(a => a.toLowerCase() === email) || 
+                             protectedAdmins.some(a => a.toLowerCase() === email);
 
-          if (isSuperAdmin || hasClubAccess) {
-            set({ user: { email, isAdmin: isSuperAdmin, photoURL: result.user.photoURL || undefined } });
-            return true;
-          }
+          // Set basic auth user first
+          set({ user: { uid, email, isAdmin: isSuperAdmin, photoURL: result.user.photoURL || undefined } });
           
-          await signOut(auth);
-          return false;
+          // Load global profile and memberships
+          const profile = await getUserProfile(uid);
+          const memberships = await getUserMemberships(uid);
+          
+          set({ userProfile: profile, memberships });
+          
+          return true;
         } catch (error) {
           console.error("Login error:", error);
           return false;
         }
       },
 
-      loginDev: (email, forceAdmin = false) => {
-        const normalizedEmail = email.trim().toLowerCase() || 'developer@internal.dev';
-        const { superAdmins, protectedAdmins } = get();
-        
-        // Root dev access: If forced from ?admin=true OR if in the superAdmins list
-        const isSuperAdmin = forceAdmin || 
-                             superAdmins.some(a => a.toLowerCase() === normalizedEmail) ||
-                             protectedAdmins.some(a => a.toLowerCase() === normalizedEmail);
-        
-        set({ user: { email: normalizedEmail, isAdmin: isSuperAdmin } });
-        return true;
+      setUserProfile: (profile) => set({ userProfile: profile }),
+
+      refreshMemberships: async () => {
+          const { user } = get();
+          if (user) {
+              const ms = await getUserMemberships(user.uid);
+              set({ memberships: ms });
+          }
       },
 
       logout: async () => {
         await signOut(auth);
-        set({ user: null });
+        set({ user: null, userProfile: null, memberships: [] });
       },
+
+      setActiveClub: (clubId) => set({ activeClub: clubId }),
+      setSyncStatus: (status) => set({ setSyncStatus: status }),
+      
+      setGlobalConfig: (config) => set({ 
+          superAdmins: config.superAdmins.map(a => a.toLowerCase().trim()),
+          protectedAdmins: (config.protectedAdmins || []).map(a => a.toLowerCase().trim())
+      }),
 
       setCloudData: (data) => set((state) => ({
         people: data.people || state.people,
@@ -205,21 +212,16 @@ export const useAppStore = create<AppState>()(
       addSuperAdmin: (email) => set(state => {
           const normalized = email.toLowerCase().trim();
           if (state.superAdmins.includes(normalized)) return state;
-          return {
-              superAdmins: [...state.superAdmins, normalized]
-          };
+          return { superAdmins: [...state.superAdmins, normalized] };
       }),
 
       removeSuperAdmin: (email) => set(state => {
           const normalized = email.toLowerCase().trim();
-          // Cannot remove protected admins
           if (state.protectedAdmins.includes(normalized)) {
-              alert('חשבון זה מוגדר כחשבון שורשי (Root) ולא ניתן להסרה.');
+              alert('Root account cannot be removed.');
               return state;
           }
-          return {
-              superAdmins: state.superAdmins.filter(a => a.toLowerCase() !== normalized)
-          };
+          return { superAdmins: state.superAdmins.filter(a => a.toLowerCase() !== normalized) };
       }),
 
       addPermission: (email, clubId) => set(state => {
@@ -246,11 +248,8 @@ export const useAppStore = create<AppState>()(
 
       addPerson: (personData) => set((state) => {
         if (!state.activeClub) return state;
-        const newPerson: Person = { ...personData, clubId: state.activeClub };
-        return { 
-          people: [...state.people, newPerson],
-          pairingDirty: true 
-        };
+        const newPerson: Person = { ...personData, clubId: state.activeClub } as Person;
+        return { people: [...state.people, newPerson], pairingDirty: true };
       }),
       
       updatePerson: (updatedPerson) => set((state) => ({
@@ -266,52 +265,30 @@ export const useAppStore = create<AppState>()(
       clearClubPeople: () => set(state => {
           const clubId = state.activeClub;
           if (!clubId) return state;
-          return {
-              people: state.people.filter(p => p.clubId !== clubId),
-              pairingDirty: true
-          };
+          return { people: state.people.filter(p => p.clubId !== clubId), pairingDirty: true };
       }),
 
-      restoreDemoData: () => set(() => {
-        return { 
+      restoreDemoData: () => set(() => ({ 
           clubs: DEFAULT_CLUBS,
           people: INITIAL_PEOPLE,
-          clubSettings: {
-             'KAYAK': { boatDefinitions: KAYAK_DEFINITIONS },
-             'SAILING': { boatDefinitions: SAILING_DEFINITIONS }
-          },
+          clubSettings: { 'KAYAK': { boatDefinitions: KAYAK_DEFINITIONS }, 'SAILING': { boatDefinitions: SAILING_DEFINITIONS } },
           sessions: {
             'KAYAK': { ...EMPTY_SESSION, inventory: createInventoryFromDefs(KAYAK_DEFINITIONS) },
             'SAILING': { ...EMPTY_SESSION, inventory: createInventoryFromDefs(SAILING_DEFINITIONS) },
           },
           snapshots: {},
           pairingDirty: false
-        };
-      }),
-
-      loadDemoForActiveClub: () => set(state => {
-          const clubId = state.activeClub;
-          if (!clubId) return state;
-          const otherPeople = state.people.filter(p => p.clubId !== clubId);
-          const demoPeople = INITIAL_PEOPLE.filter(p => p.clubId === clubId);
-          return {
-              people: [...otherPeople, ...demoPeople],
-              pairingDirty: true
-          };
-      }),
+      })),
 
       importClubData: (data: any) => set((state) => {
           if (!state.activeClub) return state;
           const currentClubId = state.activeClub;
           if (!data || !data.clubId || data.clubId !== currentClubId) {
-             alert("קובץ זה אינו תואם לחוג הנוכחי.");
+             alert("Data mismatch for this club.");
              return state;
           }
           const otherPeople = state.people.filter(p => p.clubId !== currentClubId);
-          const importedPeople = (data.people || []).map((p: Person) => ({
-              ...p,
-              clubId: currentClubId
-          }));
+          const importedPeople = (data.people || []).map((p: Person) => ({ ...p, clubId: currentClubId }));
           return {
               people: [...otherPeople, ...importedPeople],
               clubSettings: { ...state.clubSettings, [currentClubId]: data.settings || { boatDefinitions: [] } },
@@ -325,16 +302,9 @@ export const useAppStore = create<AppState>()(
           const clubId = state.activeClub;
           if (!clubId) return state;
           const currentPeople = state.people.filter(p => p.clubId === clubId);
-          const newSnapshot: PersonSnapshot = {
-              id: Date.now().toString(),
-              name,
-              date: new Date().toISOString(),
-              people: currentPeople
-          };
+          const newSnapshot: PersonSnapshot = { id: Date.now().toString(), name, date: new Date().toISOString(), people: currentPeople };
           const currentSnapshots = state.snapshots[clubId] || [];
-          return {
-              snapshots: { ...state.snapshots, [clubId]: [newSnapshot, ...currentSnapshots] }
-          };
+          return { snapshots: { ...state.snapshots, [clubId]: [newSnapshot, ...currentSnapshots] } };
       }),
 
       loadSnapshot: (snapshotId) => set(state => {
@@ -343,23 +313,16 @@ export const useAppStore = create<AppState>()(
           const clubSnaps = state.snapshots[clubId] || [];
           const snap = clubSnaps.find(s => s.id === snapshotId);
           if (!snap) return state;
-          
           const otherPeople = state.people.filter(p => p.clubId !== clubId);
           const restoredPeople = snap.people.map(p => ({ ...p, clubId }));
-          
-          return {
-              people: [...otherPeople, ...restoredPeople],
-              pairingDirty: true
-          };
+          return { people: [...otherPeople, ...restoredPeople], pairingDirty: true };
       }),
 
       deleteSnapshot: (snapshotId) => set(state => {
           const clubId = state.activeClub;
           if (!clubId) return state;
           const clubSnaps = state.snapshots[clubId] || [];
-          return {
-              snapshots: { ...state.snapshots, [clubId]: clubSnaps.filter(s => s.id !== snapshotId) }
-          };
+          return { snapshots: { ...state.snapshots, [clubId]: clubSnaps.filter(s => s.id !== snapshotId) } };
       }),
 
       toggleAttendance: (id) => set((state) => {
@@ -498,9 +461,9 @@ export const useAppStore = create<AppState>()(
             name: name,
             role: Role.GUEST,
             rank: 1,
-            gender: Gender.MALE,
+            gender: Gender.MALE, // Updated to Gender
             tags: [],
-            notes: 'הוסף ידנית'
+            notes: 'Manual'
         };
         const newTeams = currentSession.teams.map(t => t.id === teamId ? { ...t, members: [...t.members, newGuest] } : t);
         set((state) => ({
@@ -620,9 +583,11 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'etgarim-storage',
-      version: 25.0, 
+      version: 40.0, 
       partialize: (state) => ({
         user: state.user,
+        userProfile: state.userProfile,
+        memberships: state.memberships,
         people: state.people,
         sessions: state.sessions,
         clubSettings: state.clubSettings,
