@@ -1,28 +1,46 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { ClubID, APP_VERSION, Role, MembershipStatus, getRoleLabel } from '../types';
-import { Waves, Ship, Settings, Anchor, User, Loader2, LogOut, CheckCircle2, Clock, UserCheck } from 'lucide-react';
+import { Waves, Ship, Settings, Anchor, User, Loader2, LogOut, CheckCircle2, Clock, UserCheck, ShieldAlert, X } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const { setActiveClub, clubs, user, userProfile, memberships, authInitialized, logout } = useAppStore();
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const handleClubSelect = (clubId: ClubID) => {
+    setAuthError(null);
     setActiveClub(clubId);
+
     if (user) {
-        // If logged in, check role. Members go to portal, admins/staff to app
         const membership = memberships.find(m => m.clubId === clubId);
         const isStaff = membership && (membership.role === Role.INSTRUCTOR || membership.role === Role.VOLUNTEER);
         
-        if (user.isAdmin || isStaff) {
+        // Super Admin can always go to the app for any club
+        if (user.isAdmin) {
             navigate('/app');
-        } else {
-            // Member portal stays on landing for now with specific UI
+            return;
         }
+
+        // Staff can go to the app
+        if (isStaff && membership.status === MembershipStatus.ACTIVE) {
+            navigate('/app');
+            return;
+        }
+
+        // Regular member with active status - just stay here or portal logic
+        if (membership) {
+            return; 
+        }
+
+        // If logged in but no membership and NOT an admin: Deny entry.
+        // They must come through an Invite Link to get a membership.
+        setAuthError("אין לך הרשאת גישה לחוג זה. הצטרפות מתבצעת דרך לינק הזמנה בלבד.");
     } else {
-        navigate('/login');
+        // Redirect to login, but include a hint about which club was selected
+        navigate(`/login?club=${clubId}`);
     }
   };
 
@@ -33,8 +51,6 @@ export const LandingPage: React.FC = () => {
         navigate('/login?admin=true');
     }
   };
-
-  const currentClubMembership = user && memberships.find(m => m.clubId === useAppStore.getState().activeClub);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col items-center justify-between p-4">
@@ -82,62 +98,107 @@ export const LandingPage: React.FC = () => {
               </p>
             </div>
 
+            {/* Error Notification */}
+            {authError && (
+                <div className="bg-red-50 border border-red-200 p-4 rounded-2xl flex items-center justify-between gap-4 animate-in slide-in-from-top-4 max-w-2xl mx-auto shadow-sm">
+                    <div className="flex items-center gap-3 text-red-700 font-bold">
+                        <ShieldAlert size={24} />
+                        <span>{authError}</span>
+                    </div>
+                    <button onClick={() => setAuthError(null)} className="text-red-400 hover:text-red-600">
+                        <X size={20} />
+                    </button>
+                </div>
+            )}
+
             {/* Content Area */}
             <div className="bg-white/40 backdrop-blur-md p-6 md:p-10 rounded-[2.5rem] border border-white/50 shadow-xl max-w-2xl mx-auto w-full">
                 
-                {user && memberships.length > 0 ? (
-                    // LOGGED IN VIEW - MEMBER PORTAL
+                {user && (memberships.length > 0 || user.isAdmin) ? (
+                    // LOGGED IN VIEW - MEMBER PORTAL / ADMIN ENTRY
                     <div className="space-y-6">
                         <div className="text-center mb-8">
                             <div className="w-20 h-20 bg-brand-100 text-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-inner">
-                                <UserCheck size={40} />
+                                {user.isAdmin ? <Settings size={40} /> : <UserCheck size={40} />}
                             </div>
-                            <h2 className="text-2xl font-black text-slate-800">החוגים שלי</h2>
+                            <h2 className="text-2xl font-black text-slate-800">
+                                {user.isAdmin ? 'כניסה לניהול חוגים' : 'החוגים שלי'}
+                            </h2>
                         </div>
 
                         <div className="grid gap-4">
-                            {memberships.map(m => {
-                                const club = clubs.find(c => c.id === m.clubId);
-                                const isStaff = m.role === Role.INSTRUCTOR || m.role === Role.VOLUNTEER;
-                                const isActive = m.status === MembershipStatus.ACTIVE;
-
-                                return (
-                                    <div key={m.clubId} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group transition-all">
+                            {user.isAdmin ? (
+                                // Super Admin sees all available clubs to enter
+                                clubs.map(club => (
+                                    <div key={club.id} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group transition-all">
                                         <div className="flex items-center gap-4">
                                             <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center group-hover:bg-brand-50 group-hover:text-brand-600 transition-colors">
-                                                {club?.label.includes('שייט') ? <Ship size={24} /> : <Waves size={24} />}
+                                                {club.label.includes('שייט') ? <Ship size={24} /> : <Waves size={24} />}
                                             </div>
                                             <div>
-                                                <h3 className="font-bold text-slate-800">{club?.label}</h3>
-                                                <div className="flex gap-2 items-center mt-1">
-                                                    <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded-full font-bold text-slate-500">
-                                                        {getRoleLabel(m.role, userProfile?.gender || 'MALE' as any)}
-                                                    </span>
-                                                    {isActive ? (
-                                                        <span className="text-[10px] text-green-600 font-bold flex items-center gap-1"><CheckCircle2 size={10} /> מנוי פעיל</span>
-                                                    ) : (
-                                                        <span className="text-[10px] text-amber-500 font-bold flex items-center gap-1"><Clock size={10} /> בהמתנה לאישור</span>
-                                                    )}
-                                                </div>
+                                                <h3 className="font-bold text-slate-800">{club.label}</h3>
+                                                <span className="text-[10px] bg-slate-800 text-white px-2 py-0.5 rounded-full font-bold">מנהל מערכת</span>
                                             </div>
                                         </div>
-                                        
-                                        {(user.isAdmin || isStaff) && isActive && (
-                                            <button 
-                                                onClick={() => handleClubSelect(m.clubId)}
-                                                className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-2xl text-sm font-black transition-all shadow-lg shadow-brand-100"
-                                            >
-                                                כניסה לניהול
-                                            </button>
-                                        )}
+                                        <button 
+                                            onClick={() => handleClubSelect(club.id)}
+                                            className="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-2xl text-sm font-black transition-all shadow-lg"
+                                        >
+                                            כניסה
+                                        </button>
                                     </div>
-                                );
-                            })}
+                                ))
+                            ) : (
+                                // Regular user sees their memberships
+                                memberships.map(m => {
+                                    const club = clubs.find(c => c.id === m.clubId);
+                                    const isStaff = m.role === Role.INSTRUCTOR || m.role === Role.VOLUNTEER;
+                                    const isActive = m.status === MembershipStatus.ACTIVE;
+
+                                    return (
+                                        <div key={m.clubId} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group transition-all">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center group-hover:bg-brand-50 group-hover:text-brand-600 transition-colors">
+                                                    {club?.label.includes('שייט') ? <Ship size={24} /> : <Waves size={24} />}
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold text-slate-800">{club?.label}</h3>
+                                                    <div className="flex gap-2 items-center mt-1">
+                                                        <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded-full font-bold text-slate-500">
+                                                            {getRoleLabel(m.role, userProfile?.gender || 'MALE' as any)}
+                                                        </span>
+                                                        {isActive ? (
+                                                            <span className="text-[10px] text-green-600 font-bold flex items-center gap-1"><CheckCircle2 size={10} /> מנוי פעיל</span>
+                                                        ) : (
+                                                            <span className="text-[10px] text-amber-500 font-bold flex items-center gap-1"><Clock size={10} /> בהמתנה לאישור</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            {isStaff && isActive && (
+                                                <button 
+                                                    onClick={() => handleClubSelect(m.clubId)}
+                                                    className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-2xl text-sm font-black transition-all shadow-lg shadow-brand-100"
+                                                >
+                                                    כניסה לניהול
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            )}
                         </div>
                         
-                        {!user.isAdmin && !memberships.some(m => m.role === Role.INSTRUCTOR || m.role === Role.VOLUNTEER) && (
+                        {!user.isAdmin && memberships.length > 0 && !memberships.some(m => m.role === Role.INSTRUCTOR || m.role === Role.VOLUNTEER) && (
                             <div className="text-center p-4 bg-slate-100/50 rounded-2xl text-slate-500 text-xs italic">
                                 כחבר מועדון, השיבוצים שלך יופיעו כאן ברגע שהאימון יתחיל.
+                            </div>
+                        )}
+
+                        {user.isAdmin && (
+                            <div className="text-center p-4 bg-brand-50 rounded-2xl text-brand-600 text-xs font-bold">
+                                אתה מזוהה כמנהל מערכת ראשי. יש לך גישה מלאה לכל החוגים.
                             </div>
                         )}
                     </div>

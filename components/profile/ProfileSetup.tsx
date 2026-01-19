@@ -3,12 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../store';
 import { saveUserProfile } from '../../services/profileService';
 import { addPersonToClubCloud } from '../../services/syncService';
-import { UserProfile, Gender, GenderLabel, EmergencyContact, Certification, Role, Person } from '../../types';
+// Added MembershipStatus to the imports to resolve the error on line 81
+import { UserProfile, Gender, GenderLabel, EmergencyContact, Certification, Role, Person, MembershipStatus } from '../../types';
 import { User, Phone, Calendar, HeartPulse, Plus, Trash2, Save, LogOut, Mail, ShipWheel, Award, UserCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const ProfileSetup: React.FC = () => {
-  const { user, userProfile, memberships, setUserProfile, logout } = useAppStore();
+  const { user, userProfile, memberships, setUserProfile, logout, activeClub } = useAppStore();
   const navigate = useNavigate();
 
   const initialFirstName = userProfile?.firstName || user?.email.split('@')[0].split('.')[0] || '';
@@ -18,7 +19,7 @@ export const ProfileSetup: React.FC = () => {
   const [lastName, setLastName] = useState(initialLastName);
   const [contactEmail, setContactEmail] = useState(userProfile?.contactEmail || user?.email || '');
   const [gender, setGender] = useState<Gender>(userProfile?.gender || Gender.MALE);
-  const [birthDate, setBirthDate] = useState(userProfile?.birthDate || '');
+  const [birthDate, setBirthDate] = useState(initialLastName === 'מערכת' ? '1990-01-01' : (userProfile?.birthDate || ''));
   const [primaryPhone, setPrimaryPhone] = useState(userProfile?.primaryPhone || '');
   const [medicalNotes, setMedicalNotes] = useState(userProfile?.medicalNotes || '');
   const [isSkipper, setIsSkipper] = useState(userProfile?.isSkipper || false);
@@ -76,9 +77,9 @@ export const ProfileSetup: React.FC = () => {
       await saveUserProfile(newProfile);
       setUserProfile(newProfile);
 
-      // CRITICAL FIX: Ensure the user is added to the "people" list of any club they just joined via Invite (Auto-Approve)
+      // Add to club people list if authorized
       for (const m of memberships) {
-          if (m.status === 'ACTIVE') {
+          if (m.status === MembershipStatus.ACTIVE) {
               const personData: Person = {
                   id: user.uid,
                   clubId: m.clubId,
@@ -94,6 +95,18 @@ export const ProfileSetup: React.FC = () => {
           }
       }
 
+      // REDIRECT LOGIC FIX:
+      // If Super Admin, go to management app if a club is selected, otherwise to super dashboard
+      if (user.isAdmin) {
+          if (activeClub) {
+              navigate('/app');
+          } else {
+              navigate('/super-admin');
+          }
+          return;
+      }
+
+      // Regular members/staff go to landing to see their portal
       navigate('/');
     } catch (err: any) {
       console.error("Profile save error:", err);
@@ -140,6 +153,16 @@ export const ProfileSetup: React.FC = () => {
                     <p className="font-bold text-blue-900 text-sm">{user?.email}</p>
                 </div>
             </div>
+
+            {user?.isAdmin && (
+                 <div className="bg-slate-800 p-4 rounded-2xl text-white flex items-center gap-3">
+                    <UserCircle2 className="text-brand-400" size={20} />
+                    <div>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">זיהוי מערכת</p>
+                        <p className="font-bold text-sm text-white">מנהל מערכת ראשי (Super Admin)</p>
+                    </div>
+                </div>
+            )}
 
             {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex items-start gap-3 text-sm font-bold">

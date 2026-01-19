@@ -28,17 +28,18 @@ const ProtectedAppRoute: React.FC<{ children: React.ReactNode }> = ({ children }
       return <Navigate to="/profile-setup" />;
   }
 
-  // If user is not Super Admin, check membership
-  if (!user.isAdmin) {
-      const clubExists = clubs.some(c => c.id === activeClub);
-      const membership = memberships.find(m => m.clubId === activeClub && m.status !== 'INACTIVE');
-      
-      // SECURITY FIX: Block regular members and guests from dashboard
-      const isStaff = membership && (membership.role === Role.INSTRUCTOR || membership.role === Role.VOLUNTEER);
+  // If user is Super Admin, they have bypass access to everything management-related
+  if (user.isAdmin) {
+      return <>{children}</>;
+  }
 
-      if (!activeClub || !clubExists || !isStaff) {
-          return <Navigate to="/" />;
-      }
+  // Regular users need staff role and active status for a specific club
+  const clubExists = clubs.some(c => c.id === activeClub);
+  const membership = memberships.find(m => m.clubId === activeClub && m.status !== 'INACTIVE');
+  const isStaff = membership && (membership.role === Role.INSTRUCTOR || membership.role === Role.VOLUNTEER);
+
+  if (!activeClub || !clubExists || !isStaff) {
+      return <Navigate to="/" />;
   }
   
   return <>{children}</>;
