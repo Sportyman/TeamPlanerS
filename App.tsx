@@ -15,7 +15,7 @@ import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, Clipboa
 import { APP_VERSION, Role } from './types';
 import { triggerCloudSync, fetchFromCloud, fetchGlobalConfig } from './services/syncService';
 import { auth } from './firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 const ProtectedAppRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, userProfile, activeClub, clubs, authInitialized, memberships } = useAppStore();
@@ -28,12 +28,10 @@ const ProtectedAppRoute: React.FC<{ children: React.ReactNode }> = ({ children }
       return <Navigate to="/profile-setup" />;
   }
 
-  // If user is Super Admin, they have bypass access to everything management-related
   if (user.isAdmin) {
       return <>{children}</>;
   }
 
-  // Regular users need staff role and active status for a specific club
   const clubExists = clubs.some(c => c.id === activeClub);
   const membership = memberships.find(m => m.clubId === activeClub && m.status !== 'INACTIVE');
   const isStaff = membership && (membership.role === Role.INSTRUCTOR || membership.role === Role.VOLUNTEER);
@@ -228,15 +226,18 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const App: React.FC = () => {
-  const { loadUserResources, setAuthInitialized, superAdmins, protectedAdmins, user } = useAppStore();
+  const { loadUserResources, setAuthInitialized, superAdmins, protectedAdmins, permissions, setAuthError, logout } = useAppStore();
 
   useEffect(() => {
     fetchGlobalConfig();
     
-    // Auth Listener
+    // Auth Listener with Gatekeeper logic
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-        const currentUser = useAppStore.getState().user;
+        const state = useAppStore.getState();
+        const currentUser = state.user;
+        const currentPath = window.location.hash; // Using HashRouter
         
+        // Prevent dev user from being cleared
         if (currentUser && currentUser.isDev) {
             setAuthInitialized(true);
             return;
@@ -244,19 +245,34 @@ const App: React.FC = () => {
 
         if (firebaseUser) {
             const email = firebaseUser.email?.toLowerCase().trim() || '';
-            const isSuperAdmin = superAdmins.some(a => a.toLowerCase() === email) || 
-                               protectedAdmins.some(a => a.toLowerCase() === email);
-                               
-            useAppStore.setState({ 
-                user: { 
-                    uid: firebaseUser.uid, 
-                    email: email, 
-                    isAdmin: isSuperAdmin, 
-                    photoURL: firebaseUser.photoURL || undefined,
-                    isDev: false
-                } 
-            });
-            await loadUserResources(firebaseUser.uid);
+            const isSuperAdmin = state.superAdmins.some(a => a.toLowerCase() === email) || 
+                               state.protectedAdmins.some(a => a.toLowerCase() === email);
+            
+            // Check if user is in Whitelist (Super Admin or defined in Permissions)
+            const isStaff = state.permissions.some(p => p.email.toLowerCase() === email);
+            const isAuthorized = isSuperAdmin || isStaff;
+
+            // GATEKEEPER: If not authorized AND NOT on an invite link -> KICK OUT
+            const isInvitePath = currentPath.includes('/join/');
+            
+            if (!isAuthorized && !isInvitePath) {
+                console.warn("Unauthorized access attempt from main page:", email);
+                setAuthError("הגישה למנהלים מורשים בלבד. אם ברצונך להצטרף כחבר, אנא השתמש בלינק הזמנה.");
+                await signOut(auth);
+                useAppStore.setState({ user: null, userProfile: null, memberships: [] });
+            } else {
+                // Authorized or on Invite Path
+                useAppStore.setState({ 
+                    user: { 
+                        uid: firebaseUser.uid, 
+                        email: email, 
+                        isAdmin: isSuperAdmin, 
+                        photoURL: firebaseUser.photoURL || undefined,
+                        isDev: false
+                    } 
+                });
+                await loadUserResources(firebaseUser.uid);
+            }
         } else {
             const current = useAppStore.getState().user;
             if (!current || !current.isDev) {
@@ -267,7 +283,7 @@ const App: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [superAdmins, protectedAdmins]);
+  }, [superAdmins, protectedAdmins, permissions]);
 
   return (
     <Router>

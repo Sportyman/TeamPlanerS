@@ -17,7 +17,8 @@ export const fetchGlobalConfig = async () => {
             const data = docSnap.data();
             setGlobalConfig({
                 superAdmins: data.superAdmins || [],
-                protectedAdmins: data.protectedAdmins || []
+                protectedAdmins: data.protectedAdmins || [],
+                permissions: data.permissions || []
             });
         }
     } catch (error) {
@@ -43,7 +44,7 @@ export const addPersonToClubCloud = async (clubId: ClubID, person: Person) => {
 
 export const syncToCloud = async (clubId: ClubID) => {
     const state = useAppStore.getState();
-    const { people, sessions, clubSettings, snapshots, user, setSyncStatus, superAdmins } = state;
+    const { people, sessions, clubSettings, snapshots, user, setSyncStatus, superAdmins, permissions } = state;
 
     if (!user || !clubId || user.isDev) {
         if (user?.isDev) setSyncStatus('SYNCED'); 
@@ -82,7 +83,8 @@ export const syncToCloud = async (clubId: ClubID) => {
         if (user.isAdmin) {
             const configDocRef = doc(db, 'config', 'global');
             await setDoc(configDocRef, {
-                superAdmins: superAdmins
+                superAdmins,
+                permissions // Sync staff list as well
             }, { merge: true });
         }
         

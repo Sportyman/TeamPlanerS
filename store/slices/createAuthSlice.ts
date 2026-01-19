@@ -14,6 +14,7 @@ export interface AuthSlice {
   protectedAdmins: string[];
   permissions: UserPermission[];
   authInitialized: boolean;
+  authError: string | null;
 
   loginWithGoogle: () => Promise<boolean>;
   loginDev: (email: string, isAdmin: boolean) => boolean;
@@ -21,6 +22,7 @@ export interface AuthSlice {
   setUserProfile: (profile: UserProfile) => void;
   loadUserResources: (uid: string) => Promise<void>;
   setAuthInitialized: (initialized: boolean) => void;
+  setAuthError: (error: string | null) => void;
   refreshMemberships: () => Promise<void>;
   addSuperAdmin: (email: string) => void;
   removeSuperAdmin: (email: string) => void;
@@ -36,8 +38,10 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
   protectedAdmins: [],
   permissions: [],
   authInitialized: false,
+  authError: null,
 
   loginWithGoogle: async () => {
+    set({ authError: null });
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const email = result.user.email?.toLowerCase().trim() || '';
@@ -52,11 +56,13 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
       return true;
     } catch (error) {
       console.error("Login error:", error);
+      set({ authError: 'התחברות בוטלה או נכשלה.' });
       return false;
     }
   },
 
   loginDev: (email, isAdmin) => {
+    set({ authError: null });
     const uid = 'dev-user-' + Date.now();
     const devEmail = email || 'dev@example.com';
     const { activeClub } = get();
@@ -77,7 +83,6 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
       joinedSystemDate: new Date().toISOString()
     };
 
-    // Create a mock membership if there is an active club to prevent redirect to landing
     const mockMemberships: ClubMembership[] = activeClub ? [{
         uid,
         clubId: activeClub,
@@ -105,6 +110,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
   setUserProfile: (profile) => set({ userProfile: profile }),
 
   loadUserResources: async (uid) => {
+    if (uid.startsWith('dev-user-')) return;
     try {
       const profile = await getUserProfile(uid);
       const memberships = await getUserMemberships(uid);
@@ -115,6 +121,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
   },
 
   setAuthInitialized: (val) => set({ authInitialized: val }),
+  setAuthError: (err) => set({ authError: err }),
 
   refreshMemberships: async () => {
     const { user } = get();

@@ -2,32 +2,30 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../store';
-import { ShieldCheck, Mail, Zap, AlertTriangle, ArrowRight, Loader2 } from 'lucide-react';
+import { ShieldCheck, Mail, Zap, AlertTriangle, ArrowRight, Loader2, ShieldAlert } from 'lucide-react';
 import { APP_VERSION } from '../types';
 
 export const Login: React.FC = () => {
-  const { loginWithGoogle, loginDev, user, activeClub, clubs } = useAppStore();
+  const { loginWithGoogle, loginDev, user, activeClub, clubs, authError, setAuthError } = useAppStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [emailInput, setEmailInput] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+  const [localError, setLocalError] = useState('');
   const [isRedirecting, setIsRedirecting] = useState(false);
   
   const isAdminLogin = searchParams.get('admin') === 'true';
   const currentClubLabel = activeClub ? clubs.find(c => c.id === activeClub)?.label : '';
 
-  // Improved Redirect Logic based on dynamic isAdmin flag
   useEffect(() => {
     if (user) {
       if (isAdminLogin) {
           if (user.isAdmin) {
               navigate('/super-admin');
           } else {
-              setErrorMsg('אינך מורשה לגשת למערכת הניהול הראשי.');
+              setLocalError('אינך מורשה לגשת למערכת הניהול הראשי.');
               setIsRedirecting(false);
           }
       } else {
-          // Standard club login
           if (activeClub) {
              navigate('/app');
           } else {
@@ -39,38 +37,40 @@ export const Login: React.FC = () => {
 
   const handleGoogleLogin = async () => {
       setIsRedirecting(true);
-      setErrorMsg('');
+      setLocalError('');
+      setAuthError(null);
       const success = await loginWithGoogle();
       if (!success) {
           setIsRedirecting(false);
-          setErrorMsg('התחברות נכשלה או שאין לך הרשאות מתאימות.');
+          // General errors are handled by localError, specific kick-outs are handled by authError
       }
   };
 
   const handleDevLogin = (e: React.FormEvent) => {
       e.preventDefault();
-      setErrorMsg('');
+      setLocalError('');
+      setAuthError(null);
       setIsRedirecting(true);
-      
-      // Free dev login: if they are in admin mode, we grant them admin status for development.
       const success = loginDev(emailInput.trim(), isAdminLogin);
       if (!success) {
           setIsRedirecting(false);
-          setErrorMsg('שגיאה בתהליך ההתחברות.');
+          setLocalError('שגיאה בתהליך ההתחברות.');
       }
   };
 
-  if (isRedirecting && !errorMsg) {
+  if (isRedirecting && !localError && !authError) {
       return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
               <div className="bg-white p-8 rounded-2xl shadow-xl flex flex-col items-center animate-in fade-in zoom-in duration-300">
                   <Loader2 size={48} className="text-brand-600 animate-spin mb-4" />
                   <h2 className="text-xl font-bold text-slate-800">מתחבר למערכת...</h2>
-                  <p className="text-slate-500 text-sm mt-2">אנא המתן</p>
+                  <p className="text-slate-500 text-sm mt-2">בודק הרשאות כניסה</p>
               </div>
           </div>
       );
   }
+
+  const combinedError = localError || authError;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4 animate-in fade-in duration-500">
@@ -78,7 +78,7 @@ export const Login: React.FC = () => {
         
         <div className="text-center relative">
           <button 
-             onClick={() => navigate('/')} 
+             onClick={() => { setAuthError(null); navigate('/'); }} 
              className="absolute right-0 -top-2 p-2 text-slate-400 hover:text-brand-600 hover:bg-slate-50 rounded-full transition-all"
              title="חזרה לדף הראשי"
           >
@@ -97,10 +97,10 @@ export const Login: React.FC = () => {
           </p>
         </div>
 
-        {errorMsg && (
-            <div className="flex items-center gap-3 text-red-600 bg-red-50 p-4 rounded-xl text-sm font-bold animate-in slide-in-from-top-2">
-                <AlertTriangle size={20} />
-                {errorMsg}
+        {combinedError && (
+            <div className={`flex items-start gap-3 p-4 rounded-xl text-sm font-bold animate-in slide-in-from-top-2 ${authError ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                {authError ? <ShieldAlert size={20} className="shrink-0" /> : <AlertTriangle size={20} className="shrink-0" />}
+                <span>{combinedError}</span>
             </div>
         )}
 

@@ -1,7 +1,7 @@
 
 import { StateCreator } from 'zustand';
 import { AppState, EMPTY_SESSION, createInventoryFromDefs } from '../store';
-import { Club, ClubID, Person, ClubSettings, SyncStatus, BoatDefinition } from '../../types';
+import { Club, ClubID, Person, ClubSettings, SyncStatus, BoatDefinition, UserPermission } from '../../types';
 import { DEFAULT_CLUBS, INITIAL_PEOPLE, KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from '../../mockData';
 
 export interface GlobalSlice {
@@ -13,7 +13,7 @@ export interface GlobalSlice {
 
   setActiveClub: (clubId: ClubID) => void;
   setSyncStatus: (status: SyncStatus) => void;
-  setGlobalConfig: (config: { superAdmins: string[], protectedAdmins?: string[] }) => void;
+  setGlobalConfig: (config: { superAdmins: string[], protectedAdmins?: string[], permissions?: UserPermission[] }) => void;
   addClub: (label: string) => void;
   removeClub: (id: string) => void;
   setCloudData: (data: any) => void;
@@ -41,7 +41,8 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
   
   setGlobalConfig: (config) => set({ 
       superAdmins: config.superAdmins.map(a => a.toLowerCase().trim()),
-      protectedAdmins: (config.protectedAdmins || []).map(a => a.toLowerCase().trim())
+      protectedAdmins: (config.protectedAdmins || []).map(a => a.toLowerCase().trim()),
+      permissions: config.permissions || []
   }),
 
   addClub: (label) => set(state => {
