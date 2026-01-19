@@ -1,5 +1,4 @@
 
-
 export enum Role {
   INSTRUCTOR = 'INSTRUCTOR',
   VOLUNTEER = 'VOLUNTEER',
@@ -7,13 +6,11 @@ export enum Role {
   GUEST = 'GUEST',
 }
 
-// Renamed Sex to Gender to fix import errors in Dashboard and PublicPairingView
 export enum Gender {
   MALE = 'MALE',
   FEMALE = 'FEMALE',
 }
 
-// Renamed SexLabel to GenderLabel
 export const GenderLabel: Record<Gender, string> = {
   [Gender.MALE]: 'זכר',
   [Gender.FEMALE]: 'נקבה',
@@ -39,15 +36,18 @@ export interface Certification {
 
 export interface UserProfile {
   uid: string;
-  fullName: string;
-  email: string;
+  firstName: string;
+  lastName: string;
+  email: string; // Google Email (Read-only reference)
+  contactEmail: string; // User editable contact email
   photoURL?: string;
-  gender: Gender; // Renamed from sex to gender to match naming conventions
+  gender: Gender;
   birthDate: string; // ISO
   primaryPhone: string;
   emergencyContacts: EmergencyContact[];
-  medicalNotes: string;
+  medicalNotes?: string; // Optional
   certifications: Certification[];
+  isSkipper: boolean; // Direct flag for easier logic
   joinedSystemDate: string; // ISO
 }
 
@@ -61,7 +61,6 @@ export interface ClubMembership {
   clubSpecificNotes?: string;
 }
 
-// Updated to use Gender instead of Sex
 export const getRoleLabel = (role: Role, gender: Gender): string => {
     const labels: Record<Role, { [key in Gender]: string }> = {
         [Role.INSTRUCTOR]: { [Gender.MALE]: 'מדריך', [Gender.FEMALE]: 'מדריכה' },
@@ -129,7 +128,7 @@ export interface UserPermission {
   allowedClubs: ClubID[];
 }
 
-export const APP_VERSION = '4.0.0'; // Infrastructure Update: Global User Profiles
+export const APP_VERSION = '4.1.0'; // Updated for split name and certifications logic
 
 export const TEAM_COLORS = [
   'bg-blue-50 border-blue-200',      
@@ -156,7 +155,7 @@ export interface Person {
   id: string;
   clubId: ClubID;
   name: string;
-  gender: Gender; // Renamed from sex to gender to match naming conventions
+  gender: Gender;
   tags?: string[];
   phone?: string;
   role: Role;
