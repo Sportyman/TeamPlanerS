@@ -31,7 +31,11 @@ export const syncToCloud = async (clubId: ClubID) => {
     const state = useAppStore.getState();
     const { people, sessions, clubSettings, snapshots, user, setSyncStatus, superAdmins } = state;
 
-    if (!user || !clubId) return;
+    // Skip sync if user is not logged in OR is a Dev User (avoids Permission Denied errors)
+    if (!user || !clubId || user.isDev) {
+        if (user?.isDev) setSyncStatus('SYNCED'); 
+        return;
+    }
 
     // Filter people for this club
     const clubPeople = people.filter(p => p.clubId === clubId);
@@ -55,7 +59,6 @@ export const syncToCloud = async (clubId: ClubID) => {
         }, { merge: true });
 
         // If user is admin, also sync the global admin list
-        // Note: Security rules should protect 'protectedAdmins' from being overwritten via SDK if implemented correctly
         if (user.isAdmin) {
             const configDocRef = doc(db, 'config', 'global');
             await setDoc(configDocRef, {
@@ -71,7 +74,14 @@ export const syncToCloud = async (clubId: ClubID) => {
 };
 
 export const fetchFromCloud = async (clubId: ClubID) => {
-    const { setCloudData, setSyncStatus } = useAppStore.getState();
+    const { setCloudData, setSyncStatus, user } = useAppStore.getState();
+    
+    // Skip fetch for Dev Users
+    if (!user || user.isDev) {
+        if (user?.isDev) setSyncStatus('SYNCED');
+        return;
+    }
+
     setSyncStatus('SYNCING');
 
     try {
@@ -87,7 +97,7 @@ export const fetchFromCloud = async (clubId: ClubID) => {
                 snapshots: { [clubId]: data.snapshots as PersonSnapshot[] || [] }
             });
         } else {
-            setSyncStatus('SYNCED'); // Nothing to fetch
+            setSyncStatus('SYNCED'); 
         }
     } catch (error) {
         console.error("Cloud Fetch Error:", error);

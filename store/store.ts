@@ -28,7 +28,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'etgarim-storage',
-      version: 43.0, 
+      version: 44.0, 
       partialize: (state) => ({
         user: state.user,
         userProfile: state.userProfile,

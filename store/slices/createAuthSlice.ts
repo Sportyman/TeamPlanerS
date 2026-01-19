@@ -4,10 +4,10 @@ import { AppState } from '../store';
 import { auth, googleProvider } from '../../firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { getUserProfile, getUserMemberships } from '../../services/profileService';
-import { UserProfile, ClubMembership, UserPermission, ClubID } from '../../types';
+import { UserProfile, ClubMembership, UserPermission, ClubID, Gender } from '../../types';
 
 export interface AuthSlice {
-  user: { uid: string; email: string; isAdmin: boolean; photoURL?: string } | null;
+  user: { uid: string; email: string; isAdmin: boolean; photoURL?: string; isDev?: boolean } | null;
   userProfile: UserProfile | null;
   memberships: ClubMembership[];
   superAdmins: string[];
@@ -47,7 +47,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
       const isSuperAdmin = superAdmins.some(a => a.toLowerCase() === email) || 
                          protectedAdmins.some(a => a.toLowerCase() === email);
 
-      set({ user: { uid, email, isAdmin: isSuperAdmin, photoURL: result.user.photoURL || undefined } });
+      set({ user: { uid, email, isAdmin: isSuperAdmin, photoURL: result.user.photoURL || undefined, isDev: false } });
       await get().loadUserResources(uid);
       return true;
     } catch (error) {
@@ -57,13 +57,36 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
   },
 
   loginDev: (email, isAdmin) => {
-    const uid = 'dev-' + Date.now();
-    set({ user: { uid, email: email || 'dev@example.com', isAdmin, photoURL: undefined }, authInitialized: true });
+    const uid = 'dev-user-' + Date.now();
+    const devEmail = email || 'dev@example.com';
+    
+    const mockProfile: UserProfile = {
+      uid,
+      firstName: 'מפתח',
+      lastName: 'מערכת',
+      email: devEmail,
+      contactEmail: devEmail,
+      gender: Gender.MALE,
+      birthDate: '1990-01-01',
+      primaryPhone: '050-000-0000',
+      emergencyContacts: [],
+      medicalNotes: 'חשבון פיתוח - כניסה מהירה',
+      certifications: [],
+      isSkipper: true,
+      joinedSystemDate: new Date().toISOString()
+    };
+
+    set({ 
+      user: { uid, email: devEmail, isAdmin, photoURL: undefined, isDev: true }, 
+      userProfile: mockProfile,
+      authInitialized: true 
+    });
+    
     return true;
   },
 
   logout: async () => {
-    await signOut(auth);
+    try { await signOut(auth); } catch(e) {}
     set({ user: null, userProfile: null, memberships: [], activeClub: null });
   },
 
@@ -83,7 +106,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
   refreshMemberships: async () => {
     const { user } = get();
-    if (user) {
+    if (user && !user.isDev) {
       const ms = await getUserMemberships(user.uid);
       set({ memberships: ms });
     }

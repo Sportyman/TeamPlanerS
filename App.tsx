@@ -1,4 +1,5 @@
 
+// Fix: Import React as a default import instead of a named import to resolve compilation error.
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from './store';
@@ -199,13 +200,20 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const App: React.FC = () => {
-  const { loadUserResources, setAuthInitialized, superAdmins, protectedAdmins } = useAppStore();
+  const { loadUserResources, setAuthInitialized, superAdmins, protectedAdmins, user } = useAppStore();
 
   useEffect(() => {
     fetchGlobalConfig();
     
-    // Auth Listener with background resource loading
+    // Auth Listener
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        // CRITICAL: If we have a Dev User manually logged in, DO NOT let Firebase wipe the session.
+        const currentUser = useAppStore.getState().user;
+        if (currentUser && currentUser.isDev) {
+            setAuthInitialized(true);
+            return;
+        }
+
         if (firebaseUser) {
             const email = firebaseUser.email?.toLowerCase().trim() || '';
             const isSuperAdmin = superAdmins.some(a => a.toLowerCase() === email) || 
@@ -216,12 +224,13 @@ const App: React.FC = () => {
                     uid: firebaseUser.uid, 
                     email: email, 
                     isAdmin: isSuperAdmin, 
-                    photoURL: firebaseUser.photoURL || undefined 
+                    photoURL: firebaseUser.photoURL || undefined,
+                    isDev: false
                 } 
             });
             await loadUserResources(firebaseUser.uid);
         } else {
-            // Explicitly logged out, clear store
+            // Only clear if we are not in Dev Mode
             useAppStore.setState({ user: null, userProfile: null, memberships: [] });
         }
         setAuthInitialized(true);

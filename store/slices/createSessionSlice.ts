@@ -2,6 +2,7 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../store';
 import { ClubID, SessionState, BoatInventory, BoatDefinition, PersonSnapshot } from '../../types';
+import { KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from '../../mockData';
 
 export interface SessionSlice {
   sessions: Record<ClubID, SessionState>;
@@ -18,14 +19,27 @@ export interface SessionSlice {
   deleteSnapshot: (snapshotId: string) => void;
 }
 
+// Helper to create initial inventory for default clubs
+const createInitialInventory = (defs: BoatDefinition[]): BoatInventory => {
+    const inv: BoatInventory = {};
+    defs.forEach(d => inv[d.id] = d.defaultCount);
+    return inv;
+};
+
+const INITIAL_EMPTY_SESSION = { inventory: {}, presentPersonIds: [], teams: [] };
+
 export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = (set, get) => ({
-  sessions: {},
+  // Initialize with default clubs' sessions to prevent 'Data missing' errors
+  sessions: {
+    'KAYAK': { ...INITIAL_EMPTY_SESSION, inventory: createInitialInventory(KAYAK_DEFINITIONS) },
+    'SAILING': { ...INITIAL_EMPTY_SESSION, inventory: createInitialInventory(SAILING_DEFINITIONS) }
+  },
   snapshots: {},
 
   toggleAttendance: (id) => set((state) => {
     const { activeClub } = state;
     if (!activeClub) return state;
-    const currentSession = state.sessions[activeClub];
+    const currentSession = state.sessions[activeClub] || { ...INITIAL_EMPTY_SESSION };
     const isPresent = currentSession.presentPersonIds.includes(id);
     const newPresent = isPresent ? currentSession.presentPersonIds.filter(pid => pid !== id) : [...currentSession.presentPersonIds, id];
     return { sessions: { ...state.sessions, [activeClub]: { ...currentSession, presentPersonIds: newPresent } } };
@@ -34,13 +48,15 @@ export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = 
   setBulkAttendance: (ids) => set((state) => {
     const { activeClub } = state;
     if (!activeClub) return state;
-    return { sessions: { ...state.sessions, [activeClub]: { ...state.sessions[activeClub], presentPersonIds: ids } } };
+    const currentSession = state.sessions[activeClub] || { ...INITIAL_EMPTY_SESSION };
+    return { sessions: { ...state.sessions, [activeClub]: { ...currentSession, presentPersonIds: ids } } };
   }),
 
   updateInventory: (inventory) => set((state) => {
     const { activeClub } = state;
     if (!activeClub) return state;
-    return { sessions: { ...state.sessions, [activeClub]: { ...state.sessions[activeClub], inventory } } };
+    const currentSession = state.sessions[activeClub] || { ...INITIAL_EMPTY_SESSION };
+    return { sessions: { ...state.sessions, [activeClub]: { ...currentSession, inventory } } };
   }),
 
   addBoatDefinition: (def) => set((state) => {
@@ -48,7 +64,7 @@ export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = 
     if (!activeClub) return state;
     const currentSettings = state.clubSettings[activeClub];
     const newDefs = [...currentSettings.boatDefinitions, def];
-    const currentSession = state.sessions[activeClub];
+    const currentSession = state.sessions[activeClub] || { ...INITIAL_EMPTY_SESSION };
     const newInventory = { ...currentSession.inventory, [def.id]: def.defaultCount };
     return {
         clubSettings: { ...state.clubSettings, [activeClub]: { ...currentSettings, boatDefinitions: newDefs } },
@@ -73,7 +89,7 @@ export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = 
     if (!activeClub) return state;
     const currentSettings = state.clubSettings[activeClub];
     const newDefs = currentSettings.boatDefinitions.filter(d => d.id !== boatId);
-    const currentSession = state.sessions[activeClub];
+    const currentSession = state.sessions[activeClub] || { ...INITIAL_EMPTY_SESSION };
     const newInventory = { ...currentSession.inventory };
     delete newInventory[boatId];
     return {
