@@ -1,5 +1,4 @@
 
-
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { 
@@ -43,6 +42,7 @@ interface AppState {
   
   // Auth Actions
   loginWithGoogle: () => Promise<boolean>;
+  loginDev: (email: string, isAdmin: boolean) => boolean;
   logout: () => Promise<void>;
   setUserProfile: (profile: UserProfile) => void;
   refreshMemberships: () => Promise<void>;
@@ -158,6 +158,12 @@ export const useAppStore = create<AppState>()(
         }
       },
 
+      loginDev: (email, isAdmin) => {
+          const uid = 'dev-' + Date.now();
+          set({ user: { uid, email: email || 'dev@example.com', isAdmin, photoURL: undefined } });
+          return true;
+      },
+
       setUserProfile: (profile) => set({ userProfile: profile }),
 
       refreshMemberships: async () => {
@@ -174,7 +180,7 @@ export const useAppStore = create<AppState>()(
       },
 
       setActiveClub: (clubId) => set({ activeClub: clubId }),
-      setSyncStatus: (status) => set({ setSyncStatus: status }),
+      setSyncStatus: (status) => set({ syncStatus: status }),
       
       setGlobalConfig: (config) => set({ 
           superAdmins: config.superAdmins.map(a => a.toLowerCase().trim()),
@@ -461,7 +467,7 @@ export const useAppStore = create<AppState>()(
             name: name,
             role: Role.GUEST,
             rank: 1,
-            gender: Gender.MALE, // Updated to Gender
+            gender: Gender.MALE, 
             tags: [],
             notes: 'Manual'
         };
