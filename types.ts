@@ -11,6 +11,9 @@ export enum Gender {
   FEMALE = 'FEMALE',
 }
 
+// Added missing GenderPrefType
+export type GenderPrefType = 'NONE' | 'MALE' | 'FEMALE';
+
 export const GenderLabel: Record<Gender, string> = {
   [Gender.MALE]: 'זכר',
   [Gender.FEMALE]: 'נקבה',
@@ -38,17 +41,17 @@ export interface UserProfile {
   uid: string;
   firstName: string;
   lastName: string;
-  email: string; // Google Email (Read-only reference)
-  contactEmail: string; // User editable contact email
+  email: string; 
+  contactEmail: string; 
   photoURL?: string;
   gender: Gender;
-  birthDate: string; // ISO
+  birthDate: string; 
   primaryPhone: string;
   emergencyContacts: EmergencyContact[];
-  medicalNotes?: string; // Optional
+  medicalNotes?: string; 
   certifications: Certification[];
-  isSkipper: boolean; // Direct flag for easier logic
-  joinedSystemDate: string; // ISO
+  isSkipper: boolean; 
+  joinedSystemDate: string; 
 }
 
 export interface ClubMembership {
@@ -56,10 +59,12 @@ export interface ClubMembership {
   clubId: ClubID;
   role: Role;
   status: MembershipStatus;
-  joinedClubDate: string; // ISO
+  joinedClubDate: string; 
   rank: number;
   clubSpecificNotes?: string;
 }
+
+export type InviteType = 'AUTO_APPROVE' | 'REQUIRE_APPROVAL';
 
 export const getRoleLabel = (role: Role, gender: Gender): string => {
     const labels: Record<Role, { [key in Gender]: string }> = {
@@ -71,33 +76,25 @@ export const getRoleLabel = (role: Role, gender: Gender): string => {
     return labels[role][gender] || labels[role][Gender.MALE];
 };
 
-export type GenderPrefType = 'NONE' | 'MALE' | 'FEMALE';
-export type ConstraintStrength = 'NONE' | 'MUST' | 'PREFER';
+export type ClubID = string; 
+export interface Club { id: ClubID; label: string; }
 
-export interface GenderConstraint {
-    type: GenderPrefType;
-    strength: ConstraintStrength;
+// Added missing DefaultBoatTypes and BoatType
+export enum DefaultBoatTypes {
+  DOUBLE = 'DOUBLE',
+  SINGLE = 'SINGLE',
+  PRIVATE = 'PRIVATE'
 }
 
-export const GenderPrefLabels: Record<GenderPrefType, string> = {
-    'NONE': 'ללא העדפה',
-    'MALE': 'גברים בלבד',
-    'FEMALE': 'נשים בלבד'
-};
-
 export type BoatType = string;
-
-export const DefaultBoatTypes = {
-  DOUBLE: 'DOUBLE',
-  SINGLE: 'SINGLE',
-  PRIVATE: 'PRIVATE'
-};
 
 export const BoatTypeLabel: Record<string, string> = {
   [DefaultBoatTypes.DOUBLE]: 'קיאק זוגי',
   [DefaultBoatTypes.SINGLE]: 'קיאק יחיד',
-  [DefaultBoatTypes.PRIVATE]: 'פרטי'
+  [DefaultBoatTypes.PRIVATE]: 'פרטי',
 };
+
+export interface ClubSettings { boatDefinitions: BoatDefinition[]; }
 
 export interface BoatDefinition {
   id: string;
@@ -108,86 +105,33 @@ export interface BoatDefinition {
   minSkippers?: number;
 }
 
-export interface BoatInventory {
-  [boatTypeId: string]: number;
-}
+export interface BoatInventory { [boatTypeId: string]: number; }
+export interface UserPermission { email: string; allowedClubs: ClubID[]; }
 
-export type ClubID = string; 
-
-export interface Club {
-    id: ClubID;
-    label: string;
-}
-
-export interface ClubSettings {
-  boatDefinitions: BoatDefinition[];
-}
-
-export interface UserPermission {
-  email: string;
-  allowedClubs: ClubID[];
-}
-
-export const APP_VERSION = '4.1.0'; // Updated for split name and certifications logic
+export const APP_VERSION = '4.2.0'; 
 
 export const TEAM_COLORS = [
-  'bg-blue-50 border-blue-200',      
-  'bg-orange-50 border-orange-200',  
-  'bg-purple-50 border-purple-200',  
-  'bg-yellow-50 border-yellow-200',  
-  'bg-teal-50 border-teal-200',      
-  'bg-red-50 border-red-200',        
-  'bg-indigo-50 border-indigo-200',  
-  'bg-amber-50 border-amber-200',    
-  'bg-cyan-50 border-cyan-200',      
-  'bg-rose-50 border-rose-200',      
-  'bg-emerald-50 border-emerald-200',
-  'bg-fuchsia-50 border-fuchsia-200',
-  'bg-slate-50 border-slate-200',    
-  'bg-lime-50 border-lime-200',      
-  'bg-violet-50 border-violet-200',  
-  'bg-pink-50 border-pink-200',      
-  'bg-sky-50 border-sky-200',        
-  'bg-green-50 border-green-200',    
+  'bg-blue-50 border-blue-200', 'bg-orange-50 border-orange-200', 'bg-purple-50 border-purple-200',  
+  'bg-yellow-50 border-yellow-200', 'bg-teal-50 border-teal-200', 'bg-red-50 border-red-200',        
+  'bg-indigo-50 border-indigo-200', 'bg-amber-50 border-amber-200', 'bg-cyan-50 border-cyan-200',      
+  'bg-rose-50 border-rose-200', 'bg-emerald-50 border-emerald-200', 'bg-fuchsia-50 border-fuchsia-200',
+  'bg-slate-50 border-slate-200', 'bg-lime-50 border-lime-200', 'bg-violet-50 border-violet-200',  
+  'bg-pink-50 border-pink-200', 'bg-sky-50 border-sky-200', 'bg-green-50 border-green-200',    
 ];
 
 export interface Person {
-  id: string;
-  clubId: ClubID;
-  name: string;
-  gender: Gender;
-  tags?: string[];
-  phone?: string;
-  role: Role;
-  rank: number;
-  notes?: string;
-  isSkipper?: boolean;
-  preferredBoatType?: string; 
-  genderConstraint?: GenderConstraint;
-  mustPairWith?: string[];   
-  preferPairWith?: string[]; 
-  cannotPairWith?: string[]; 
+  id: string; clubId: ClubID; name: string; gender: Gender; tags?: string[]; phone?: string;
+  role: Role; rank: number; notes?: string; isSkipper?: boolean; preferredBoatType?: string; 
+  genderConstraint?: { type: GenderPrefType; strength: 'NONE' | 'MUST' | 'PREFER'; };
+  mustPairWith?: string[]; preferPairWith?: string[]; cannotPairWith?: string[]; 
 }
 
+// Added missing PersonSnapshot
 export interface PersonSnapshot {
-  id: string;
-  name: string;
-  date: string;
+  timestamp: string;
   people: Person[];
 }
 
-export interface Team {
-  id: string;
-  members: Person[];
-  boatType: BoatType;
-  boatCount: number;
-  warnings?: string[];
-}
-
-export interface SessionState {
-  inventory: BoatInventory;
-  presentPersonIds: string[];
-  teams: Team[];
-}
-
+export interface Team { id: string; members: Person[]; boatType: string; boatCount: number; warnings?: string[]; }
+export interface SessionState { inventory: BoatInventory; presentPersonIds: string[]; teams: Team[]; }
 export type SyncStatus = 'SYNCED' | 'SYNCING' | 'OFFLINE' | 'ERROR';
