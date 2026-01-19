@@ -27,6 +27,7 @@ interface AppState {
   activeClub: ClubID | null;
   pairingDirty: boolean; 
   syncStatus: SyncStatus;
+  authInitialized: boolean;
   
   clubs: Club[];
   superAdmins: string[]; 
@@ -46,6 +47,7 @@ interface AppState {
   logout: () => Promise<void>;
   setUserProfile: (profile: UserProfile) => void;
   loadUserResources: (uid: string) => Promise<void>;
+  setAuthInitialized: (initialized: boolean) => void;
   refreshMemberships: () => Promise<void>;
   
   setActiveClub: (clubId: ClubID) => void;
@@ -112,6 +114,7 @@ export const useAppStore = create<AppState>()(
       activeClub: null,
       pairingDirty: false,
       syncStatus: 'OFFLINE',
+      authInitialized: false,
       
       clubs: DEFAULT_CLUBS,
       superAdmins: [],
@@ -153,14 +156,20 @@ export const useAppStore = create<AppState>()(
       },
 
       loadUserResources: async (uid) => {
-          const profile = await getUserProfile(uid);
-          const memberships = await getUserMemberships(uid);
-          set({ userProfile: profile, memberships });
+          try {
+              const profile = await getUserProfile(uid);
+              const memberships = await getUserMemberships(uid);
+              set({ userProfile: profile, memberships });
+          } catch (e) {
+              console.error("Resource loading failed", e);
+          }
       },
+
+      setAuthInitialized: (val) => set({ authInitialized: val }),
 
       loginDev: (email, isAdmin) => {
           const uid = 'dev-' + Date.now();
-          set({ user: { uid, email: email || 'dev@example.com', isAdmin, photoURL: undefined } });
+          set({ user: { uid, email: email || 'dev@example.com', isAdmin, photoURL: undefined }, authInitialized: true });
           return true;
       },
 
@@ -176,7 +185,7 @@ export const useAppStore = create<AppState>()(
 
       logout: async () => {
         await signOut(auth);
-        set({ user: null, userProfile: null, memberships: [] });
+        set({ user: null, userProfile: null, memberships: [], activeClub: null });
       },
 
       setActiveClub: (clubId) => set({ activeClub: clubId }),
@@ -589,7 +598,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'etgarim-storage',
-      version: 41.0, 
+      version: 42.0, 
       partialize: (state) => ({
         user: state.user,
         userProfile: state.userProfile,

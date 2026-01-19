@@ -3,23 +3,52 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { ClubID, APP_VERSION } from '../types';
-import { Waves, Ship, Settings, Anchor } from 'lucide-react';
+import { Waves, Ship, Settings, Anchor, User, Loader2 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const { setActiveClub, clubs } = useAppStore();
+  const { setActiveClub, clubs, user, userProfile, authInitialized } = useAppStore();
 
   const handleClubSelect = (clubId: ClubID) => {
     setActiveClub(clubId);
-    navigate('/login');
+    if (user) {
+        // If logged in, go straight to the app
+        navigate('/app');
+    } else {
+        // Otherwise, ask for login
+        navigate('/login');
+    }
   };
 
   const handleSuperAdmin = () => {
-    navigate('/login?admin=true');
+    if (user && user.isAdmin) {
+        navigate('/super-admin');
+    } else {
+        navigate('/login?admin=true');
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col items-center justify-between p-4">
+      {/* Background Auth Status */}
+      <div className="w-full max-w-7xl flex justify-end p-2">
+           {!authInitialized ? (
+               <Loader2 className="animate-spin text-slate-300" size={20} />
+           ) : user ? (
+               <div className="flex items-center gap-2 bg-white/50 backdrop-blur-sm px-4 py-2 rounded-full border border-slate-200 shadow-sm animate-in fade-in slide-in-from-top-2">
+                   <div className="text-right">
+                       <div className="text-[10px] text-slate-400 font-bold uppercase">מחובר כרגע</div>
+                       <div className="text-xs font-bold text-slate-700">{userProfile ? `${userProfile.firstName} ${userProfile.lastName}` : user.email}</div>
+                   </div>
+                   {user.photoURL ? (
+                       <img src={user.photoURL} alt="User" className="w-8 h-8 rounded-full border" />
+                   ) : (
+                       <div className="w-8 h-8 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center"><User size={16} /></div>
+                   )}
+               </div>
+           ) : null}
+      </div>
+
       <div className="w-full flex-1 flex flex-col items-center justify-center">
           <div className="max-w-4xl w-full space-y-8 md:space-y-12">
             
@@ -50,6 +79,9 @@ export const LandingPage: React.FC = () => {
                        <Anchor size={32} />}
                     </div>
                     <h2 className="text-lg md:text-xl font-bold text-slate-800 text-center leading-tight">{club.label}</h2>
+                    {user && (
+                        <div className="absolute top-2 left-2 text-[8px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold opacity-0 group-hover:opacity-100 transition-opacity">כניסה מהירה</div>
+                    )}
                   </button>
               ))}
             </div>

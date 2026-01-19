@@ -9,19 +9,19 @@ import { LandingPage } from './components/LandingPage';
 import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { PublicPairingView } from './components/PublicPairingView';
 import { ProfileSetup } from './components/profile/ProfileSetup';
-import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw, LayoutGrid, History as HistoryIcon, Clock, ChevronLeft, Home, Shield } from 'lucide-react';
+import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw, LayoutGrid, History as HistoryIcon, Clock, ChevronLeft, Home, Shield, Loader2 } from 'lucide-react';
 import { APP_VERSION } from './types';
 import { triggerCloudSync, fetchFromCloud, fetchGlobalConfig } from './services/syncService';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
 const ProtectedAppRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, userProfile, activeClub, clubs } = useAppStore();
+  const { user, userProfile, activeClub, clubs, authInitialized } = useAppStore();
   const location = useLocation();
 
+  if (!authInitialized) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-brand-600" size={48} /></div>;
   if (!user) return <Navigate to="/login" />;
   
-  // If user is logged in but has no profile, redirect to profile setup
   if (!userProfile && location.pathname !== '/profile-setup') {
       return <Navigate to="/profile-setup" />;
   }
@@ -32,9 +32,10 @@ const ProtectedAppRoute: React.FC<{ children: React.ReactNode }> = ({ children }
 };
 
 const SuperAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { user, userProfile } = useAppStore();
+    const { user, userProfile, authInitialized } = useAppStore();
     const location = useLocation();
 
+    if (!authInitialized) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-brand-600" size={48} /></div>;
     if (!user || !user.isAdmin) return <Navigate to="/" />; 
     if (!userProfile && location.pathname !== '/profile-setup') {
         return <Navigate to="/profile-setup" />;
@@ -198,13 +199,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const App: React.FC = () => {
-  const { loadUserResources, superAdmins, protectedAdmins } = useAppStore();
+  const { loadUserResources, setAuthInitialized, superAdmins, protectedAdmins } = useAppStore();
 
   useEffect(() => {
     fetchGlobalConfig();
     
-    // Auth Listener to prevent profile loop and sync resources
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    // Auth Listener with background resource loading
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
             const email = firebaseUser.email?.toLowerCase().trim() || '';
             const isSuperAdmin = superAdmins.some(a => a.toLowerCase() === email) || 
@@ -218,8 +219,12 @@ const App: React.FC = () => {
                     photoURL: firebaseUser.photoURL || undefined 
                 } 
             });
-            loadUserResources(firebaseUser.uid);
+            await loadUserResources(firebaseUser.uid);
+        } else {
+            // Explicitly logged out, clear store
+            useAppStore.setState({ user: null, userProfile: null, memberships: [] });
         }
+        setAuthInitialized(true);
     });
 
     return () => unsubscribe();
