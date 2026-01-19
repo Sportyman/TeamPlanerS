@@ -5,6 +5,7 @@ import { useAppStore } from '../store';
 import { Person, SessionState, ClubSettings, ClubID, PersonSnapshot } from '../types';
 
 let syncTimeout: any = null;
+let lastSyncPayload: string = '';
 
 /**
  * Fetches global configuration (like Super Admin list and Protected Admins) from Firestore
@@ -31,22 +32,27 @@ export const syncToCloud = async (clubId: ClubID) => {
     const state = useAppStore.getState();
     const { people, sessions, clubSettings, snapshots, user, setSyncStatus, superAdmins } = state;
 
-    // Skip sync if user is not logged in OR is a Dev User (avoids Permission Denied errors)
+    // Skip sync if user is not logged in OR is a Dev User
     if (!user || !clubId || user.isDev) {
         if (user?.isDev) setSyncStatus('SYNCED'); 
         return;
     }
 
-    // Filter people for this club
     const clubPeople = people.filter(p => p.clubId === clubId);
     const clubSession = sessions[clubId];
     const clubSet = clubSettings[clubId];
     const clubSnapshots = snapshots[clubId] || [];
 
+    // Create a fingerprint of the data to see if it actually changed
+    const currentPayload = JSON.stringify({ clubPeople, clubSession, clubSet, clubSnapshots });
+    if (currentPayload === lastSyncPayload) {
+        setSyncStatus('SYNCED');
+        return;
+    }
+
     setSyncStatus('SYNCING');
 
     try {
-        // Sync club data
         const clubDocRef = doc(db, 'clubs', clubId);
         await setDoc(clubDocRef, {
             clubId,
@@ -58,7 +64,8 @@ export const syncToCloud = async (clubId: ClubID) => {
             updatedBy: user.email
         }, { merge: true });
 
-        // If user is admin, also sync the global admin list
+        lastSyncPayload = currentPayload;
+        
         if (user.isAdmin) {
             const configDocRef = doc(db, 'config', 'global');
             await setDoc(configDocRef, {
@@ -76,7 +83,6 @@ export const syncToCloud = async (clubId: ClubID) => {
 export const fetchFromCloud = async (clubId: ClubID) => {
     const { setCloudData, setSyncStatus, user } = useAppStore.getState();
     
-    // Skip fetch for Dev Users
     if (!user || user.isDev) {
         if (user?.isDev) setSyncStatus('SYNCED');
         return;
@@ -90,6 +96,14 @@ export const fetchFromCloud = async (clubId: ClubID) => {
 
         if (docSnap.exists()) {
             const data = docSnap.data();
+            // Store the initial payload to prevent immediate re-sync
+            lastSyncPayload = JSON.stringify({ 
+                clubPeople: data.people, 
+                clubSession: data.session, 
+                clubSet: data.settings, 
+                clubSnapshots: data.snapshots || [] 
+            });
+
             setCloudData({
                 people: data.people as Person[],
                 sessions: { [clubId]: data.session as SessionState },
@@ -112,5 +126,5 @@ export const triggerCloudSync = (clubId: ClubID) => {
     if (syncTimeout) clearTimeout(syncTimeout);
     syncTimeout = setTimeout(() => {
         syncToCloud(clubId);
-    }, 2000); 
+    }, 3000); // Increased debounce to 3s for stability
 };

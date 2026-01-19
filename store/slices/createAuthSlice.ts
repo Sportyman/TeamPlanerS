@@ -4,7 +4,7 @@ import { AppState } from '../store';
 import { auth, googleProvider } from '../../firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { getUserProfile, getUserMemberships } from '../../services/profileService';
-import { UserProfile, ClubMembership, UserPermission, ClubID, Gender } from '../../types';
+import { UserProfile, ClubMembership, UserPermission, ClubID, Gender, MembershipStatus } from '../../types';
 
 export interface AuthSlice {
   user: { uid: string; email: string; isAdmin: boolean; photoURL?: string; isDev?: boolean } | null;
@@ -59,6 +59,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
   loginDev: (email, isAdmin) => {
     const uid = 'dev-user-' + Date.now();
     const devEmail = email || 'dev@example.com';
+    const { activeClub } = get();
     
     const mockProfile: UserProfile = {
       uid,
@@ -76,9 +77,20 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
       joinedSystemDate: new Date().toISOString()
     };
 
+    // Create a mock membership if there is an active club to prevent redirect to landing
+    const mockMemberships: ClubMembership[] = activeClub ? [{
+        uid,
+        clubId: activeClub,
+        role: isAdmin ? 'INSTRUCTOR' : 'VOLUNTEER' as any,
+        status: MembershipStatus.ACTIVE,
+        joinedClubDate: new Date().toISOString(),
+        rank: 5
+    }] : [];
+
     set({ 
       user: { uid, email: devEmail, isAdmin, photoURL: undefined, isDev: true }, 
       userProfile: mockProfile,
+      memberships: mockMemberships,
       authInitialized: true 
     });
     

@@ -1,6 +1,6 @@
 
 // Fix: Import React as a default import instead of a named import to resolve compilation error.
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from './store';
 import { Dashboard } from './components/Dashboard';
@@ -76,10 +76,23 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Use a ref to track data changes for sync without triggering re-renders
+  const lastDataRef = useRef<string>('');
 
   useEffect(() => {
     if (user && activeClub) {
-      triggerCloudSync(activeClub);
+      const currentPeople = people.filter(p => p.clubId === activeClub);
+      const dataString = JSON.stringify({ 
+        p: currentPeople, 
+        s: sessions[activeClub], 
+        st: clubSettings[activeClub] 
+      });
+
+      if (dataString !== lastDataRef.current) {
+        lastDataRef.current = dataString;
+        triggerCloudSync(activeClub);
+      }
     }
   }, [people, sessions, clubSettings, user, activeClub]);
 
@@ -178,11 +191,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                         {currentClub ? currentClub.label : 'TeamPlaner'}
                     </span>
                  </div>
-                 <div className="flex items-center justify-center gap-1 mt-0.5">
+                 <div className="flex items-center justify-center gap-1 mt-0.5 h-4">
                     {syncStatus === 'SYNCING' && <RefreshCw size={10} className="text-brand-500 animate-spin" />}
                     {syncStatus === 'SYNCED' && <Cloud size={10} className="text-green-500" />}
-                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
-                        {syncStatus === 'SYNCED' ? 'Cloud Saved' : syncStatus === 'SYNCING' ? 'Syncing...' : 'Local'}
+                    {syncStatus === 'ERROR' && <CloudOff size={10} className="text-red-500" />}
+                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter ml-1">
+                        {syncStatus === 'SYNCED' ? 'Cloud Saved' : syncStatus === 'SYNCING' ? 'Syncing...' : syncStatus === 'ERROR' ? 'Sync Error' : 'Local'}
                     </span>
                  </div>
             </div>
@@ -214,7 +228,6 @@ const App: React.FC = () => {
     
     // Auth Listener
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-        // CRITICAL: If we have a Dev User manually logged in, DO NOT let Firebase wipe the session.
         const currentUser = useAppStore.getState().user;
         if (currentUser && currentUser.isDev) {
             setAuthInitialized(true);
@@ -237,7 +250,6 @@ const App: React.FC = () => {
             });
             await loadUserResources(firebaseUser.uid);
         } else {
-            // Only clear if we are not in Dev Mode
             useAppStore.setState({ user: null, userProfile: null, memberships: [] });
         }
         setAuthInitialized(true);
