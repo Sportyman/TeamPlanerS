@@ -7,8 +7,62 @@ import { Person, SessionState, ClubSettings, ClubID, PersonSnapshot } from '../t
 let syncTimeout: any = null;
 let lastSyncPayload: string = '';
 
+// --- LOGGING SYSTEM ---
+const systemLogs: string[] = [];
+export const addLog = (msg: string) => {
+    const time = new Date().toLocaleTimeString();
+    const entry = `[${time}] ${msg}`;
+    systemLogs.push(entry);
+    if (systemLogs.length > 500) systemLogs.shift();
+    console.log(entry);
+};
+
+(window as any).exportLogs = () => {
+    const blob = new Blob([systemLogs.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `etgarim-logs-${Date.now()}.txt`;
+    a.click();
+    return "Logs exported.";
+};
+
+// --- RATE LIMITER ---
+let requestTimes: number[] = [];
+const RATE_LIMIT_PER_MINUTE = 40; // Safe threshold
+
+const checkRateLimit = (): boolean => {
+    const now = Date.now();
+    requestTimes = requestTimes.filter(t => now - t < 60000);
+    if (requestTimes.length >= RATE_LIMIT_PER_MINUTE) {
+        addLog("CRITICAL: Rate limit exceeded! Sync suspended.");
+        return false;
+    }
+    requestTimes.push(now);
+    return true;
+};
+
+// --- STABLE JSON HELPER ---
+/**
+ * Sorting arrays by ID ensures stringify comparisons are order-independent.
+ * This is the root cause fix for infinite loops when Firestore returns data in a different order.
+ */
+const getStablePayload = (clubPeople: Person[], clubSession: SessionState, clubSet: ClubSettings, clubSnapshots: PersonSnapshot[]) => {
+    return JSON.stringify({
+        clubPeople: [...clubPeople].sort((a, b) => a.id.localeCompare(b.id)),
+        clubSession: { 
+            ...clubSession, 
+            presentPersonIds: [...(clubSession?.presentPersonIds || [])].sort(),
+            teams: [...(clubSession?.teams || [])].map(t => ({...t, members: [...t.members].sort((a, b) => a.id.localeCompare(b.id))})).sort((a,b) => a.id.localeCompare(b.id))
+        },
+        clubSet,
+        clubSnapshots: [...clubSnapshots].sort((a, b) => a.id.localeCompare(b.id))
+    });
+};
+
 export const fetchGlobalConfig = async () => {
     const { setGlobalConfig } = useAppStore.getState();
+    addLog("Fetching global config...");
     try {
         const configDocRef = doc(db, 'config', 'global');
         const docSnap = await getDoc(configDocRef);
@@ -22,23 +76,19 @@ export const fetchGlobalConfig = async () => {
             });
         }
     } catch (error) {
-        console.error("Global Config Fetch Error:", error);
+        addLog(`Global Config Fetch Error: ${error}`);
     }
 };
 
-/**
- * Specifically adds a single person to the club's people array in Firestore
- * Used during onboarding to prevent "Ghost Users"
- */
 export const addPersonToClubCloud = async (clubId: ClubID, person: Person) => {
+    addLog(`Adding individual user ${person.name} to club ${clubId}...`);
     try {
         const clubDocRef = doc(db, 'clubs', clubId);
         await updateDoc(clubDocRef, {
             people: arrayUnion(person)
         });
-        console.log(`User ${person.name} added to club ${clubId} cloud list.`);
     } catch (error) {
-        console.error("Error adding person to club cloud:", error);
+        addLog(`Error adding person to club cloud: ${error}`);
     }
 };
 
@@ -46,25 +96,26 @@ export const syncToCloud = async (clubId: ClubID) => {
     const state = useAppStore.getState();
     const { people, sessions, clubSettings, snapshots, user, setSyncStatus, superAdmins, permissions } = state;
 
-    if (!user || !clubId || user.isDev) {
-        if (user?.isDev) setSyncStatus('SYNCED'); 
-        return;
-    }
+    if (!user || !clubId || user.isDev) return;
 
     const clubPeople = people.filter(p => p.clubId === clubId);
     const clubSession = sessions[clubId];
     const clubSet = clubSettings[clubId];
     const clubSnapshots = snapshots[clubId] || [];
 
-    const currentPayload = JSON.stringify({ clubPeople, clubSession, clubSet, clubSnapshots });
+    const currentPayload = getStablePayload(clubPeople, clubSession, clubSet, clubSnapshots);
     
-    // IF NO CHANGE, EXIT QUIETLY WITHOUT CHANGING STATUS
     if (currentPayload === lastSyncPayload) {
         return;
     }
 
-    // ONLY CHANGE TO SYNCING WHEN WE ACTUALLY START THE WRITE
+    if (!checkRateLimit()) {
+        setSyncStatus('ERROR');
+        return;
+    }
+
     setSyncStatus('SYNCING');
+    addLog(`Syncing to cloud for club: ${clubId}...`);
 
     try {
         const clubDocRef = doc(db, 'clubs', clubId);
@@ -84,13 +135,14 @@ export const syncToCloud = async (clubId: ClubID) => {
             const configDocRef = doc(db, 'config', 'global');
             await setDoc(configDocRef, {
                 superAdmins,
-                permissions // Sync staff list as well
+                permissions
             }, { merge: true });
         }
         
         setSyncStatus('SYNCED');
+        addLog(`Sync successful for ${clubId}.`);
     } catch (error) {
-        console.error("Cloud Sync Error:", error);
+        addLog(`Cloud Sync Error: ${error}`);
         setSyncStatus('ERROR');
     }
 };
@@ -98,23 +150,22 @@ export const syncToCloud = async (clubId: ClubID) => {
 export const fetchFromCloud = async (clubId: ClubID) => {
     const { setCloudData, setSyncStatus, user } = useAppStore.getState();
     
-    if (!user || user.isDev) {
-        if (user?.isDev) setSyncStatus('SYNCED');
-        return;
-    }
+    if (!user || user.isDev) return;
 
+    addLog(`Fetching data from cloud for ${clubId}...`);
     try {
         const clubDocRef = doc(db, 'clubs', clubId);
         const docSnap = await getDoc(clubDocRef);
 
         if (docSnap.exists()) {
             const data = docSnap.data();
-            lastSyncPayload = JSON.stringify({ 
-                clubPeople: data.people, 
-                clubSession: data.session, 
-                clubSet: data.settings, 
-                clubSnapshots: data.snapshots || [] 
-            });
+            
+            lastSyncPayload = getStablePayload(
+                data.people || [], 
+                data.session || { inventory: {}, presentPersonIds: [], teams: [] }, 
+                data.settings || { boatDefinitions: [] }, 
+                data.snapshots || []
+            );
 
             setCloudData({
                 people: data.people as Person[],
@@ -123,11 +174,12 @@ export const fetchFromCloud = async (clubId: ClubID) => {
                 snapshots: { [clubId]: data.snapshots as PersonSnapshot[] || [] }
             });
             setSyncStatus('SYNCED');
+            addLog(`Fetched data successfully for ${clubId}.`);
         } else {
             setSyncStatus('SYNCED'); 
         }
     } catch (error) {
-        console.error("Cloud Fetch Error:", error);
+        addLog(`Cloud Fetch Error: ${error}`);
         setSyncStatus('OFFLINE');
     }
 };

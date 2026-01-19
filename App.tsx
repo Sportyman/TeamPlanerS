@@ -11,9 +11,9 @@ import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { PublicPairingView } from './components/PublicPairingView';
 import { ProfileSetup } from './components/profile/ProfileSetup';
 import { InviteLanding } from './components/invites/InviteLanding';
-import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw, LayoutGrid, History as HistoryIcon, Clock, ChevronLeft, Home, Shield, Loader2, Sparkles } from 'lucide-react';
+import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw, LayoutGrid, History as HistoryIcon, Clock, ChevronLeft, Home, Shield, Loader2, Sparkles, FileText } from 'lucide-react';
 import { APP_VERSION, Role } from './types';
-import { triggerCloudSync, fetchFromCloud, fetchGlobalConfig } from './services/syncService';
+import { triggerCloudSync, fetchFromCloud, fetchGlobalConfig, addLog } from './services/syncService';
 import { auth } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 
@@ -81,23 +81,26 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  const lastSyncHashRef = useRef<string>('');
+  // Use a ref to prevent re-triggering sync when the effect itself runs
+  const lastObservedHash = useRef<string>('');
 
   useEffect(() => {
-    if (user && activeClub && !user.isDev) {
+    if (user && activeClub && !user.isDev && syncStatus !== 'ERROR') {
       const currentPeople = people.filter(p => p.clubId === activeClub);
-      const dataString = JSON.stringify({ 
-        p: currentPeople, 
-        s: sessions[activeClub], 
-        st: clubSettings[activeClub] 
+      // Data hash for observation
+      const hash = JSON.stringify({ 
+        p_ids: currentPeople.map(p => p.id).sort(), 
+        s_pres: (sessions[activeClub]?.presentPersonIds || []).sort(),
+        s_teams: (sessions[activeClub]?.teams || []).length,
+        st_defs: (clubSettings[activeClub]?.boatDefinitions || []).length
       });
 
-      if (dataString !== lastSyncHashRef.current) {
-        lastSyncHashRef.current = dataString;
+      if (hash !== lastObservedHash.current) {
+        lastObservedHash.current = hash;
         triggerCloudSync(activeClub);
       }
     }
-  }, [people, sessions, clubSettings, user, activeClub]);
+  }, [people, sessions, clubSettings, user, activeClub, syncStatus]);
 
   useEffect(() => {
     if (user && activeClub && !user.isDev) {
@@ -201,12 +204,22 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                         {syncStatus === 'ERROR' && <CloudOff size={10} className="text-red-500" />}
                     </div>
                     <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter ml-1">
-                        {syncStatus === 'SYNCED' ? 'Cloud Saved' : syncStatus === 'SYNCING' ? 'Syncing...' : syncStatus === 'ERROR' ? 'Sync Error' : 'Local'}
+                        {syncStatus === 'SYNCED' ? 'Cloud Saved' : syncStatus === 'SYNCING' ? 'Syncing...' : syncStatus === 'ERROR' ? 'Sync Paused' : 'Local'}
                     </span>
                  </div>
             </div>
 
             <div className="flex items-center gap-3 z-20">
+              {syncStatus === 'ERROR' && (
+                  <button 
+                    // Fix: Casting window to any to access exportLogs property defined in syncService.ts
+                    onClick={() => { if((window as any).exportLogs) (window as any).exportLogs(); }} 
+                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg animate-pulse"
+                    title="ייצוא לוגים לניתוח"
+                  >
+                      <FileText size={20} />
+                  </button>
+              )}
               <button onClick={handleLogout} className="text-slate-400 hover:text-red-500 p-2"><LogOut size={20} /></button>
             </div>
           </div>
@@ -219,17 +232,27 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
       <footer className="py-8 text-center border-t border-slate-100 mt-auto bg-white/50" dir="ltr">
          <div className="text-xs text-slate-400 opacity-70 font-medium">Built by Shay Kalimi - @Shay.A.i</div>
-         <div className="text-[10px] font-black text-slate-300 mt-2 uppercase tracking-[0.3em]">v{APP_VERSION}</div>
+         <div 
+            className="text-[10px] font-black text-slate-300 mt-2 uppercase tracking-[0.3em] cursor-help"
+            onClick={(e) => {
+                if (e.detail === 3) {
+                    if ((window as any).exportLogs) (window as any).exportLogs();
+                }
+            }}
+         >
+             v{APP_VERSION}
+         </div>
       </footer>
     </div>
   );
 };
 
 const App: React.FC = () => {
-  const { loadUserResources, setAuthInitialized, superAdmins, protectedAdmins, permissions, setAuthError, logout } = useAppStore();
+  const { loadUserResources, setAuthInitialized, superAdmins, protectedAdmins, permissions, setAuthError } = useAppStore();
 
   useEffect(() => {
     fetchGlobalConfig();
+    addLog("System starting...");
     
     // Auth Listener with Gatekeeper logic
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -257,11 +280,13 @@ const App: React.FC = () => {
             
             if (!isAuthorized && !isInvitePath) {
                 console.warn("Unauthorized access attempt from main page:", email);
+                addLog(`Gatekeeper blocked entry for: ${email}`);
                 setAuthError("הגישה למנהלים מורשים בלבד. אם ברצונך להצטרף כחבר, אנא השתמש בלינק הזמנה.");
                 await signOut(auth);
                 useAppStore.setState({ user: null, userProfile: null, memberships: [] });
             } else {
                 // Authorized or on Invite Path
+                addLog(`Auth successful for: ${email}`);
                 useAppStore.setState({ 
                     user: { 
                         uid: firebaseUser.uid, 

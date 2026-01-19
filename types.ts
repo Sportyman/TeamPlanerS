@@ -140,7 +140,7 @@ export interface UserPermission {
   allowedClubs: ClubID[];
 }
 
-export const APP_VERSION = '4.4.0'; 
+export const APP_VERSION = '4.5.0'; 
 
 export const TEAM_COLORS = [
   'bg-blue-50 border-blue-200',      
