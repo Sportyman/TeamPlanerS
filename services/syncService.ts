@@ -1,15 +1,12 @@
 
 import { db } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { useAppStore } from '../store';
 import { Person, SessionState, ClubSettings, ClubID, PersonSnapshot } from '../types';
 
 let syncTimeout: any = null;
 let lastSyncPayload: string = '';
 
-/**
- * Fetches global configuration (like Super Admin list and Protected Admins) from Firestore
- */
 export const fetchGlobalConfig = async () => {
     const { setGlobalConfig } = useAppStore.getState();
     try {
@@ -28,11 +25,26 @@ export const fetchGlobalConfig = async () => {
     }
 };
 
+/**
+ * Specifically adds a single person to the club's people array in Firestore
+ * Used during onboarding to prevent "Ghost Users"
+ */
+export const addPersonToClubCloud = async (clubId: ClubID, person: Person) => {
+    try {
+        const clubDocRef = doc(db, 'clubs', clubId);
+        await updateDoc(clubDocRef, {
+            people: arrayUnion(person)
+        });
+        console.log(`User ${person.name} added to club ${clubId} cloud list.`);
+    } catch (error) {
+        console.error("Error adding person to club cloud:", error);
+    }
+};
+
 export const syncToCloud = async (clubId: ClubID) => {
     const state = useAppStore.getState();
     const { people, sessions, clubSettings, snapshots, user, setSyncStatus, superAdmins } = state;
 
-    // Skip sync if user is not logged in OR is a Dev User
     if (!user || !clubId || user.isDev) {
         if (user?.isDev) setSyncStatus('SYNCED'); 
         return;
@@ -43,13 +55,14 @@ export const syncToCloud = async (clubId: ClubID) => {
     const clubSet = clubSettings[clubId];
     const clubSnapshots = snapshots[clubId] || [];
 
-    // Create a fingerprint of the data to see if it actually changed
     const currentPayload = JSON.stringify({ clubPeople, clubSession, clubSet, clubSnapshots });
+    
+    // IF NO CHANGE, EXIT QUIETLY WITHOUT CHANGING STATUS
     if (currentPayload === lastSyncPayload) {
-        setSyncStatus('SYNCED');
         return;
     }
 
+    // ONLY CHANGE TO SYNCING WHEN WE ACTUALLY START THE WRITE
     setSyncStatus('SYNCING');
 
     try {
@@ -88,15 +101,12 @@ export const fetchFromCloud = async (clubId: ClubID) => {
         return;
     }
 
-    setSyncStatus('SYNCING');
-
     try {
         const clubDocRef = doc(db, 'clubs', clubId);
         const docSnap = await getDoc(clubDocRef);
 
         if (docSnap.exists()) {
             const data = docSnap.data();
-            // Store the initial payload to prevent immediate re-sync
             lastSyncPayload = JSON.stringify({ 
                 clubPeople: data.people, 
                 clubSession: data.session, 
@@ -110,6 +120,7 @@ export const fetchFromCloud = async (clubId: ClubID) => {
                 settings: { [clubId]: data.settings as ClubSettings },
                 snapshots: { [clubId]: data.snapshots as PersonSnapshot[] || [] }
             });
+            setSyncStatus('SYNCED');
         } else {
             setSyncStatus('SYNCED'); 
         }
@@ -119,12 +130,12 @@ export const fetchFromCloud = async (clubId: ClubID) => {
     }
 };
 
-/**
- * Debounced sync to avoid excessive writes
- */
 export const triggerCloudSync = (clubId: ClubID) => {
+    const state = useAppStore.getState();
+    if (!state.user || state.user.isDev) return;
+
     if (syncTimeout) clearTimeout(syncTimeout);
     syncTimeout = setTimeout(() => {
         syncToCloud(clubId);
-    }, 3000); // Increased debounce to 3s for stability
+    }, 2000); 
 };

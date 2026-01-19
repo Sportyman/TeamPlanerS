@@ -12,7 +12,7 @@ import { PublicPairingView } from './components/PublicPairingView';
 import { ProfileSetup } from './components/profile/ProfileSetup';
 import { InviteLanding } from './components/invites/InviteLanding';
 import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw, LayoutGrid, History as HistoryIcon, Clock, ChevronLeft, Home, Shield, Loader2, Sparkles } from 'lucide-react';
-import { APP_VERSION } from './types';
+import { APP_VERSION, Role } from './types';
 import { triggerCloudSync, fetchFromCloud, fetchGlobalConfig } from './services/syncService';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -28,12 +28,17 @@ const ProtectedAppRoute: React.FC<{ children: React.ReactNode }> = ({ children }
       return <Navigate to="/profile-setup" />;
   }
 
-  // If user is not Super Admin, they MUST have a membership in the activeClub to access /app
-  const clubExists = clubs.some(c => c.id === activeClub);
-  const hasMembership = memberships.some(m => m.clubId === activeClub && m.status !== 'INACTIVE');
-  
-  if (!activeClub || !clubExists || (!user.isAdmin && !hasMembership)) {
-      return <Navigate to="/" />;
+  // If user is not Super Admin, check membership
+  if (!user.isAdmin) {
+      const clubExists = clubs.some(c => c.id === activeClub);
+      const membership = memberships.find(m => m.clubId === activeClub && m.status !== 'INACTIVE');
+      
+      // SECURITY FIX: Block regular members and guests from dashboard
+      const isStaff = membership && (membership.role === Role.INSTRUCTOR || membership.role === Role.VOLUNTEER);
+
+      if (!activeClub || !clubExists || !isStaff) {
+          return <Navigate to="/" />;
+      }
   }
   
   return <>{children}</>;
@@ -77,11 +82,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Use a ref to track data changes for sync without triggering re-renders
-  const lastDataRef = useRef<string>('');
+  const lastSyncHashRef = useRef<string>('');
 
   useEffect(() => {
-    if (user && activeClub) {
+    if (user && activeClub && !user.isDev) {
       const currentPeople = people.filter(p => p.clubId === activeClub);
       const dataString = JSON.stringify({ 
         p: currentPeople, 
@@ -89,15 +93,15 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         st: clubSettings[activeClub] 
       });
 
-      if (dataString !== lastDataRef.current) {
-        lastDataRef.current = dataString;
+      if (dataString !== lastSyncHashRef.current) {
+        lastSyncHashRef.current = dataString;
         triggerCloudSync(activeClub);
       }
     }
   }, [people, sessions, clubSettings, user, activeClub]);
 
   useEffect(() => {
-    if (user && activeClub) {
+    if (user && activeClub && !user.isDev) {
         fetchFromCloud(activeClub);
     }
   }, [user, activeClub]);
@@ -192,9 +196,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     </span>
                  </div>
                  <div className="flex items-center justify-center gap-1 mt-0.5 h-4">
-                    {syncStatus === 'SYNCING' && <RefreshCw size={10} className="text-brand-500 animate-spin" />}
-                    {syncStatus === 'SYNCED' && <Cloud size={10} className="text-green-500" />}
-                    {syncStatus === 'ERROR' && <CloudOff size={10} className="text-red-500" />}
+                    <div className="w-4 flex items-center justify-center">
+                        {syncStatus === 'SYNCING' && <RefreshCw size={10} className="text-brand-500 animate-spin" />}
+                        {syncStatus === 'SYNCED' && <Cloud size={10} className="text-green-500" />}
+                        {syncStatus === 'ERROR' && <CloudOff size={10} className="text-red-500" />}
+                    </div>
                     <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter ml-1">
                         {syncStatus === 'SYNCED' ? 'Cloud Saved' : syncStatus === 'SYNCING' ? 'Syncing...' : syncStatus === 'ERROR' ? 'Sync Error' : 'Local'}
                     </span>
@@ -229,6 +235,7 @@ const App: React.FC = () => {
     // Auth Listener
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         const currentUser = useAppStore.getState().user;
+        
         if (currentUser && currentUser.isDev) {
             setAuthInitialized(true);
             return;
@@ -250,7 +257,10 @@ const App: React.FC = () => {
             });
             await loadUserResources(firebaseUser.uid);
         } else {
-            useAppStore.setState({ user: null, userProfile: null, memberships: [] });
+            const current = useAppStore.getState().user;
+            if (!current || !current.isDev) {
+                useAppStore.setState({ user: null, userProfile: null, memberships: [] });
+            }
         }
         setAuthInitialized(true);
     });
