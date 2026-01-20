@@ -3,6 +3,7 @@ import { StateCreator } from 'zustand';
 import { AppState, EMPTY_SESSION, createInventoryFromDefs } from '../store';
 import { Club, ClubID, Person, ClubSettings, SyncStatus, BoatDefinition, UserPermission } from '../../types';
 import { DEFAULT_CLUBS, INITIAL_PEOPLE, KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from '../../mockData';
+import { addLog } from '../../services/syncService';
 
 export interface GlobalSlice {
   clubs: Club[];
@@ -24,6 +25,7 @@ export interface GlobalSlice {
   restoreDemoData: () => void;
   importClubData: (data: any) => void;
   saveBoatDefinitions: (defs: BoatDefinition[]) => void;
+  loadSampleGroup: () => void;
 }
 
 export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (set, get) => ({
@@ -33,7 +35,7 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
     'KAYAK': { boatDefinitions: KAYAK_DEFINITIONS },
     'SAILING': { boatDefinitions: SAILING_DEFINITIONS },
   },
-  people: INITIAL_PEOPLE,
+  people: [], // App starts empty as requested
   syncStatus: 'OFFLINE',
 
   setActiveClub: (clubId) => set({ activeClub: clubId }),
@@ -42,7 +44,8 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
   setGlobalConfig: (config) => set({ 
       superAdmins: config.superAdmins.map(a => a.toLowerCase().trim()),
       protectedAdmins: (config.protectedAdmins || []).map(a => a.toLowerCase().trim()),
-      permissions: config.permissions || []
+      permissions: config.permissions || [],
+      syncStatus: 'SYNCED' // Success loading config means we are online
   }),
 
   addClub: (label) => set(state => {
@@ -66,7 +69,7 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
   }),
 
   setCloudData: (data) => set((state) => ({
-    people: data.people || state.people,
+    people: data.people || [],
     sessions: { ...state.sessions, ...data.sessions },
     clubSettings: { ...state.clubSettings, ...data.settings },
     snapshots: data.snapshots ? { ...state.snapshots, ...data.snapshots } : state.snapshots,
@@ -97,7 +100,7 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
 
   restoreDemoData: () => set(() => ({ 
     clubs: DEFAULT_CLUBS,
-    people: INITIAL_PEOPLE,
+    people: [], // Keep it empty even on reset, user must load samples manually
     clubSettings: { 'KAYAK': { boatDefinitions: KAYAK_DEFINITIONS }, 'SAILING': { boatDefinitions: SAILING_DEFINITIONS } },
     sessions: {
       'KAYAK': { ...EMPTY_SESSION, inventory: createInventoryFromDefs(KAYAK_DEFINITIONS) },
@@ -140,4 +143,25 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
         pairingDirty: true
     };
   }),
+
+  loadSampleGroup: () => set(state => {
+    const { activeClub, people } = state;
+    if (!activeClub) return state;
+
+    // Filter mock data for current club type and assign new unique IDs
+    const clubType = activeClub.includes('SAILING') ? 'SAILING' : 'KAYAK';
+    const samples = INITIAL_PEOPLE
+        .filter(p => p.clubId === clubType)
+        .map(p => ({
+            ...p,
+            id: `sample-${p.id}-${Date.now()}`,
+            clubId: activeClub
+        }));
+
+    addLog(`Loaded ${samples.length} sample participants to ${activeClub}`, 'INFO');
+    return {
+        people: [...people, ...samples],
+        pairingDirty: true
+    };
+  })
 });

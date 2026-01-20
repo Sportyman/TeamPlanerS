@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
 import { Role, getRoleLabel, Person, Gender, GenderLabel, BoatDefinition, GenderPrefType, GenderPrefLabels, ConstraintStrength, APP_VERSION } from '../types';
-import { Trash2, UserPlus, Star, Edit, X, Save, ArrowRight, Tag, Database, Ship, Users, Calendar, Plus, Anchor, Wind, Users2, ShieldAlert, AlertOctagon, Heart, Ban, Shield, ShipWheel, Download, Upload, Clock, CheckCircle, Sparkles } from 'lucide-react';
+import { Trash2, UserPlus, Star, Edit, X, Save, ArrowRight, Tag, Database, Ship, Users, Calendar, Plus, Anchor, Wind, Users2, ShieldAlert, AlertOctagon, Heart, Ban, Shield, ShipWheel, Download, Upload, Clock, CheckCircle, Sparkles, Wand2 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -169,7 +169,8 @@ export const Dashboard: React.FC = () => {
       restoreDemoData,
       importClubData,
       clubSettings,
-      saveBoatDefinitions 
+      saveBoatDefinitions,
+      loadSampleGroup
     } = useAppStore();
   
   const navigate = useNavigate();
@@ -473,6 +474,12 @@ export const Dashboard: React.FC = () => {
       setPhoneError('');
     }
   };
+
+  const handleLoadSamples = () => {
+    if (confirm('האם לטעון רשימת משתתפים לדוגמה לאימון? המשתתפים יתווספו לרשימה הנוכחית.')) {
+        loadSampleGroup();
+    }
+  }
 
   // --- Relationship Manager Logic ---
   const toggleRelationship = (targetId: string, type: 'MUST' | 'PREFER' | 'CANNOT', isEditMode: boolean) => {
@@ -920,7 +927,16 @@ export const Dashboard: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h2 className="text-2xl font-bold text-slate-800">רשימת משתתפים ({clubPeople.length})</h2>
           
-          <div className="flex gap-2 w-full sm:w-auto">
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+             {/* Load Samples Button */}
+             <button 
+                onClick={handleLoadSamples}
+                className="bg-amber-100 border border-amber-200 text-amber-700 hover:bg-amber-200 px-3 py-2 rounded-lg flex items-center gap-2 font-bold shadow-sm transition-all active:scale-95"
+                title="טען רשימת משתתפים לדוגמה"
+             >
+                 <Wand2 size={18} /> <span className="inline">טען רשימה לדוגמה</span>
+             </button>
+
              {/* Hidden Import Input */}
              <input 
                 type="file" 
@@ -966,7 +982,15 @@ export const Dashboard: React.FC = () => {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                    {clubPeople.map(person => (
+                    {clubPeople.length === 0 ? (
+                        <tr>
+                            <td colSpan={4} className="p-12 text-center text-slate-400 italic">
+                                <Users size={48} className="mx-auto mb-4 opacity-10" />
+                                אין משתתפים רשומים בחוג זה. <br/>
+                                <button onClick={handleLoadSamples} className="text-brand-600 underline font-bold mt-2">לחץ כאן לטעינת רשימת משתתפים לדוגמה</button>
+                            </td>
+                        </tr>
+                    ) : clubPeople.map(person => (
                         <tr key={person.id} className="hover:bg-slate-50/50 transition-colors">
                             <td className="p-4">
                                 <div className="flex items-center gap-2">
@@ -1054,7 +1078,7 @@ export const Dashboard: React.FC = () => {
                     <input 
                         type="tel" 
                         value={newPhone} 
-                        onChange={e => handlePhoneChange(e, setNewPhone)} 
+                        onChange={e => e.target && handlePhoneChange(e, setNewPhone)} 
                         className={`w-full border rounded-lg p-2 ${phoneError ? 'border-red-500' : ''}`}
                         placeholder="05X-XXXXXXX"
                         dir="ltr"
@@ -1209,6 +1233,7 @@ export const Dashboard: React.FC = () => {
                         type="tel" 
                         value={editingPerson.phone || ''} 
                         onChange={e => {
+                            if (!e.target) return;
                             const formatted = formatPhoneNumber(e.target.value);
                             setEditingPerson({...editingPerson, phone: formatted});
                             if(formatted.length === 11) setPhoneError('');
@@ -1274,7 +1299,16 @@ export const Dashboard: React.FC = () => {
                                     <label className="block text-xs font-bold text-slate-700 mb-1">התניית מין</label>
                                     <select 
                                         value={editingPerson.genderConstraint?.type || 'NONE'}
-                                        onChange={setEditingPerson as any}
+                                        onChange={(e) => {
+                                            const type = e.target.value as GenderPrefType;
+                                            setEditingPerson({
+                                                ...editingPerson,
+                                                genderConstraint: { 
+                                                    type, 
+                                                    strength: editingPerson.genderConstraint?.strength || 'NONE' 
+                                                }
+                                            });
+                                        }}
                                         className="w-full border rounded p-1.5 text-xs"
                                     >
                                         {Object.entries(GenderPrefLabels).map(([key, label]) => (
@@ -1286,7 +1320,16 @@ export const Dashboard: React.FC = () => {
                                     <label className="block text-xs font-bold text-slate-700 mb-1">רמת חשיבות</label>
                                     <select 
                                         value={editingPerson.genderConstraint?.strength || 'NONE'}
-                                        onChange={setEditingPerson as any}
+                                        onChange={(e) => {
+                                            const strength = e.target.value as ConstraintStrength;
+                                            setEditingPerson({
+                                                ...editingPerson,
+                                                genderConstraint: { 
+                                                    type: editingPerson.genderConstraint?.type || 'NONE',
+                                                    strength
+                                                }
+                                            });
+                                        }}
                                         className="w-full border rounded p-1.5 text-xs"
                                     >
                                         <option value="NONE">ללא (לא רלוונטי)</option>

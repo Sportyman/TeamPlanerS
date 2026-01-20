@@ -71,7 +71,7 @@ const getStablePayload = (clubPeople: Person[], clubSession: SessionState, clubS
 
 export const fetchGlobalConfig = async () => {
     if (isFatalError) return;
-    const { setGlobalConfig } = useAppStore.getState();
+    const { setGlobalConfig, setSyncStatus } = useAppStore.getState();
     addLog("Fetching global configuration...", 'SYNC');
     try {
         const configDocRef = doc(db, 'config', 'global');
@@ -84,9 +84,13 @@ export const fetchGlobalConfig = async () => {
                 permissions: data.permissions || []
             });
             addLog("Global configuration loaded successfully", 'SYNC');
+        } else {
+            addLog("Global config document missing, starting fresh", 'WARN');
+            setSyncStatus('SYNCED'); // Connected, just empty
         }
     } catch (error) {
         addLog(`Global Config Fetch Error: ${error}`, 'ERROR');
+        setSyncStatus('OFFLINE');
     }
 };
 
@@ -95,9 +99,10 @@ export const addPersonToClubCloud = async (clubId: ClubID, person: Person) => {
     addLog(`Attempting to sync person ${person.name} to club ${clubId}`, 'SYNC');
     try {
         const clubDocRef = doc(db, 'clubs', clubId);
-        await updateDoc(clubDocRef, {
+        // Use setDoc with merge to avoid 'No document to update'
+        await setDoc(clubDocRef, {
             people: arrayUnion(person)
-        });
+        }, { merge: true });
         addLog(`Successfully synced person ${person.name} to cloud`, 'SYNC');
     } catch (error) {
         addLog(`Error adding person to club cloud: ${error}`, 'ERROR');
@@ -181,6 +186,9 @@ export const fetchFromCloud = async (clubId: ClubID) => {
             });
             setSyncStatus('SYNCED');
             addLog(`Club ${clubId} data loaded successfully`, 'SYNC');
+        } else {
+            addLog(`No cloud data for club ${clubId}, starting clean`, 'INFO');
+            setSyncStatus('SYNCED');
         }
     } catch (error) {
         addLog(`Cloud Fetch Error: ${error}`, 'ERROR');

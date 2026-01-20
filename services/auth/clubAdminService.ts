@@ -1,12 +1,12 @@
 
 import { db } from '../../firebase';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { AccessLevel, ClubID } from '../../types';
 import { addLog } from '../syncService';
 
 /**
  * Updates or sets the AccessLevel for a user within a specific club.
- * This directly updates the membership document.
+ * This uses setDoc with merge to prevent 'No document to update' errors.
  */
 export const setClubAccessLevel = async (
   clubId: ClubID, 
@@ -17,16 +17,18 @@ export const setClubAccessLevel = async (
     const membershipId = `${clubId}_${uid}`;
     const membershipRef = doc(db, 'memberships', membershipId);
     
-    await updateDoc(membershipRef, {
+    // Using setDoc with merge: true ensures the document is created if it doesn't exist
+    await setDoc(membershipRef, {
+      uid,
+      clubId,
       accessLevel: level,
       lastPermissionUpdate: new Date().toISOString()
-    });
+    }, { merge: true });
     
     addLog(`AccessLevel for user ${uid} in club ${clubId} set to ${level}`);
     return true;
   } catch (error) {
-    // If document doesn't exist, we might need to handle creation elsewhere or here
-    addLog(`Error setting Club Access Level: ${error}`);
+    addLog(`Error setting Club Access Level: ${error}`, 'ERROR');
     throw error;
   }
 };
