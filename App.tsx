@@ -1,6 +1,5 @@
 
-// Fix: Import React as a default import instead of a named import to resolve compilation error.
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { HashRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from './store';
 import { Dashboard } from './components/Dashboard';
@@ -11,49 +10,13 @@ import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { PublicPairingView } from './components/PublicPairingView';
 import { ProfileSetup } from './components/profile/ProfileSetup';
 import { InviteLanding } from './components/invites/InviteLanding';
-import { Waves, LayoutDashboard, Calendar, LogOut, Menu, X, Ship, Users, ClipboardCheck, Settings, Cloud, CloudOff, RefreshCw, LayoutGrid, History as HistoryIcon, Clock, ChevronLeft, Home, Shield, Loader2, Sparkles, FileText, AlertOctagon } from 'lucide-react';
-import { APP_VERSION, Role } from './types';
+import { AuthGuard } from './components/auth/AuthGuard';
+import { usePermissions } from './hooks/usePermissions';
+import { Waves, LogOut, Menu, X, Ship, LayoutGrid, Calendar, Shield, Loader2, Sparkles, FileText, AlertOctagon, RefreshCw, Cloud, Home, ChevronLeft } from 'lucide-react';
+import { APP_VERSION, AccessLevel } from './types';
 import { triggerCloudSync, fetchFromCloud, fetchGlobalConfig, addLog } from './services/syncService';
 import { auth } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-
-const ProtectedAppRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, userProfile, activeClub, clubs, authInitialized, memberships } = useAppStore();
-  const location = useLocation();
-
-  if (!authInitialized) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-brand-600" size={48} /></div>;
-  if (!user) return <Navigate to="/login" />;
-  
-  if (!userProfile && location.pathname !== '/profile-setup') {
-      return <Navigate to="/profile-setup" />;
-  }
-
-  if (user.isAdmin) {
-      return <>{children}</>;
-  }
-
-  const clubExists = clubs.some(c => c.id === activeClub);
-  const membership = memberships.find(m => m.clubId === activeClub && m.status !== 'INACTIVE');
-  const isStaff = membership && (membership.role === Role.INSTRUCTOR || membership.role === Role.VOLUNTEER);
-
-  if (!activeClub || !clubExists || !isStaff) {
-      return <Navigate to="/" />;
-  }
-  
-  return <>{children}</>;
-};
-
-const SuperAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { user, userProfile, authInitialized } = useAppStore();
-    const location = useLocation();
-
-    if (!authInitialized) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-brand-600" size={48} /></div>;
-    if (!user || !user.isAdmin) return <Navigate to="/" />; 
-    if (!userProfile && location.pathname !== '/profile-setup') {
-        return <Navigate to="/profile-setup" />;
-    }
-    return <>{children}</>;
-};
 
 const NavLink: React.FC<{ to: string; icon: React.ReactNode; text: string; onClick?: () => void; className?: string }> = ({ to, icon, text, onClick, className }) => {
   const location = useLocation();
@@ -77,26 +40,24 @@ const NavLink: React.FC<{ to: string; icon: React.ReactNode; text: string; onCli
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { logout, user, activeClub, clubs, syncStatus, people, sessions, clubSettings } = useAppStore();
+  const { isSuperAdmin, isClubAdmin } = usePermissions();
+  // Fix: added missing useState import from React
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   
   const lastObservedHash = useRef<string>('');
 
-  // Sync Observer - Optimized to prevent Feedback Loops
   useEffect(() => {
-    // Only trigger sync if NOT in Error state (Fatal Lock)
     if (user && activeClub && !user.isDev && syncStatus !== 'ERROR') {
       const currentPeople = people.filter(p => p.clubId === activeClub);
-      // Create a stable minimal hash for comparison
       const hash = `${currentPeople.length}-${(sessions[activeClub]?.presentPersonIds || []).length}-${(sessions[activeClub]?.teams || []).length}`;
-
       if (hash !== lastObservedHash.current) {
         lastObservedHash.current = hash;
         triggerCloudSync(activeClub);
       }
     }
-  }, [people, sessions, clubSettings, user, activeClub]); // REMOVED syncStatus from dependencies to prevent loops
+  }, [people, sessions, clubSettings, user, activeClub]);
 
   useEffect(() => {
     if (user && activeClub && !user.isDev) {
@@ -143,11 +104,15 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-3 mb-2">תפריט ראשי</div>
             <NavLink to="/app" icon={<Calendar size={20} />} text="ניהול אימון" className="p-4" />
-            <NavLink to="/app/manage" icon={<LayoutGrid size={20} />} text="ניהול חוג" className="p-4" />
-            <NavLink to="/app/manage?view=PEOPLE" icon={<Users size={20} />} text="רשימת משתתפים" className="p-4" />
-            <NavLink to="/app/manage?view=INVITES" icon={<Sparkles size={20} />} text="לינקים וצירוף חברים" className="p-4" />
             
-            {user?.isAdmin && (
+            {isClubAdmin && (
+              <>
+                <NavLink to="/app/manage" icon={<LayoutGrid size={20} />} text="ניהול חוג" className="p-4" />
+                <NavLink to="/app/manage?view=INVITES" icon={<Sparkles size={20} />} text="לינקים וצירוף" className="p-4" />
+              </>
+            )}
+            
+            {isSuperAdmin && (
                 <>
                     <div className="h-px bg-slate-100 my-4" />
                     <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-3 mb-2">ניהול על</div>
@@ -164,12 +129,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <Home size={20} />
                 <span>חזרה לדף הבית</span>
             </button>
-            <button 
-                onClick={handleLogout}
-                className="w-full flex items-center gap-3 p-4 text-red-500 hover:bg-red-50 font-bold transition-all rounded-lg"
-            >
+            <button onClick={handleLogout} className="w-full flex items-center gap-3 p-4 text-red-500 hover:bg-red-50 font-bold transition-all rounded-lg">
                 <LogOut size={20} />
-                <span>התנתקות מהמערכת</span>
+                <span>התנתקות</span>
             </button>
         </div>
       </aside>
@@ -177,21 +139,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative flex justify-between h-16 items-center">
-            <div className="flex items-center gap-4 z-20">
-              <button 
-                onClick={() => setIsMenuOpen(!isMenuOpen)} 
-                className={`p-2 rounded-xl transition-all ${isMenuOpen ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
-              >
-                {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
-              </button>
-            </div>
+            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className={`p-2 rounded-xl transition-all ${isMenuOpen ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}>
+              {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
+            </button>
             
-            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 text-center">
+            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
                  <div className="flex items-center gap-2">
                     {activeClub === 'SAILING' ? <Ship className="text-sky-600" size={20} /> : <Waves className="text-brand-600" size={20} />}
-                    <span className="font-bold text-sm md:text-lg text-slate-800 whitespace-nowrap">
-                        {currentClub ? currentClub.label : 'TeamPlaner'}
-                    </span>
+                    <span className="font-bold text-sm md:text-lg text-slate-800">{currentClub?.label || 'TeamPlaner'}</span>
                  </div>
                  <div className="flex items-center justify-center gap-1 mt-0.5 h-4">
                     <div className="w-4 flex items-center justify-center">
@@ -199,24 +154,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                         {syncStatus === 'SYNCED' && <Cloud size={10} className="text-green-500" />}
                         {syncStatus === 'ERROR' && <AlertOctagon size={10} className="text-red-500 animate-pulse" />}
                     </div>
-                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter ml-1">
-                        {syncStatus === 'SYNCED' ? 'Cloud Saved' : syncStatus === 'SYNCING' ? 'Syncing...' : syncStatus === 'ERROR' ? 'FATAL LOCK - REFRESH F5' : 'Local'}
+                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
+                        {syncStatus === 'SYNCED' ? 'Cloud Saved' : syncStatus === 'SYNCING' ? 'Syncing...' : syncStatus === 'ERROR' ? 'FATAL LOCK' : 'Local'}
                     </span>
                  </div>
             </div>
 
-            <div className="flex items-center gap-3 z-20">
-              {syncStatus === 'ERROR' && (
-                  <button 
-                    onClick={() => { if((window as any).exportLogs) (window as any).exportLogs(); }} 
-                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg animate-pulse"
-                    title="ייצוא לוגים לניתוח"
-                  >
-                      <FileText size={20} />
-                  </button>
-              )}
-              <button onClick={handleLogout} className="text-slate-400 hover:text-red-500 p-2"><LogOut size={20} /></button>
-            </div>
+            <button onClick={handleLogout} className="text-slate-400 hover:text-red-500 p-2"><LogOut size={20} /></button>
           </div>
         </div>
       </nav>
@@ -226,40 +170,26 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </main>
 
       <footer className="py-8 text-center border-t border-slate-100 mt-auto bg-white/50" dir="ltr">
-         <div className="text-xs text-slate-400 opacity-70 font-medium">Built by Shay Kalimi - @Shay.A.i</div>
-         <div 
-            className="text-[10px] font-black text-slate-300 mt-2 uppercase tracking-[0.3em] cursor-help"
-            onClick={(e) => {
-                if (e.detail === 3) {
-                    if ((window as any).exportLogs) (window as any).exportLogs();
-                }
-            }}
-         >
-             v{APP_VERSION}
-         </div>
+         <div className="text-xs text-slate-400 opacity-70">Built by Shay Kalimi - v{APP_VERSION}</div>
       </footer>
     </div>
   );
 };
 
 const App: React.FC = () => {
-  const { loadUserResources, setAuthInitialized, superAdmins, protectedAdmins, permissions, setAuthError } = useAppStore();
-  const initializedRef = useRef(false); // PREVENTS MOUNTING LOOP
+  const { loadUserResources, setAuthInitialized, setAuthError } = useAppStore();
+  const initializedRef = useRef(false);
 
   useEffect(() => {
-    // CRITICAL FIX: Ensure effect runs exactly ONCE per session
     if (initializedRef.current) return;
     initializedRef.current = true;
 
     fetchGlobalConfig();
-    addLog("System starting...");
+    addLog("System starting v5.0.0...");
     
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         const state = useAppStore.getState();
-        const currentUser = state.user;
-        const currentPath = window.location.hash; 
-        
-        if (currentUser && currentUser.isDev) {
+        if (state.user?.isDev) {
             setAuthInitialized(true);
             return;
         }
@@ -269,30 +199,18 @@ const App: React.FC = () => {
             const isSuperAdmin = state.superAdmins.some(a => a.toLowerCase() === email) || 
                                state.protectedAdmins.some(a => a.toLowerCase() === email);
             
-            const isStaff = state.permissions.some(p => p.email.toLowerCase() === email);
-            const isAuthorized = isSuperAdmin || isStaff;
-            const isInvitePath = currentPath.includes('/join/');
-            
-            if (!isAuthorized && !isInvitePath) {
-                addLog(`CRITICAL: Unauthorized access blocked for: ${email}`);
-                setAuthError("הגישה למנהלים מורשים בלבד. אם ברצונך להצטרף כחבר, אנא השתמש בלינק הזמנה.");
-                await signOut(auth);
-                useAppStore.setState({ user: null, userProfile: null, memberships: [] });
-            } else {
-                useAppStore.setState({ 
-                    user: { 
-                        uid: firebaseUser.uid, 
-                        email: email, 
-                        isAdmin: isSuperAdmin, 
-                        photoURL: firebaseUser.photoURL || undefined,
-                        isDev: false
-                    } 
-                });
-                await loadUserResources(firebaseUser.uid);
-            }
+            useAppStore.setState({ 
+                user: { 
+                    uid: firebaseUser.uid, 
+                    email: email, 
+                    isAdmin: isSuperAdmin, 
+                    photoURL: firebaseUser.photoURL || undefined,
+                    isDev: false
+                } 
+            });
+            await loadUserResources(firebaseUser.uid);
         } else {
-            const current = useAppStore.getState().user;
-            if (!current || !current.isDev) {
+            if (!state.user?.isDev) {
                 useAppStore.setState({ user: null, userProfile: null, memberships: [] });
             }
         }
@@ -300,7 +218,7 @@ const App: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, []); // Empty dependencies + initializedRef = Guaranteed single run
+  }, []);
 
   return (
     <Router>
@@ -309,10 +227,13 @@ const App: React.FC = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/join/:token" element={<InviteLanding />} />
         <Route path="/share" element={<PublicPairingView />} />
-        <Route path="/profile-setup" element={<ProfileSetup />} />
-        <Route path="/super-admin" element={<SuperAdminRoute><Layout><SuperAdminDashboard /></Layout></SuperAdminRoute>} />
-        <Route path="/app" element={<ProtectedAppRoute><Layout><SessionManager /></Layout></ProtectedAppRoute>} />
-        <Route path="/app/manage" element={<ProtectedAppRoute><Layout><Dashboard /></Layout></ProtectedAppRoute>} />
+        <Route path="/profile-setup" element={<AuthGuard requireProfile={false}><ProfileSetup /></AuthGuard>} />
+        
+        {/* Protected Routes with AuthGuard */}
+        <Route path="/super-admin" element={<AuthGuard requiredLevel={AccessLevel.SUPER_ADMIN}><Layout><SuperAdminDashboard /></Layout></AuthGuard>} />
+        <Route path="/app" element={<AuthGuard requiredLevel={AccessLevel.STAFF}><Layout><SessionManager /></Layout></AuthGuard>} />
+        <Route path="/app/manage" element={<AuthGuard requiredLevel={AccessLevel.CLUB_ADMIN}><Layout><Dashboard /></Layout></AuthGuard>} />
+        
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>

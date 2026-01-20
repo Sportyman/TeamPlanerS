@@ -6,6 +6,14 @@ export enum Role {
   GUEST = 'GUEST',
 }
 
+export enum AccessLevel {
+  NONE = 0,
+  MEMBER = 1,     // הצופה: רואה רק את השיבוץ שלו
+  STAFF = 2,      // המבצע: יכול לנהל נוכחות ושיבוץ (מדריכים/מתנדבים)
+  CLUB_ADMIN = 3, // המנהל: ניהול ציוד, חברים והרשאות בתוך החוג
+  SUPER_ADMIN = 4 // הבעלים: ניהול מערכת גלובלי
+}
+
 export enum Gender {
   MALE = 'MALE',
   FEMALE = 'FEMALE',
@@ -38,25 +46,26 @@ export interface UserProfile {
   uid: string;
   firstName: string;
   lastName: string;
-  email: string; // Google Email (Read-only reference)
-  contactEmail: string; // User editable contact email
+  email: string;
+  contactEmail: string;
   photoURL?: string;
   gender: Gender;
-  birthDate: string; // ISO
+  birthDate: string;
   primaryPhone: string;
   emergencyContacts: EmergencyContact[];
-  medicalNotes?: string; // Optional
+  medicalNotes?: string;
   certifications: Certification[];
-  isSkipper: boolean; // Direct flag for easier logic
-  joinedSystemDate: string; // ISO
+  isSkipper: boolean;
+  joinedSystemDate: string;
 }
 
 export interface ClubMembership {
   uid: string;
   clubId: ClubID;
   role: Role;
+  accessLevel?: AccessLevel; // New in v5.0.0
   status: MembershipStatus;
-  joinedClubDate: string; // ISO
+  joinedClubDate: string;
   rank: number;
   clubSpecificNotes?: string;
 }
@@ -65,11 +74,12 @@ export interface ClubInvite {
   id: string;
   clubId: ClubID;
   role: Role;
+  accessLevel?: AccessLevel;
   autoApprove: boolean;
   token: string;
   usageCount: number;
   createdAt: string;
-  createdBy: string; // UID
+  createdBy: string;
   isActive: boolean;
 }
 
@@ -137,10 +147,11 @@ export interface ClubSettings {
 
 export interface UserPermission {
   email: string;
-  allowedClubs: ClubID[];
+  clubId: ClubID;
+  accessLevel: AccessLevel;
 }
 
-export const APP_VERSION = '4.6.0'; 
+export const APP_VERSION = '5.0.0'; 
 
 export const TEAM_COLORS = [
   'bg-blue-50 border-blue-200',      
