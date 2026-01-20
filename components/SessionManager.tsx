@@ -57,7 +57,7 @@ export const SessionManager: React.FC = () => {
   const clubPeople = people.filter(p => p.clubId === activeClub);
   const [localInventory, setLocalInventory] = useState<BoatInventory>(currentSession.inventory);
 
-  // Sync internal state when store updates
+  // Sync internal state when store updates 
   useEffect(() => {
     setLocalInventory(currentSession.inventory);
   }, [currentSession.inventory]);

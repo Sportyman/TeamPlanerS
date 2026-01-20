@@ -39,6 +39,7 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         user: state.user,
         userProfile: state.userProfile,
+        activeClub: state.activeClub, // CRITICAL FIX: Persist the selected club
         memberships: state.memberships,
         people: state.people,
         sessions: state.sessions,
