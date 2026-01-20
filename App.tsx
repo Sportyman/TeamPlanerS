@@ -23,6 +23,14 @@ const AppContent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, activeClub, isInitialLoading, syncStatus, people, sessions, clubSettings } = useAppStore();
   const lastObservedHash = useRef<string>('');
 
+  // CRITICAL: Effects must be at the TOP level, before any conditional returns
+  useEffect(() => {
+    if (user && activeClub && !user.isDev) {
+        addLog(`AppContent: Triggering fetchFromCloud for ${activeClub}`, 'SYNC');
+        fetchFromCloud(activeClub);
+    }
+  }, [user, activeClub]);
+
   useEffect(() => {
     if (user && activeClub && !user.isDev && syncStatus === 'SYNCED') {
       const currentPeople = people.filter(p => p.clubId === activeClub);
@@ -34,14 +42,9 @@ const AppContent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     }
   }, [people, sessions, clubSettings, user, activeClub, syncStatus]);
 
-  useEffect(() => {
-    if (user && activeClub && !user.isDev) {
-        fetchFromCloud(activeClub);
-    }
-  }, [user, activeClub]);
-
+  // Loading Guard after Effects
   if (activeClub && isInitialLoading) {
-      return <MainLayout><LoadingScreen /></MainLayout>;
+      return <MainLayout><LoadingScreen message="מסנכרן נתוני מועדון..." /></MainLayout>;
   }
 
   return <MainLayout>{children}</MainLayout>;
@@ -56,7 +59,7 @@ const App: React.FC = () => {
     initializedRef.current = true;
 
     fetchGlobalConfig();
-    addLog("System starting v5.2.0...", 'INFO');
+    addLog("System starting v5.2.1...", 'INFO');
     
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         const state = useAppStore.getState();
@@ -74,8 +77,12 @@ const App: React.FC = () => {
                 user: { uid: firebaseUser.uid, email, isAdmin: isSuperAdmin, photoURL: firebaseUser.photoURL || undefined, isDev: false } 
             });
             await loadUserResources(firebaseUser.uid);
+            addLog("Auth: User resources loaded", 'INFO');
         } else {
-            if (!state.user?.isDev) useAppStore.setState({ user: null, userProfile: null, memberships: [] });
+            if (!state.user?.isDev) {
+                useAppStore.setState({ user: null, userProfile: null, memberships: [] });
+                addLog("Auth: No user found", 'INFO');
+            }
         }
         setAuthInitialized(true);
     });

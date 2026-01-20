@@ -4,7 +4,7 @@ import { useAppStore } from '../store';
 import { BoatInventory } from '../types';
 import { AlertTriangle, RotateCcw, ArrowRight } from 'lucide-react';
 import { PairingBoard } from './PairingBoard';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
 import { StepIndicator } from './session/StepIndicator';
 import { AttendanceList } from './session/AttendanceList';
 import { InventorySelector } from './session/InventorySelector';
@@ -29,7 +29,12 @@ export const SessionManager: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Guards for active club and global loading state
+  // If we land here without a club (e.g. refresh lost state or superadmin bypass), 
+  // redirect to selection instead of showing a permanent loading spinner.
+  if (!activeClub && !isInitialLoading) {
+      return <Navigate to="/" replace />;
+  }
+
   if (!activeClub) return <LoadingScreen message="מזהה חוג..." />;
   if (isInitialLoading) return <LoadingScreen message="מסנכרן נתוני אימון..." />;
 
