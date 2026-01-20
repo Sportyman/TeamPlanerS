@@ -11,6 +11,7 @@ import { PublicPairingView } from './components/PublicPairingView';
 import { ProfileSetup } from './components/profile/ProfileSetup';
 import { InviteLanding } from './components/invites/InviteLanding';
 import { AuthGuard } from './components/auth/AuthGuard';
+import { DebugOverlay } from './components/debug/DebugOverlay';
 import { usePermissions } from './hooks/usePermissions';
 import { Waves, LogOut, Menu, X, Ship, LayoutGrid, Calendar, Shield, Loader2, Sparkles, FileText, AlertOctagon, RefreshCw, Cloud, Home, ChevronLeft } from 'lucide-react';
 import { APP_VERSION, AccessLevel } from './types';
@@ -41,7 +42,6 @@ const NavLink: React.FC<{ to: string; icon: React.ReactNode; text: string; onCli
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { logout, user, activeClub, clubs, syncStatus, people, sessions, clubSettings } = useAppStore();
   const { isSuperAdmin, isClubAdmin } = usePermissions();
-  // Fix: added missing useState import from React
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -169,6 +169,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {children}
       </main>
 
+      <DebugOverlay />
+
       <footer className="py-8 text-center border-t border-slate-100 mt-auto bg-white/50" dir="ltr">
          <div className="text-xs text-slate-400 opacity-70">Built by Shay Kalimi - v{APP_VERSION}</div>
       </footer>
@@ -185,7 +187,7 @@ const App: React.FC = () => {
     initializedRef.current = true;
 
     fetchGlobalConfig();
-    addLog("System starting v5.0.0...");
+    addLog("System starting v5.1.0...", 'INFO');
     
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         const state = useAppStore.getState();

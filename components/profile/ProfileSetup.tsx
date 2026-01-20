@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../store';
-import { saveUserProfile } from '../../services/profileService';
-import { addPersonToClubCloud } from '../../services/syncService';
-// Added MembershipStatus to the imports to resolve the error on line 81
+import { saveUserProfile, joinClub } from '../../services/profileService';
+import { addPersonToClubCloud, addLog } from '../../services/syncService';
 import { UserProfile, Gender, GenderLabel, EmergencyContact, Certification, Role, Person, MembershipStatus } from '../../types';
 import { User, Phone, Calendar, HeartPulse, Plus, Trash2, Save, LogOut, Mail, ShipWheel, Award, UserCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -55,6 +54,7 @@ export const ProfileSetup: React.FC = () => {
 
     setLoading(true);
     setError(null);
+    addLog(`User ${user.email} is saving profile...`, 'INFO');
 
     const newProfile: UserProfile = {
       uid: user.uid,
@@ -74,12 +74,19 @@ export const ProfileSetup: React.FC = () => {
     };
 
     try {
+      // 1. Save global profile
       await saveUserProfile(newProfile);
       setUserProfile(newProfile);
+      addLog("Global profile saved successfully", 'SYNC');
 
-      // Add to club people list if authorized
+      // 2. Sync active memberships to clubs and membership collection
       for (const m of memberships) {
           if (m.status === MembershipStatus.ACTIVE) {
+              addLog(`Syncing membership for club: ${m.clubId}`, 'SYNC');
+              
+              // Ensure membership document exists in collection
+              await joinClub(m); 
+
               const personData: Person = {
                   id: user.uid,
                   clubId: m.clubId,
@@ -91,25 +98,21 @@ export const ProfileSetup: React.FC = () => {
                   isSkipper: isSkipper,
                   notes: medicalNotes
               };
+              
+              // Ensure person is in club's person list
               await addPersonToClubCloud(m.clubId, personData);
           }
       }
 
-      // REDIRECT LOGIC FIX:
-      // If Super Admin, go to management app if a club is selected, otherwise to super dashboard
+      addLog("Profile setup complete. Redirecting...", 'INFO');
       if (user.isAdmin) {
-          if (activeClub) {
-              navigate('/app');
-          } else {
-              navigate('/super-admin');
-          }
+          if (activeClub) navigate('/app');
+          else navigate('/super-admin');
           return;
       }
-
-      // Regular members/staff go to landing to see their portal
       navigate('/');
     } catch (err: any) {
-      console.error("Profile save error:", err);
+      addLog(`Profile Setup Error: ${err.message}`, 'ERROR');
       setError("שגיאה בשמירת הפרופיל. נסה שנית.");
     } finally {
       setLoading(false);
