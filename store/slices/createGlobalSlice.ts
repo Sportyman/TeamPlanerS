@@ -12,6 +12,7 @@ export interface GlobalSlice {
   people: Person[];
   syncStatus: SyncStatus;
   isInitialLoading: boolean;
+  _hasHydrated: boolean; // Track if store finished reading from localStorage
 
   setActiveClub: (clubId: ClubID) => void;
   setSyncStatus: (status: SyncStatus) => void;
@@ -28,6 +29,7 @@ export interface GlobalSlice {
   saveBoatDefinitions: (defs: BoatDefinition[]) => void;
   loadSampleGroup: () => void;
   setInitialLoading: (isLoading: boolean) => void;
+  setHasHydrated: (val: boolean) => void;
 }
 
 export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (set, get) => ({
@@ -40,10 +42,12 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
   people: [], 
   syncStatus: 'OFFLINE',
   isInitialLoading: false,
+  _hasHydrated: false,
 
   setActiveClub: (clubId) => set({ activeClub: clubId }),
   setSyncStatus: (status) => set({ syncStatus: status }),
   setInitialLoading: (isLoading) => set({ isInitialLoading: isLoading }),
+  setHasHydrated: (val) => set({ _hasHydrated: val }),
   
   setGlobalConfig: (config) => set({ 
       superAdmins: config.superAdmins.map(a => a.toLowerCase().trim()),

@@ -31,6 +31,11 @@ export const useAppStore = create<AppState>()(
     {
       name: 'etgarim-storage',
       version: 45.0, 
+      onRehydrateStorage: () => (state) => {
+          if (state) {
+              state.setHasHydrated(true);
+          }
+      },
       partialize: (state) => ({
         user: state.user,
         userProfile: state.userProfile,

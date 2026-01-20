@@ -51,7 +51,7 @@ const AppContent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const App: React.FC = () => {
-  const { loadUserResources, setAuthInitialized } = useAppStore();
+  const { loadUserResources, setAuthInitialized, _hasHydrated } = useAppStore();
   const initializedRef = useRef(false);
 
   useEffect(() => {
@@ -59,7 +59,7 @@ const App: React.FC = () => {
     initializedRef.current = true;
 
     fetchGlobalConfig();
-    addLog("System starting v5.2.1...", 'INFO');
+    addLog("System starting v5.2.2...", 'INFO');
     
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         const state = useAppStore.getState();
@@ -89,6 +89,11 @@ const App: React.FC = () => {
 
     return () => unsubscribe();
   }, []);
+
+  // Hydration Guard: Don't boot the router until we've read from localStorage
+  if (!_hasHydrated) {
+    return <LoadingScreen message="מטעין הגדרות מקומיות..." />;
+  }
 
   return (
     <Router>

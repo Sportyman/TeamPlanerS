@@ -23,15 +23,16 @@ export const SessionManager: React.FC = () => {
     resetSession,
     clubSettings,
     pairingDirty,
-    isInitialLoading
+    isInitialLoading,
+    _hasHydrated
   } = useAppStore();
 
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // If we land here without a club (e.g. refresh lost state or superadmin bypass), 
-  // redirect to selection instead of showing a permanent loading spinner.
-  if (!activeClub && !isInitialLoading) {
+  // If we land here without a club after hydration and loading is done, 
+  // then we really don't have an active club selection.
+  if (_hasHydrated && !isInitialLoading && !activeClub) {
       return <Navigate to="/" replace />;
   }
 
