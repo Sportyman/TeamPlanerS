@@ -4,7 +4,7 @@ import { AppState } from '../store';
 import { auth, googleProvider } from '../../firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { getUserProfile, getUserMemberships } from '../../services/profileService';
-import { UserProfile, ClubMembership, UserPermission, ClubID, Gender, MembershipStatus } from '../../types';
+import { UserProfile, ClubMembership, UserPermission, ClubID, Gender, MembershipStatus, AccessLevel } from '../../types';
 
 export interface AuthSlice {
   user: { uid: string; email: string; isAdmin: boolean; photoURL?: string; isDev?: boolean } | null;
@@ -26,7 +26,7 @@ export interface AuthSlice {
   refreshMemberships: () => Promise<void>;
   addSuperAdmin: (email: string) => void;
   removeSuperAdmin: (email: string) => void;
-  addPermission: (email: string, clubId: ClubID) => void;
+  addPermission: (email: string, clubId: ClubID, level: AccessLevel) => void;
   removePermission: (email: string, clubId: ClubID) => void;
 }
 
@@ -146,25 +146,28 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     return { superAdmins: state.superAdmins.filter(a => a.toLowerCase() !== normalized) };
   }),
 
-  addPermission: (email, clubId) => set(state => {
-    const existing = state.permissions.find(p => p.email === email);
-    let newPermissions;
-    if (existing) {
-      if (existing.allowedClubs.includes(clubId)) return state;
-      newPermissions = state.permissions.map(p => 
-        p.email === email ? { ...p, allowedClubs: [...p.allowedClubs, clubId] } : p
-      );
-    } else {
-      newPermissions = [...state.permissions, { email, allowedClubs: [clubId] }];
-    }
-    return { permissions: newPermissions };
+  addPermission: (email, clubId, level) => set(state => {
+    const normalizedEmail = email.toLowerCase().trim();
+    // Remove any existing permission for this specific email + club combination
+    const filteredPermissions = state.permissions.filter(p => 
+      !(p.email.toLowerCase() === normalizedEmail && p.clubId === clubId)
+    );
+    
+    const newPermission: UserPermission = {
+      email: normalizedEmail,
+      clubId,
+      accessLevel: level
+    };
+    
+    return { permissions: [...filteredPermissions, newPermission] };
   }),
 
-  removePermission: (email, clubId) => set(state => ({
-    permissions: state.permissions.map(p => 
-      p.email === email 
-        ? { ...p, allowedClubs: p.allowedClubs.filter(c => c !== clubId) }
-        : p
-    ).filter(p => p.allowedClubs.length > 0)
-  })),
+  removePermission: (email, clubId) => set(state => {
+    const normalizedEmail = email.toLowerCase().trim();
+    return {
+      permissions: state.permissions.filter(p => 
+        !(p.email.toLowerCase() === normalizedEmail && p.clubId === clubId)
+      )
+    };
+  }),
 });
