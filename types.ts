@@ -63,7 +63,7 @@ export interface ClubMembership {
   uid: string;
   clubId: ClubID;
   role: Role;
-  accessLevel?: AccessLevel; // New in v5.0.0
+  accessLevel?: AccessLevel; 
   status: MembershipStatus;
   joinedClubDate: string;
   rank: number;
@@ -151,7 +151,7 @@ export interface UserPermission {
   accessLevel: AccessLevel;
 }
 
-export const APP_VERSION = '5.0.0'; 
+export const APP_VERSION = '5.2.0'; 
 
 export const TEAM_COLORS = [
   'bg-blue-50 border-blue-200',      

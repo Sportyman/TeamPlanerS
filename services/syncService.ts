@@ -8,7 +8,6 @@ let syncTimeout: any = null;
 let lastSyncPayload: string = '';
 let isFatalError = false; 
 
-// --- ADVANCED LOGGING SYSTEM ---
 const systemLogs: { time: string; msg: string; type: 'INFO' | 'WARN' | 'ERROR' | 'SYNC' }[] = [];
 
 export const addLog = (msg: string, type: 'INFO' | 'WARN' | 'ERROR' | 'SYNC' = 'INFO') => {
@@ -35,7 +34,6 @@ export const downloadSystemLogs = () => {
     addLog("Logs exported by user", 'INFO');
 };
 
-// --- RATE LIMITER ---
 let requestTimes: number[] = [];
 const RATE_LIMIT_PER_MINUTE = 40; 
 
@@ -86,7 +84,7 @@ export const fetchGlobalConfig = async () => {
             addLog("Global configuration loaded successfully", 'SYNC');
         } else {
             addLog("Global config document missing, starting fresh", 'WARN');
-            setSyncStatus('SYNCED'); // Connected, just empty
+            setSyncStatus('SYNCED'); 
         }
     } catch (error) {
         addLog(`Global Config Fetch Error: ${error}`, 'ERROR');
@@ -99,7 +97,6 @@ export const addPersonToClubCloud = async (clubId: ClubID, person: Person) => {
     addLog(`Attempting to sync person ${person.name} to club ${clubId}`, 'SYNC');
     try {
         const clubDocRef = doc(db, 'clubs', clubId);
-        // Use setDoc with merge to avoid 'No document to update'
         await setDoc(clubDocRef, {
             people: arrayUnion(person)
         }, { merge: true });
@@ -161,9 +158,14 @@ export const syncToCloud = async (clubId: ClubID) => {
 
 export const fetchFromCloud = async (clubId: ClubID) => {
     if (isFatalError) return;
-    const { setCloudData, setSyncStatus, user } = useAppStore.getState();
-    if (!user || user.isDev) return;
+    const { setCloudData, setSyncStatus, setInitialLoading, user } = useAppStore.getState();
+    if (!user || user.isDev) {
+        setInitialLoading(false);
+        return;
+    }
 
+    setSyncStatus('SYNCING');
+    setInitialLoading(true);
     addLog(`Fetching data for club ${clubId}...`, 'SYNC');
     try {
         const clubDocRef = doc(db, 'clubs', clubId);
@@ -171,28 +173,34 @@ export const fetchFromCloud = async (clubId: ClubID) => {
 
         if (docSnap.exists()) {
             const data = docSnap.data();
-            lastSyncPayload = getStablePayload(
-                data.people || [], 
-                data.session || { inventory: {}, presentPersonIds: [], teams: [] }, 
-                data.settings || { boatDefinitions: [] }, 
-                data.snapshots || []
-            );
+            const cloudPeople = data.people || [];
+            const cloudSession = data.session || { inventory: {}, presentPersonIds: [], teams: [] };
+            const cloudSettings = data.settings || { boatDefinitions: [] };
+            const cloudSnapshots = data.snapshots || [];
+
+            lastSyncPayload = getStablePayload(cloudPeople, cloudSession, cloudSettings, cloudSnapshots);
 
             setCloudData({
-                people: data.people as Person[],
-                sessions: { [clubId]: data.session as SessionState },
-                settings: { [clubId]: data.settings as ClubSettings },
-                snapshots: { [clubId]: data.snapshots as PersonSnapshot[] || [] }
+                people: cloudPeople,
+                sessions: { [clubId]: cloudSession },
+                settings: { [clubId]: cloudSettings },
+                snapshots: { [clubId]: cloudSnapshots }
             });
-            setSyncStatus('SYNCED');
             addLog(`Club ${clubId} data loaded successfully`, 'SYNC');
         } else {
-            addLog(`No cloud data for club ${clubId}, starting clean`, 'INFO');
-            setSyncStatus('SYNCED');
+            addLog(`No cloud data for club ${clubId}, clean start`, 'INFO');
+            setCloudData({
+                people: [],
+                sessions: { [clubId]: { inventory: {}, presentPersonIds: [], teams: [] } },
+                settings: { [clubId]: { boatDefinitions: [] } },
+                snapshots: { [clubId]: [] }
+            });
         }
     } catch (error) {
         addLog(`Cloud Fetch Error: ${error}`, 'ERROR');
         setSyncStatus('OFFLINE');
+    } finally {
+        setInitialLoading(false);
     }
 };
 

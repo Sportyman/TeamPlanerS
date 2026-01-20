@@ -11,6 +11,7 @@ export interface GlobalSlice {
   clubSettings: Record<ClubID, ClubSettings>;
   people: Person[];
   syncStatus: SyncStatus;
+  isInitialLoading: boolean;
 
   setActiveClub: (clubId: ClubID) => void;
   setSyncStatus: (status: SyncStatus) => void;
@@ -26,6 +27,7 @@ export interface GlobalSlice {
   importClubData: (data: any) => void;
   saveBoatDefinitions: (defs: BoatDefinition[]) => void;
   loadSampleGroup: () => void;
+  setInitialLoading: (isLoading: boolean) => void;
 }
 
 export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (set, get) => ({
@@ -35,17 +37,19 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
     'KAYAK': { boatDefinitions: KAYAK_DEFINITIONS },
     'SAILING': { boatDefinitions: SAILING_DEFINITIONS },
   },
-  people: [], // App starts empty as requested
+  people: [], 
   syncStatus: 'OFFLINE',
+  isInitialLoading: false,
 
   setActiveClub: (clubId) => set({ activeClub: clubId }),
   setSyncStatus: (status) => set({ syncStatus: status }),
+  setInitialLoading: (isLoading) => set({ isInitialLoading: isLoading }),
   
   setGlobalConfig: (config) => set({ 
       superAdmins: config.superAdmins.map(a => a.toLowerCase().trim()),
       protectedAdmins: (config.protectedAdmins || []).map(a => a.toLowerCase().trim()),
       permissions: config.permissions || [],
-      syncStatus: 'SYNCED' // Success loading config means we are online
+      syncStatus: 'SYNCED'
   }),
 
   addClub: (label) => set(state => {
@@ -73,7 +77,8 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
     sessions: { ...state.sessions, ...data.sessions },
     clubSettings: { ...state.clubSettings, ...data.settings },
     snapshots: data.snapshots ? { ...state.snapshots, ...data.snapshots } : state.snapshots,
-    syncStatus: 'SYNCED'
+    syncStatus: 'SYNCED',
+    isInitialLoading: false
   })),
 
   addPerson: (personData) => set((state) => {
@@ -100,7 +105,7 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
 
   restoreDemoData: () => set(() => ({ 
     clubs: DEFAULT_CLUBS,
-    people: [], // Keep it empty even on reset, user must load samples manually
+    people: [], 
     clubSettings: { 'KAYAK': { boatDefinitions: KAYAK_DEFINITIONS }, 'SAILING': { boatDefinitions: SAILING_DEFINITIONS } },
     sessions: {
       'KAYAK': { ...EMPTY_SESSION, inventory: createInventoryFromDefs(KAYAK_DEFINITIONS) },
@@ -148,7 +153,6 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
     const { activeClub, people } = state;
     if (!activeClub) return state;
 
-    // Filter mock data for current club type and assign new unique IDs
     const clubType = activeClub.includes('SAILING') ? 'SAILING' : 'KAYAK';
     const samples = INITIAL_PEOPLE
         .filter(p => p.clubId === clubType)
