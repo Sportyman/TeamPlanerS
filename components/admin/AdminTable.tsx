@@ -1,9 +1,11 @@
 
-import React from 'react';
-import { Trash2, ShieldAlert, Lock, UserX, UserCheck, XCircle } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ShieldAlert, Lock, UserX, UserCheck, XCircle, Loader2 } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { useAppStore } from '../../store';
-import { Role } from '../../types';
+import { Role, ClubMembership, AccessLevel } from '../../types';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 interface AdminTableProps {
   onRemoveSuper: (email: string) => void;
@@ -11,10 +13,33 @@ interface AdminTableProps {
 }
 
 export const AdminTable: React.FC<AdminTableProps> = ({ onRemoveSuper, onRemoveClubAdmin }) => {
-  const { superAdmins, protectedAdmins, people, clubs } = useAppStore();
+  const { superAdmins, protectedAdmins, clubs, user } = useAppStore();
+  const [clubAdmins, setClubAdmins] = useState<(ClubMembership & { name?: string })[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Combine protected and manual super admins for display
   const allSuperAdmins = Array.from(new Set([...protectedAdmins, ...superAdmins]));
+
+  useEffect(() => {
+    const fetchAdmins = async () => {
+      if (!user) return;
+      setLoading(true);
+      try {
+        // Fetch all memberships that have admin/staff access
+        const q = query(collection(db, 'memberships'), where('accessLevel', '>=', AccessLevel.STAFF));
+        const snap = await getDocs(q);
+        const adminMemberships = snap.docs.map(d => d.data() as ClubMembership);
+        
+        // Enhance with names from profiles (simplified for now)
+        setClubAdmins(adminMemberships);
+      } catch (err) {
+        console.error("Error fetching admins:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAdmins();
+  }, [user]);
 
   return (
     <div className="space-y-8">
@@ -63,35 +88,39 @@ export const AdminTable: React.FC<AdminTableProps> = ({ onRemoveSuper, onRemoveC
       {/* Club Admins Section */}
       <section className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-6 bg-slate-50 border-b border-slate-100">
-          <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm">מנהלי חוגים פעילים</h3>
+          <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm">מנהלי חוגים והרשאות צוות</h3>
         </div>
         <div className="divide-y divide-slate-50">
-          {people.filter(p => p.role === Role.INSTRUCTOR).length === 0 ? (
+          {loading ? (
+             <div className="p-12 text-center"><Loader2 className="animate-spin mx-auto text-brand-600" /></div>
+          ) : clubAdmins.length === 0 ? (
             <div className="p-16 text-center text-slate-400 italic bg-slate-50/50">
               <UserCheck size={48} className="mx-auto mb-4 opacity-10" />
-              <p>לא נמצאו מנהלי חוגים פעילים במערכת</p>
+              <p>לא נמצאו בעלי הרשאות בחוגים</p>
             </div>
           ) : (
-            people.filter(p => p.role === Role.INSTRUCTOR).map((p) => {
-              const club = clubs.find(c => c.id === p.clubId);
+            clubAdmins.map((m) => {
+              const club = clubs.find(c => c.id === m.clubId);
               return (
-                <div key={p.id + p.clubId} className="p-5 flex items-center justify-between group hover:bg-slate-50/50 transition-colors">
+                <div key={m.uid + m.clubId} className="p-5 flex items-center justify-between group hover:bg-slate-50/50 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-sky-100 text-sky-600 rounded-2xl flex items-center justify-center shadow-sm">
                       <UserCheck size={24} />
                     </div>
                     <div>
-                      <div className="font-black text-slate-800 text-lg leading-tight">{p.name}</div>
-                      <div className="text-xs text-slate-400 font-mono mt-0.5">{p.id}</div>
+                      <div className="font-black text-slate-800 text-lg leading-tight">{m.uid}</div>
                       <div className="flex gap-2 mt-1.5">
-                        <StatusBadge type="CLUB_ADMIN" label={club?.label || p.clubId} />
+                        <StatusBadge 
+                            type="CLUB_ADMIN" 
+                            label={`${club?.label || m.clubId} (${m.accessLevel === AccessLevel.CLUB_ADMIN ? 'ניהול' : 'צוות'})`} 
+                        />
                       </div>
                     </div>
                   </div>
                   <button
-                    onClick={() => onRemoveClubAdmin(p.id, p.clubId)}
+                    onClick={() => onRemoveClubAdmin(m.uid, m.clubId)}
                     className="p-3 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all"
-                    title="הסר מניהול חוג"
+                    title="ביטול הרשאת ניהול"
                   >
                     <XCircle size={24} />
                   </button>

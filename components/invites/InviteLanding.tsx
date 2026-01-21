@@ -4,7 +4,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store';
 import { validateInviteToken, incrementInviteUsage } from '../../services/inviteService';
 import { joinClub } from '../../services/profileService';
-import { ClubInvite, Role, MembershipStatus, ClubID, Gender } from '../../types';
+import { addPersonToClubCloud, addLog } from '../../services/syncService';
+import { ClubInvite, Role, MembershipStatus, ClubID, Gender, Person } from '../../types';
 import { Waves, Ship, Loader2, ShieldCheck, ArrowLeft, AlertCircle, LogIn, Anchor } from 'lucide-react';
 
 export const InviteLanding: React.FC = () => {
@@ -40,14 +41,33 @@ export const InviteLanding: React.FC = () => {
             uid: user.uid,
             clubId: invite.clubId,
             role: invite.role,
+            accessLevel: invite.accessLevel || (invite.role === Role.INSTRUCTOR ? 3 : 2),
             status: invite.autoApprove ? MembershipStatus.ACTIVE : MembershipStatus.PENDING,
             joinedClubDate: new Date().toISOString(),
-            rank: 3 // Default rank
+            rank: 3 
         };
 
+        // 1. Update Membership Collection (Auth)
         await joinClub(membership);
         await incrementInviteUsage(invite.id);
         
+        // 2. If Auto-Approve, Sync to People List (Display/Pairing)
+        if (invite.autoApprove) {
+            const displayName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}` : user.email.split('@')[0];
+            const personData: Person = {
+                id: user.uid,
+                clubId: invite.clubId,
+                name: displayName,
+                gender: userProfile?.gender || Gender.MALE,
+                phone: userProfile?.primaryPhone || '',
+                role: invite.role,
+                rank: 3,
+                isSkipper: userProfile?.isSkipper || false
+            };
+            await addPersonToClubCloud(invite.clubId, personData);
+            addLog(`InviteLanding: User ${user.uid} synced to People list of ${invite.clubId}`, 'SYNC');
+        }
+
         setActiveClub(invite.clubId);
 
         if (!userProfile) {
@@ -143,14 +163,9 @@ export const InviteLanding: React.FC = () => {
                     >
                         {isProcessing ? <Loader2 className="animate-spin" /> : <>אני רוצה להצטרף <ArrowLeft size={24} /></>}
                     </button>
-                    <p className="text-center text-[10px] text-slate-400">לחיצה על הכפתור מהווה הסכמה להצטרפות לחוג {clubName}</p>
                 </div>
             )}
         </div>
-      </div>
-      
-      <div className="mt-8 text-center" dir="ltr">
-         <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">TeamPlaner Hybrid</div>
       </div>
     </div>
   );

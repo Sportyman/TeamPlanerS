@@ -3,8 +3,8 @@ import { useState } from 'react';
 import { useAppStore } from '../../store';
 import { addSuperAdminToCloud, removeSuperAdminFromCloud } from '../../services/auth/superAdminService';
 import { setClubAccessLevel } from '../../services/auth/clubAdminService';
-import { AccessLevel, ClubID, Role } from '../../types';
-import { addLog } from '../../services/syncService';
+import { AccessLevel, ClubID, Role, Person } from '../../types';
+import { addLog, addPersonToClubCloud, triggerCloudSync } from '../../services/syncService';
 
 export const useAdminActions = () => {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -16,9 +16,7 @@ export const useAdminActions = () => {
     setError(null);
     try {
       await addSuperAdminToCloud(email);
-      // Force local store update
       addSuperAdmin(email); 
-      addLog(`useAdminActions: Locally promoted ${email} to Super Admin`, 'INFO');
       return true;
     } catch (err: any) {
       setError(err.message || "Failed to promote to Super Admin");
@@ -33,9 +31,7 @@ export const useAdminActions = () => {
     setError(null);
     try {
       await removeSuperAdminFromCloud(email, protectedAdmins);
-      // Force local store update
       removeSuperAdmin(email); 
-      addLog(`useAdminActions: Locally demoted Super Admin ${email}`, 'INFO');
       return true;
     } catch (err: any) {
       setError(err.message || "Failed to demote Super Admin");
@@ -51,19 +47,32 @@ export const useAdminActions = () => {
     try {
       addLog(`Updating Club Level for ${uid} to ${level}`, 'INFO');
       
-      // 1. Update Firestore Membership
+      // 1. Update Firestore Membership (The Authority)
       await setClubAccessLevel(clubId, uid, level);
       
-      // 2. Immediate Local UI Refresh for the People List
-      const targetPerson = people.find(p => p.id === uid && p.clubId === clubId);
+      // 2. Sync to People List (The Display)
+      let targetPerson = people.find(p => p.id === uid && p.clubId === clubId);
+      
+      let newRole = Role.MEMBER;
+      if (level >= AccessLevel.CLUB_ADMIN) newRole = Role.INSTRUCTOR;
+      else if (level >= AccessLevel.STAFF) newRole = Role.VOLUNTEER;
+      
       if (targetPerson) {
-          let newRole = Role.MEMBER;
-          if (level >= AccessLevel.CLUB_ADMIN) newRole = Role.INSTRUCTOR;
-          else if (level >= AccessLevel.STAFF) newRole = Role.VOLUNTEER;
-          else if (level === AccessLevel.NONE) newRole = Role.GUEST;
-          
-          updatePerson({ ...targetPerson, role: newRole });
-          addLog(`Locally updated role for ${targetPerson.name} to ${newRole}`, 'SYNC');
+          const updated = { ...targetPerson, role: newRole };
+          updatePerson(updated);
+          // We don't need a special cloud sync call here because App.tsx 
+          // watches 'people' and triggers triggerCloudSync automatically
+      } else {
+          // If person not in list, create a skeleton record so they appear
+          const skeleton: Person = {
+              id: uid,
+              clubId,
+              name: uid.split('@')[0], // Fallback if name unknown
+              gender: (window as any).lastSelectedGender || 'MALE' as any,
+              role: newRole,
+              rank: 3
+          };
+          await addPersonToClubCloud(clubId, skeleton);
       }
 
       return true;
