@@ -3,6 +3,7 @@ import React from 'react';
 import { Trash2, ShieldAlert, Lock, UserX, UserCheck, XCircle } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { useAppStore } from '../../store';
+import { Role } from '../../types';
 
 interface AdminTableProps {
   onRemoveSuper: (email: string) => void;
@@ -12,16 +13,19 @@ interface AdminTableProps {
 export const AdminTable: React.FC<AdminTableProps> = ({ onRemoveSuper, onRemoveClubAdmin }) => {
   const { superAdmins, protectedAdmins, people, clubs } = useAppStore();
 
+  // Combine protected and manual super admins for display
+  const allSuperAdmins = Array.from(new Set([...protectedAdmins, ...superAdmins]));
+
   return (
     <div className="space-y-8">
       {/* Super Admins Section */}
       <section className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
           <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm">מנהלי על גלובליים</h3>
-          <span className="text-[10px] font-black bg-white px-3 py-1 rounded-full border text-slate-400 shadow-sm">TOTAL: {superAdmins.length}</span>
+          <span className="text-[10px] font-black bg-white px-3 py-1 rounded-full border text-slate-400 shadow-sm">TOTAL: {allSuperAdmins.length}</span>
         </div>
         <div className="divide-y divide-slate-50">
-          {superAdmins.map((email) => {
+          {allSuperAdmins.map((email) => {
             const isProtected = protectedAdmins.some(a => a.toLowerCase() === email.toLowerCase());
             return (
               <div key={email} className="p-5 flex items-center justify-between group hover:bg-slate-50/50 transition-colors">
@@ -62,13 +66,13 @@ export const AdminTable: React.FC<AdminTableProps> = ({ onRemoveSuper, onRemoveC
           <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm">מנהלי חוגים פעילים</h3>
         </div>
         <div className="divide-y divide-slate-50">
-          {people.filter(p => p.role === 'INSTRUCTOR').length === 0 ? (
+          {people.filter(p => p.role === Role.INSTRUCTOR).length === 0 ? (
             <div className="p-16 text-center text-slate-400 italic bg-slate-50/50">
               <UserCheck size={48} className="mx-auto mb-4 opacity-10" />
               <p>לא נמצאו מנהלי חוגים פעילים במערכת</p>
             </div>
           ) : (
-            people.filter(p => p.role === 'INSTRUCTOR').map((p) => {
+            people.filter(p => p.role === Role.INSTRUCTOR).map((p) => {
               const club = clubs.find(c => c.id === p.clubId);
               return (
                 <div key={p.id + p.clubId} className="p-5 flex items-center justify-between group hover:bg-slate-50/50 transition-colors">

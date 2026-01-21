@@ -16,7 +16,9 @@ export const useAdminActions = () => {
     setError(null);
     try {
       await addSuperAdminToCloud(email);
+      // Force local store update
       addSuperAdmin(email); 
+      addLog(`useAdminActions: Locally promoted ${email} to Super Admin`, 'INFO');
       return true;
     } catch (err: any) {
       setError(err.message || "Failed to promote to Super Admin");
@@ -31,7 +33,9 @@ export const useAdminActions = () => {
     setError(null);
     try {
       await removeSuperAdminFromCloud(email, protectedAdmins);
+      // Force local store update
       removeSuperAdmin(email); 
+      addLog(`useAdminActions: Locally demoted Super Admin ${email}`, 'INFO');
       return true;
     } catch (err: any) {
       setError(err.message || "Failed to demote Super Admin");
