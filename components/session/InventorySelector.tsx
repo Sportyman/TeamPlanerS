@@ -17,7 +17,7 @@ export const InventorySelector: React.FC<InventorySelectorProps> = ({
   clubLabel, boatDefinitions, localInventory, onInventoryChange, onStartPairing, onBack
 }) => {
   const navigate = useNavigate();
-  // Fix: Explicitly type reduce generic and cast values to resolve unknown type addition error
+  //  Fix: Explicitly type reduce generic and cast values to resolve unknown type addition error
   const totalBoats = Object.values(localInventory).reduce<number>((a, b) => a + (Number(b) || 0), 0);
 
   return (
