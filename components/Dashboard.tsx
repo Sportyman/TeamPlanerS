@@ -13,13 +13,12 @@ import { MembershipRequests } from './dashboard/MembershipRequests';
 type ViewMode = 'MENU' | 'PEOPLE' | 'INVENTORY' | 'MEMBERSHIPS' | 'INVITES';
 
 export const Dashboard: React.FC = () => {
-  const { people, activeClub, clubs, addPerson, updatePerson, removePerson, restoreDemoData, importClubData, clubSettings, saveBoatDefinitions, loadSampleGroup } = useAppStore();
+  const { people, activeClub, clubs, addPerson, updatePerson, removePerson, restoreDemoData, clubSettings, loadSampleGroup } = useAppStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [view, setView] = useState<ViewMode>('MENU');
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const v = searchParams.get('view') as ViewMode;
@@ -47,7 +46,7 @@ export const Dashboard: React.FC = () => {
 
   if (view === 'INVITES') return <div className="max-w-4xl mx-auto py-6"><button onClick={() => navigate('/app/manage')} className="flex items-center gap-2 text-slate-500 mb-6"><ArrowRight size={20} /> חזרה</button><InviteManager /></div>;
   if (view === 'MEMBERSHIPS') return <MembershipRequests clubId={activeClub} onApprove={handleApprove} onBack={() => navigate('/app/manage')} />;
-  if (view === 'INVENTORY') return <InventoryEditor clubId={activeClub} definitions={settings.boatDefinitions} onSave={(defs) => { saveBoatDefinitions(defs); navigate('/app'); }} onCancel={() => navigate('/app/manage')} />;
+  if (view === 'INVENTORY') return <InventoryEditor clubId={activeClub} definitions={settings.boatDefinitions} onSave={(defs) => { navigate('/app'); }} onCancel={() => navigate('/app/manage')} />;
 
   if (view === 'PEOPLE') return (
     <div className="space-y-6 pb-20">
@@ -69,13 +68,20 @@ export const Dashboard: React.FC = () => {
       <div className="max-w-4xl mx-auto py-8">
           <h1 className="text-2xl font-bold text-slate-800 mb-8 text-center">ניהול {currentClubLabel}</h1>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-              <button onClick={() => navigate('/app')} className="col-span-1 md:col-span-2 bg-brand-600 text-white p-6 rounded-2xl flex items-center justify-center gap-4"><Calendar size={32} /><div><h3 className="font-bold text-xl">מעבר לשיבוץ</h3><p className="text-sm opacity-80">חזרה למסך האימון הראשי</p></div></button>
+              <button onClick={() => navigate('/app')} className="col-span-1 md:col-span-2 bg-brand-600 text-white p-6 rounded-2xl flex items-center justify-center gap-4 shadow-lg shadow-brand-100"><Calendar size={32} /><div><h3 className="font-bold text-xl text-right">מעבר לשיבוץ</h3><p className="text-sm opacity-80 text-right">חזרה למסך האימון הראשי</p></div></button>
+              
+              <button onClick={() => setIsAdding(true)} className="bg-white p-8 rounded-2xl border-2 border-brand-100 flex flex-col items-center gap-4 shadow-sm hover:border-brand-500 transition-all text-brand-600">
+                <UserPlus size={48} />
+                <h3 className="font-black text-lg">משתתף חדש</h3>
+              </button>
+
+              <button onClick={() => navigate('/app/manage?view=PEOPLE')} className="bg-white p-8 rounded-2xl border flex flex-col items-center gap-4 shadow-sm"><Users size={32} className="text-slate-600"/><h3 className="font-bold">ניהול רשימה</h3></button>
               <button onClick={() => navigate('/app/manage?view=INVITES')} className="bg-white p-8 rounded-2xl border flex flex-col items-center gap-4 shadow-sm"><Sparkles size={32} className="text-brand-600"/><h3 className="font-bold">לינקים וצירוף</h3></button>
-              <button onClick={() => navigate('/app/manage?view=PEOPLE')} className="bg-white p-8 rounded-2xl border flex flex-col items-center gap-4 shadow-sm"><Users size={32} className="text-slate-600"/><h3 className="font-bold">ניהול משתתפים</h3></button>
               <button onClick={() => navigate('/app/manage?view=MEMBERSHIPS')} className="bg-white p-8 rounded-2xl border flex flex-col items-center gap-4 shadow-sm"><Clock size={32} className="text-emerald-600"/><h3 className="font-bold">בקשות הצטרפות</h3></button>
               <button onClick={() => navigate('/app/manage?view=INVENTORY')} className="bg-white p-8 rounded-2xl border flex flex-col items-center gap-4 shadow-sm"><Ship size={32} className="text-orange-600"/><h3 className="font-bold">ניהול ציוד</h3></button>
               <button onClick={() => confirm('איפוס דמו?') && restoreDemoData()} className="col-span-1 md:col-span-2 mt-4 text-slate-400 text-sm flex items-center justify-center gap-2"><Database size={16} /> איפוס מלא לדמו</button>
           </div>
+          {(isAdding) && <PersonEditorModal allPeople={clubPeople} boatDefinitions={settings.boatDefinitions} onClose={() => setIsAdding(false)} onSave={(p) => { addPerson(p); setIsAdding(false); }} />}
       </div>
   );
 };

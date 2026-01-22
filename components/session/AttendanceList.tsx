@@ -1,7 +1,9 @@
 
 import React, { useState } from 'react';
 import { Person, Role, getRoleLabel } from '../../types';
-import { CheckSquare, Square, Shield, ArrowDownAZ, ArrowUpNarrowWide, CheckCircle2, Circle, ShipWheel, ArrowLeft } from 'lucide-react';
+import { CheckSquare, Square, Shield, ArrowDownAZ, ArrowUpNarrowWide, CheckCircle2, Circle, ShipWheel, ArrowLeft, UserPlus } from 'lucide-react';
+import { PersonEditorModal } from '../dashboard/PersonEditorModal';
+import { useAppStore } from '../../store';
 
 type SortType = 'ROLE' | 'NAME' | 'RANK';
 
@@ -16,7 +18,9 @@ interface AttendanceListProps {
 export const AttendanceList: React.FC<AttendanceListProps> = ({
   people, presentIds, onToggle, onBulkSelect, onNext
 }) => {
+  const { addPerson, clubSettings, activeClub } = useAppStore();
   const [sortBy, setSortBy] = useState<SortType>('ROLE');
+  const [isAddingQuickly, setIsAddingQuickly] = useState(false);
 
   const getSortedPeople = () => {
     const sorted = [...people];
@@ -37,7 +41,7 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
   };
 
   const getCardStyle = (role: Role, isPresent: boolean) => {
-      const base = "flex items-center justify-between p-4 rounded-2xl border text-right transition-all duration-300 select-none shadow-sm group";
+      const base = "flex items-center justify-between p-4 rounded-2xl border text-right transition-all duration-300 select-none shadow-sm group relative overflow-hidden";
       if (!isPresent) return `${base} border-slate-100 bg-white text-slate-400 hover:border-slate-300 hover:text-slate-600 grayscale`;
       switch(role) {
           case Role.INSTRUCTOR: return `${base} border-cyan-500 bg-cyan-50 text-cyan-900 ring-2 ring-cyan-500/20`;
@@ -47,12 +51,22 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
       }
   };
 
+  const boatDefs = activeClub ? (clubSettings[activeClub]?.boatDefinitions || []) : [];
+
   return (
     <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 animate-in fade-in slide-in-from-bottom-4">
       <div className="flex flex-col gap-6 mb-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-6">
            <div>
-             <h2 className="text-3xl font-black text-slate-800 tracking-tight">מי הגיע היום?</h2>
+             <div className="flex items-center gap-3">
+                <h2 className="text-3xl font-black text-slate-800 tracking-tight">מי הגיע היום?</h2>
+                <button 
+                    onClick={() => setIsAddingQuickly(true)}
+                    className="bg-brand-100 text-brand-700 p-2 rounded-xl hover:bg-brand-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-xs font-black"
+                >
+                    <UserPlus size={18} /> הוספת משתתף
+                </button>
+             </div>
              <div className="flex flex-wrap gap-2 mt-2">
                 <span className="text-orange-700 bg-orange-50 px-3 py-1 rounded-full border border-orange-200 text-xs font-bold uppercase">מתנדבים: {stats.vols}</span>
                 <span className="text-sky-700 bg-sky-50 px-3 py-1 rounded-full border border-sky-200 text-xs font-bold uppercase">חברים: {stats.mems}</span>
@@ -106,6 +120,15 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
             הבא: ציוד <ArrowLeft size={24} />
         </button>
       </div>
+
+      {isAddingQuickly && (
+          <PersonEditorModal 
+            allPeople={people} 
+            boatDefinitions={boatDefs} 
+            onClose={() => setIsAddingQuickly(false)} 
+            onSave={(p) => { addPerson(p); setIsAddingQuickly(false); }} 
+          />
+      )}
     </div>
   );
 };
