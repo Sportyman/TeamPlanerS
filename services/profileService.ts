@@ -1,11 +1,8 @@
 
 import { db } from '../firebase';
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { UserProfile, ClubMembership, ClubID } from '../types';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
+import { UserProfile, ClubMembership, ClubID, MembershipStatus } from '../types';
 
-/**
- * Global User Profile Operations
- */
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
     try {
         const docRef = doc(db, 'profiles', uid);
@@ -27,9 +24,6 @@ export const saveUserProfile = async (profile: UserProfile): Promise<void> => {
     }
 };
 
-/**
- * Club Membership Operations
- */
 export const getUserMemberships = async (uid: string): Promise<ClubMembership[]> => {
     try {
         const q = query(collection(db, 'memberships'), where('uid', '==', uid));
@@ -48,6 +42,19 @@ export const joinClub = async (membership: ClubMembership): Promise<void> => {
         await setDoc(docRef, membership, { merge: true });
     } catch (error) {
         console.error("Error joining club:", error);
+        throw error;
+    }
+};
+
+export const approveMembership = async (membershipId: string): Promise<void> => {
+    try {
+        const docRef = doc(db, 'memberships', membershipId);
+        await updateDoc(docRef, {
+            status: MembershipStatus.ACTIVE,
+            approvedAt: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error("Error in approveMembership service:", error);
         throw error;
     }
 };

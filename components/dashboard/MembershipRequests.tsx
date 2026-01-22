@@ -19,7 +19,7 @@ export const MembershipRequests: React.FC<MembershipRequestsProps> = ({ clubId, 
         const fetchRequests = async () => {
             setLoading(true);
             try {
-                // Fetch ALL memberships for this club that are PENDING
+                // 1. Fetch PENDING memberships
                 const q = query(
                     collection(db, 'memberships'), 
                     where('clubId', '==', clubId),
@@ -27,24 +27,25 @@ export const MembershipRequests: React.FC<MembershipRequestsProps> = ({ clubId, 
                 );
                 
                 const snap = await getDocs(q);
-                const members = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                const rawMembers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 
-                // Fetch profiles for each pending user
-                const requestsWithProfiles = await Promise.all(members.map(async (m: any) => {
+                // 2. Hydrate each membership with Profile data
+                const populated = await Promise.all(rawMembers.map(async (m: any) => {
+                    if (!m.uid) return m;
                     try {
                         const profileSnap = await getDoc(doc(db, 'profiles', m.uid));
-                        return { 
-                            ...m, 
-                            profile: profileSnap.exists() ? profileSnap.data() : null 
-                        };
+                        if (profileSnap.exists()) {
+                            return { ...m, profile: profileSnap.data() };
+                        }
                     } catch (e) {
-                        return { ...m, profile: null };
+                        console.error("Error hydration profile for", m.uid, e);
                     }
+                    return m;
                 }));
                 
-                setRequests(requestsWithProfiles);
+                setRequests(populated);
             } catch (err) { 
-                console.error("Error fetching requests:", err); 
+                console.error("Error in fetchRequests:", err); 
             } finally {
                 setLoading(false);
             }
@@ -61,62 +62,43 @@ export const MembershipRequests: React.FC<MembershipRequestsProps> = ({ clubId, 
             <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200">
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
-                        <div className="bg-emerald-50 p-3 rounded-2xl text-emerald-600">
-                            <Clock size={28} />
-                        </div>
+                        <div className="bg-emerald-50 p-3 rounded-2xl text-emerald-600"><Clock size={28} /></div>
                         <h2 className="text-3xl font-black text-slate-800">בקשות הצטרפות</h2>
                     </div>
-                    {requests.length > 0 && (
-                        <span className="bg-emerald-100 text-emerald-700 px-4 py-1.5 rounded-full font-black text-sm border border-emerald-200 uppercase tracking-wider animate-pulse">
-                            {requests.length} PENDING
-                        </span>
-                    )}
                 </div>
 
                 {loading ? (
-                    <div className="py-20 text-center text-slate-400">
-                        <Loader2 className="animate-spin mx-auto mb-4 text-brand-600" size={48} />
-                        <p className="font-bold">סורק בקשות...</p>
-                    </div>
+                    <div className="py-20 text-center"><Loader2 className="animate-spin mx-auto mb-4 text-brand-600" size={48} /><p className="font-bold text-slate-400">סורק בקשות...</p></div>
                 ) : requests.length === 0 ? (
                     <div className="py-24 text-center text-slate-400 bg-slate-50/50 rounded-3xl border-2 border-dashed border-slate-100">
                         <CheckCircle size={64} className="mx-auto mb-6 opacity-10" />
-                        <p className="text-xl font-medium">אין בקשות הממתינות לאישור כרגע</p>
-                        <p className="text-sm mt-2">כל מי שהשתמש בלינקים מסוג "אישור אוטומטי" כבר מופיע ברשימות.</p>
+                        <p className="text-xl font-medium">אין בקשות הממתינות לאישור</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {requests.map((m, i) => (
-                            <div key={m.id || i} className="p-6 bg-slate-50 rounded-3xl border border-slate-200 flex flex-col justify-between gap-6 hover:border-emerald-200 transition-all hover:shadow-lg group">
+                            <div key={m.id || i} className="p-6 bg-slate-50 rounded-3xl border border-slate-200 flex flex-col justify-between gap-6 hover:shadow-lg transition-all">
                                 <div className="flex items-start gap-4">
-                                    <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-slate-300 shadow-inner group-hover:text-emerald-500 transition-colors">
-                                        <UserCircle size={32} />
+                                    <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center overflow-hidden border border-slate-100 shadow-inner">
+                                        {m.profile?.photoURL ? (
+                                            <img src={m.profile.photoURL} alt="User" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <UserCircle size={32} className="text-slate-200" />
+                                        )}
                                     </div>
-                                    <div className="flex-1 overflow-hidden">
+                                    <div className="flex-1">
                                         <h3 className="font-black text-slate-800 text-xl truncate">
-                                            {m.profile ? `${m.profile.firstName} ${m.profile.lastName}` : (m.uid.includes('@') ? m.uid.split('@')[0] : 'משתמש חדש')}
+                                            {m.profile ? `${m.profile.firstName} ${m.profile.lastName}` : (m.uid?.split('@')[0] || 'משתמש חדש')}
                                         </h3>
-                                        <div className="flex flex-wrap gap-2 mt-2">
-                                            <span className="text-[10px] font-black bg-white border border-slate-100 px-3 py-1 rounded-full text-slate-500 shadow-sm">
+                                        <div className="flex gap-2 mt-2">
+                                            <span className="text-[10px] font-black bg-white border border-slate-100 px-3 py-1 rounded-full text-slate-500">
                                                 {getRoleLabel(m.role || Role.MEMBER, m.profile?.gender || Gender.MALE)}
-                                            </span>
-                                            <span className="text-[10px] font-black bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 shadow-sm uppercase tracking-widest">
-                                                PENDING
                                             </span>
                                         </div>
                                     </div>
                                 </div>
-                                
-                                {m.profile?.primaryPhone && (
-                                    <div className="text-xs text-slate-400 bg-white/50 p-2 rounded-xl border border-slate-100 font-mono text-center" dir="ltr">
-                                        {m.profile.primaryPhone}
-                                    </div>
-                                )}
-
-                                <button 
-                                    onClick={() => onApprove(m)} 
-                                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-3 shadow-lg shadow-emerald-100 transition-all active:scale-95"
-                                >
+                                {m.profile?.primaryPhone && <div className="text-xs text-slate-400 bg-white/50 p-2 rounded-xl text-center font-mono" dir="ltr">{m.profile.primaryPhone}</div>}
+                                <button onClick={() => onApprove(m)} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-3 transition-all active:scale-95">
                                     <CheckCircle size={24} /> אשר הצטרפות
                                 </button>
                             </div>

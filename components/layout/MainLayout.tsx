@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '../../store';
 import { usePermissions } from '../../hooks/usePermissions';
-import { Waves, LogOut, Menu, X, Ship, LayoutGrid, Calendar, Shield, Sparkles, Home, ChevronLeft, Cloud, RefreshCw, AlertOctagon, Bell, User } from 'lucide-react';
+import { Waves, LogOut, Menu, X, Ship, LayoutGrid, Calendar, Shield, Sparkles, Home, ChevronLeft, Cloud, RefreshCw, AlertOctagon, Bell, User, Clock } from 'lucide-react';
 
 const NavLink: React.FC<{ to: string; icon: React.ReactNode; text: string; onClick?: () => void; className?: string }> = ({ to, icon, text, onClick, className }) => {
   const location = useLocation();
@@ -26,9 +26,10 @@ const NavLink: React.FC<{ to: string; icon: React.ReactNode; text: string; onCli
 }
 
 export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { logout, activeClub, clubs, syncStatus, user, userProfile } = useAppStore();
+  const { logout, activeClub, clubs, syncStatus, user, userProfile, notifications, unreadCount, clearUnread } = useAppStore();
   const { isSuperAdmin, isClubAdmin } = usePermissions();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -43,69 +44,41 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
       }
   };
 
+  const handleBellClick = () => {
+      if (!isNotifOpen) clearUnread();
+      setIsNotifOpen(!isNotifOpen);
+  };
+
   const currentClub = clubs.find(c => c.id === activeClub);
-  const displayName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}` : (user?.email?.split('@')[0] || 'משתמש');
+  const firstName = userProfile?.firstName || (user?.email?.split('@')[0] || 'משתמש');
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {isMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 animate-in fade-in duration-300"
-          onClick={() => setIsMenuOpen(false)}
-        />
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 animate-in fade-in" onClick={() => setIsMenuOpen(false)} />
       )}
 
       <aside className={`fixed top-0 right-0 h-full w-72 bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out flex flex-col ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center gap-4">
-            <button onClick={() => setIsMenuOpen(false)} className="p-2 text-slate-400 rounded-full hover:bg-slate-200 transition-colors shrink-0">
-                <X size={24} />
-            </button>
-            <div className="text-brand-600 shrink-0">
-                <Bell size={24} />
-            </div>
-            <div className="flex items-center gap-3 overflow-hidden">
-                 <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white shadow-lg shrink-0">
-                    {activeClub === 'SAILING' ? <Ship size={16} /> : <Waves size={16} />}
-                 </div>
-                 <div className="font-black text-slate-800 leading-tight truncate">
-                    <div className="text-sm">אתגרים</div>
-                    <div className="text-[9px] text-slate-400 uppercase tracking-widest truncate">{currentClub?.label}</div>
-                 </div>
+            <button onClick={() => setIsMenuOpen(false)} className="p-2 text-slate-400 rounded-full hover:bg-slate-200 shrink-0"><X size={24} /></button>
+            <div className="text-brand-600 shrink-0"><Bell size={24} /></div>
+            <div className="font-black text-slate-800 leading-tight truncate">
+                <div className="text-sm">אתגרים</div>
+                <div className="text-[9px] text-slate-400 uppercase tracking-widest truncate">{currentClub?.label}</div>
             </div>
         </div>
-
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-3 mb-2">תפריט ראשי</div>
             <NavLink to="/app" icon={<Calendar size={20} />} text="ניהול אימון" className="p-4" />
-            
             {isClubAdmin && (
-              <>
-                <NavLink to="/app/manage" icon={<LayoutGrid size={20} />} text="ניהול חוג" className="p-4" />
-                <NavLink to="/app/manage?view=INVITES" icon={<Sparkles size={20} />} text="לינקים וצירוף" className="p-4" />
-              </>
+              <><NavLink to="/app/manage" icon={<LayoutGrid size={20} />} text="ניהול חוג" className="p-4" /><NavLink to="/app/manage?view=INVITES" icon={<Sparkles size={20} />} text="לינקים וצירוף" className="p-4" /></>
             )}
-            
             {isSuperAdmin && (
-                <>
-                    <div className="h-px bg-slate-100 my-4" />
-                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-3 mb-2">ניהול על</div>
-                    <NavLink to="/super-admin" icon={<Shield size={20} />} text="ניהול מערכת" className="p-4" />
-                </>
+                <><div className="h-px bg-slate-100 my-4" /><NavLink to="/super-admin" icon={<Shield size={20} />} text="ניהול מערכת" className="p-4" /></>
             )}
         </div>
-
         <div className="p-4 border-t border-slate-100 bg-slate-50">
-            <button 
-                onClick={() => navigate('/')}
-                className="w-full flex items-center gap-3 p-4 text-slate-600 hover:text-brand-600 font-bold transition-all rounded-lg mb-2"
-            >
-                <Home size={20} />
-                <span>חזרה לדף הבית</span>
-            </button>
-            <button onClick={handleLogout} className="w-full flex items-center gap-3 p-4 text-red-500 hover:bg-red-50 font-bold transition-all rounded-lg">
-                <LogOut size={20} />
-                <span>התנתקות</span>
-            </button>
+            <button onClick={() => navigate('/')} className="w-full flex items-center gap-3 p-4 text-slate-600 hover:text-brand-600 font-bold transition-all rounded-lg mb-2"><Home size={20} /><span>דף הבית</span></button>
+            <button onClick={handleLogout} className="w-full flex items-center gap-3 p-4 text-red-500 hover:bg-red-50 font-bold transition-all rounded-lg"><LogOut size={20} /><span>התנתקות</span></button>
         </div>
       </aside>
 
@@ -116,44 +89,54 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
             {/* Right: Menu + Bell */}
             <div className="flex items-center gap-2">
                 <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors">
-                  {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
+                  <Menu size={28} />
                 </button>
-                <button className="p-2 text-slate-400 hover:text-brand-600 transition-colors relative">
-                    <Bell size={24} />
-                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white shadow-sm"></span>
-                </button>
+                <div className="relative">
+                    <button onClick={handleBellClick} className="p-2 text-slate-400 hover:text-brand-600 transition-colors relative">
+                        <Bell size={24} />
+                        {unreadCount > 0 && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white shadow-sm animate-bounce"></span>}
+                    </button>
+                    {isNotifOpen && (
+                        <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 z-[70]">
+                            <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">התראות</span>
+                                <button onClick={() => setIsNotifOpen(false)}><X size={14} className="text-slate-300"/></button>
+                            </div>
+                            <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
+                                {notifications.length === 0 ? (
+                                    <div className="p-8 text-center text-slate-400 text-xs">אין התראות חדשות</div>
+                                ) : (
+                                    notifications.map(n => (
+                                        <div key={n.id} className="p-4 hover:bg-slate-50 transition-colors">
+                                            <p className="text-sm font-bold text-slate-700 leading-tight">{n.message}</p>
+                                            <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-400 font-medium">
+                                                <Clock size={10}/> {new Date(n.timestamp).toLocaleTimeString('he-IL')}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
             
-            {/* Center: Club Info + Sync */}
-            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
-                 <div className="flex items-center gap-2 justify-center">
-                    {activeClub === 'SAILING' ? <Ship className="text-sky-600" size={18} /> : <Waves className="text-brand-600" size={18} />}
-                    <span className="font-black text-slate-800 text-sm hidden sm:inline">{currentClub?.label || 'TeamPlaner'}</span>
-                 </div>
-                 <div className="flex items-center justify-center gap-1 h-3 mt-0.5">
-                    <div className="w-3">
-                        {syncStatus === 'SYNCING' && <RefreshCw size={8} className="text-brand-500 animate-spin" />}
-                        {syncStatus === 'SYNCED' && <Cloud size={8} className="text-green-500" />}
-                        {syncStatus === 'ERROR' && <AlertOctagon size={8} className="text-red-500 animate-pulse" />}
-                    </div>
-                    <span className="text-[7px] font-black text-slate-400 uppercase tracking-tighter">
-                        {syncStatus === 'SYNCED' ? 'Cloud' : syncStatus === 'SYNCING' ? 'Sync' : 'Local'}
-                    </span>
-                 </div>
+            {/* Center: Sync Status */}
+            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center gap-1.5 opacity-60">
+                {syncStatus === 'SYNCING' ? <RefreshCw size={10} className="animate-spin text-brand-500" /> : <Cloud size={10} className="text-green-500" />}
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">{syncStatus}</span>
             </div>
 
             {/* Left: User Info */}
             <div className="flex items-center gap-3">
-                <div className="text-left hidden xs:block">
-                    <div className="text-[9px] text-slate-400 font-black uppercase leading-none">שלום,</div>
-                    <div className="text-xs font-black text-slate-800 leading-tight truncate max-w-[100px]">{displayName}</div>
+                <div className="text-left hidden sm:block">
+                    <div className="text-[9px] text-slate-400 font-black uppercase tracking-widest leading-none">שלום,</div>
+                    <div className="text-xs font-black text-slate-800 leading-tight truncate max-w-[100px]">{firstName}</div>
                 </div>
                 {user?.photoURL ? (
                     <img src={user.photoURL} alt="User" className="w-9 h-9 rounded-full border-2 border-slate-100 shadow-sm" />
                 ) : (
-                    <div className="w-9 h-9 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center border border-slate-200">
-                        <User size={20} />
-                    </div>
+                    <div className="w-9 h-9 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center border border-slate-200"><User size={20} /></div>
                 )}
             </div>
 

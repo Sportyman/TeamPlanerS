@@ -6,10 +6,11 @@ import { createGlobalSlice, GlobalSlice } from './slices/createGlobalSlice';
 import { createSessionSlice, SessionSlice } from './slices/createSessionSlice';
 import { createPairingSlice, PairingSlice } from './slices/createPairingSlice';
 import { createInviteSlice, InviteSlice } from './slices/createInviteSlice';
+import { createNotificationSlice, NotificationSlice } from './slices/createNotificationSlice';
 import { BoatDefinition, BoatInventory } from '../types';
 import { KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from '../mockData';
 
-export type AppState = AuthSlice & GlobalSlice & SessionSlice & PairingSlice & InviteSlice;
+export type AppState = AuthSlice & GlobalSlice & SessionSlice & PairingSlice & InviteSlice & NotificationSlice;
 
 export const EMPTY_SESSION = { inventory: {}, presentPersonIds: [], teams: [] };
 
@@ -27,10 +28,11 @@ export const useAppStore = create<AppState>()(
       ...createSessionSlice(...args),
       ...createPairingSlice(...args),
       ...createInviteSlice(...args),
+      ...createNotificationSlice(...args),
     }),
     {
       name: 'etgarim-storage',
-      version: 45.0, 
+      version: 47.0, 
       onRehydrateStorage: () => (state) => {
           if (state) {
               state.setHasHydrated(true);
@@ -39,7 +41,7 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         user: state.user,
         userProfile: state.userProfile,
-        activeClub: state.activeClub, // CRITICAL FIX: Persist the selected club
+        activeClub: state.activeClub,
         memberships: state.memberships,
         people: state.people,
         sessions: state.sessions,
@@ -50,7 +52,9 @@ export const useAppStore = create<AppState>()(
         protectedAdmins: state.protectedAdmins,
         pairingDirty: state.pairingDirty,
         snapshots: state.snapshots,
-        invites: state.invites
+        invites: state.invites,
+        notifications: state.notifications,
+        unreadCount: state.unreadCount
       })
     }
   )
