@@ -6,12 +6,12 @@ import { validateInviteToken, incrementInviteUsage } from '../../services/invite
 import { joinClub } from '../../services/profileService';
 import { addPersonToClubCloud, addLog } from '../../services/syncService';
 import { ClubInvite, Role, MembershipStatus, ClubID, Gender, Person } from '../../types';
-import { Waves, Ship, Loader2, ShieldCheck, ArrowLeft, AlertCircle, LogIn, Anchor } from 'lucide-react';
+import { Waves, Ship, Loader2, ShieldCheck, ArrowLeft, AlertCircle, LogIn, Anchor, LogOut, RefreshCw } from 'lucide-react';
 
 export const InviteLanding: React.FC = () => {
   const { token } = useParams();
   const navigate = useNavigate();
-  const { user, userProfile, clubs, loginWithGoogle, setActiveClub } = useAppStore();
+  const { user, userProfile, clubs, loginWithGoogle, logout, setActiveClub } = useAppStore();
   
   const [invite, setInvite] = useState<ClubInvite | null>(null);
   const [isValidating, setIsValidating] = useState(true);
@@ -31,6 +31,12 @@ export const InviteLanding: React.FC = () => {
     };
     checkToken();
   }, [token]);
+
+  const handleLogout = async () => {
+      if (confirm('האם להתנתק כדי להחליף משתמש?')) {
+          await logout();
+      }
+  };
 
   const handleJoin = async () => {
     if (!user || !invite) return;
@@ -149,12 +155,21 @@ export const InviteLanding: React.FC = () => {
                 </button>
             ) : (
                 <div className="space-y-4">
-                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-4">
-                        {user.photoURL && <img src={user.photoURL} alt="User" className="w-12 h-12 rounded-full border-2 border-white shadow-sm" />}
-                        <div className="overflow-hidden">
-                            <p className="text-[10px] text-slate-400 font-bold uppercase">מחובר כרגע</p>
-                            <p className="font-bold text-slate-800 truncate">{user.email}</p>
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 overflow-hidden">
+                            {user.photoURL && <img src={user.photoURL} alt="User" className="w-10 h-10 rounded-full border-2 border-white shadow-sm shrink-0" />}
+                            <div className="overflow-hidden">
+                                <p className="text-[10px] text-slate-400 font-bold uppercase">מחובר כרגע</p>
+                                <p className="font-bold text-slate-800 truncate text-sm">{user.email}</p>
+                            </div>
                         </div>
+                        <button 
+                            onClick={handleLogout}
+                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-white rounded-lg transition-all shadow-sm border border-transparent hover:border-red-100 shrink-0"
+                            title="החלף חשבון"
+                        >
+                            <RefreshCw size={18} />
+                        </button>
                     </div>
                     <button 
                         onClick={handleJoin}
