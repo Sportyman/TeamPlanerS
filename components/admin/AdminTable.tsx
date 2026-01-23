@@ -1,10 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
-import { ShieldAlert, Lock, UserX, UserCheck, XCircle, Loader2, Mail, User } from 'lucide-react';
+import { ShieldAlert, Lock, UserX, UserCheck, XCircle, Loader2, Mail, User, AlertCircle } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { useAppStore } from '../../store';
 import { ClubMembership, AccessLevel, UserProfile } from '../../types';
-import { collection, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 interface AdminTableProps {
@@ -17,37 +17,58 @@ export const AdminTable: React.FC<AdminTableProps> = ({ onRemoveSuper, onRemoveC
   const [clubAdmins, setClubAdmins] = useState<ClubMembership[]>([]);
   const [profilesCache, setProfilesCache] = useState<Record<string, UserProfile>>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const allSuperAdmins = Array.from(new Set([...protectedAdmins, ...superAdmins]));
 
-  // 1. Listen to memberships
+  // 1. Listen to memberships with accessLevel >= STAFF
   useEffect(() => {
     if (!user) return;
     setLoading(true);
-    const q = query(collection(db, 'memberships'), where('accessLevel', '>=', AccessLevel.STAFF));
+    setError(null);
     
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const adminMemberships = snap.docs.map(d => d.data() as ClubMembership);
-      setClubAdmins(adminMemberships);
-      setLoading(false);
-    });
-    return () => unsubscribe();
+    try {
+        const q = query(
+            collection(db, 'memberships'), 
+            where('accessLevel', '>=', AccessLevel.STAFF),
+            limit(100)
+        );
+        
+        const unsubscribe = onSnapshot(q, (snap) => {
+          const adminMemberships = snap.docs.map(d => d.data() as ClubMembership);
+          setClubAdmins(adminMemberships);
+          setLoading(false);
+        }, (err) => {
+          console.error("Firestore Admin Query Error:", err);
+          setError("אין הרשאה מספקת לשליפת רשימת המנהלים.");
+          setLoading(false);
+        });
+        
+        return () => unsubscribe();
+    } catch (e) {
+        setError("שגיאה בהפעלת השאילתה.");
+        setLoading(false);
+    }
   }, [user]);
 
-  // 2. Hydrate profiles for UIDs found in clubAdmins
+  // 2. Hydrate profiles with timeout to prevent stuck UI
   useEffect(() => {
     const fetchMissingProfiles = async () => {
       const uidsToFetch = clubAdmins
         .map(m => m.uid)
-        .filter(uid => uid && !profilesCache[uid] && !uid.includes('@')); // Don't fetch if it's an email
+        .filter(uid => uid && !profilesCache[uid] && !uid.includes('@'));
 
       if (uidsToFetch.length === 0) return;
 
       const newProfiles = { ...profilesCache };
       await Promise.all(uidsToFetch.map(async (uid) => {
-        const snap = await getDoc(doc(db, 'profiles', uid));
-        if (snap.exists()) {
-          newProfiles[uid] = snap.data() as UserProfile;
+        try {
+            const snap = await getDoc(doc(db, 'profiles', uid));
+            if (snap.exists()) {
+              newProfiles[uid] = snap.data() as UserProfile;
+            }
+        } catch (e) {
+            console.warn("Could not fetch profile for admin:", uid);
         }
       }));
       setProfilesCache(newProfiles);
@@ -58,11 +79,17 @@ export const AdminTable: React.FC<AdminTableProps> = ({ onRemoveSuper, onRemoveC
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {error && (
+          <div className="p-6 bg-red-50 border-2 border-red-100 rounded-3xl flex items-center gap-4 text-red-700 font-bold">
+              <AlertCircle size={24} />
+              <span>{error}</span>
+          </div>
+      )}
+
       {/* Super Admins Section */}
       <section className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm">מנהלי על גלובליים</h3>
-          <span className="text-[10px] font-black bg-white px-3 py-1 rounded-full border text-slate-400 shadow-sm uppercase">סה"כ: {allSuperAdmins.length}</span>
+          <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm text-right w-full">מנהלי על גלובליים</h3>
         </div>
         <div className="divide-y divide-slate-50">
           {allSuperAdmins.map((email) => {
@@ -74,7 +101,7 @@ export const AdminTable: React.FC<AdminTableProps> = ({ onRemoveSuper, onRemoveC
                     {isProtected ? <Lock size={24} /> : <ShieldAlert size={24} />}
                   </div>
                   <div className="overflow-hidden">
-                    <div className="font-bold text-slate-800 text-base md:text-lg leading-tight truncate max-w-[200px]">{email}</div>
+                    <div className="font-bold text-slate-800 text-base leading-tight truncate max-w-[200px]">{email}</div>
                     <div className="flex gap-2 mt-1"><StatusBadge type={isProtected ? 'ROOT' : 'SUPER'} /></div>
                   </div>
                 </div>
@@ -90,7 +117,7 @@ export const AdminTable: React.FC<AdminTableProps> = ({ onRemoveSuper, onRemoveC
       {/* Club Admins Section */}
       <section className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm">מנהלי חוגים וצוות</h3>
+          <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm text-right w-full">מנהלי חוגים וצוות</h3>
           {loading && <Loader2 className="animate-spin text-brand-600" size={16} />}
         </div>
         <div className="divide-y divide-slate-50">
@@ -100,18 +127,18 @@ export const AdminTable: React.FC<AdminTableProps> = ({ onRemoveSuper, onRemoveC
             clubAdmins.map((m) => {
               const club = clubs.find(c => c.id === m.clubId);
               const profile = profilesCache[m.uid];
-              const displayName = profile ? `${profile.firstName} ${profile.lastName}` : (m.uid.includes('@') ? m.uid : 'טוען...');
+              const displayName = profile ? `${profile.firstName} ${profile.lastName}` : (m.uid.includes('@') ? m.uid : 'טוען פריט...');
               
               return (
                 <div key={m.uid + m.clubId} className="p-5 flex items-center justify-between group hover:bg-slate-50/50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-sky-100 text-sky-600 rounded-2xl flex items-center justify-center shadow-sm">
-                      {profile?.photoURL ? <img src={profile.photoURL} className="w-full h-full object-cover rounded-2xl" /> : <User size={24} />}
+                  <div className="flex items-center gap-4 text-right">
+                    <div className="w-12 h-12 bg-sky-100 text-sky-600 rounded-2xl flex items-center justify-center shadow-sm overflow-hidden">
+                      {profile?.photoURL ? <img src={profile.photoURL} className="w-full h-full object-cover" /> : <User size={24} />}
                     </div>
                     <div className="overflow-hidden">
-                      <div className="font-bold text-slate-800 text-base md:text-lg leading-tight truncate max-w-[180px] md:max-w-xs">{displayName}</div>
-                      <div className="flex gap-2 mt-1.5">
-                        <StatusBadge type="CLUB_ADMIN" label={`${club?.label || 'חוג'} (${m.accessLevel === AccessLevel.CLUB_ADMIN ? 'מנהל' : 'צוות'})`} />
+                      <div className="font-bold text-slate-800 text-base leading-tight truncate max-w-[180px]">{displayName}</div>
+                      <div className="flex gap-2 mt-1.5 justify-end">
+                        <StatusBadge type="CLUB_ADMIN" label={`${club?.label || 'חוג'}`} />
                       </div>
                     </div>
                   </div>
