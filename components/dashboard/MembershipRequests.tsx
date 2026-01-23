@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { Role, Gender, MembershipStatus, ClubID, getRoleLabel } from '../../types';
-import { Clock, CheckCircle, ArrowRight, UserCircle, Loader2, AlertCircle } from 'lucide-react';
+import { Clock, CheckCircle, ArrowRight, UserCircle, Loader2, AlertCircle, Mail } from 'lucide-react';
 
 interface MembershipRequestsProps {
     clubId: ClubID;
@@ -19,7 +19,6 @@ export const MembershipRequests: React.FC<MembershipRequestsProps> = ({ clubId, 
         const fetchRequests = async () => {
             setLoading(true);
             try {
-                // 1. Fetch PENDING memberships
                 const q = query(
                     collection(db, 'memberships'), 
                     where('clubId', '==', clubId),
@@ -29,7 +28,6 @@ export const MembershipRequests: React.FC<MembershipRequestsProps> = ({ clubId, 
                 const snap = await getDocs(q);
                 const rawMembers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 
-                // 2. Hydrate each membership with Profile data
                 const populated = await Promise.all(rawMembers.map(async (m: any) => {
                     if (!m.uid) return m;
                     try {
@@ -37,15 +35,13 @@ export const MembershipRequests: React.FC<MembershipRequestsProps> = ({ clubId, 
                         if (profileSnap.exists()) {
                             return { ...m, profile: profileSnap.data() };
                         }
-                    } catch (e) {
-                        console.error("Error hydration profile for", m.uid, e);
-                    }
+                    } catch (e) { console.error("Profile link failed:", m.uid); }
                     return m;
                 }));
                 
                 setRequests(populated);
             } catch (err) { 
-                console.error("Error in fetchRequests:", err); 
+                console.error("Fetch requests failed:", err); 
             } finally {
                 setLoading(false);
             }
@@ -76,33 +72,32 @@ export const MembershipRequests: React.FC<MembershipRequestsProps> = ({ clubId, 
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {requests.map((m, i) => (
-                            <div key={m.id || i} className="p-6 bg-slate-50 rounded-3xl border border-slate-200 flex flex-col justify-between gap-6 hover:shadow-lg transition-all">
-                                <div className="flex items-start gap-4">
-                                    <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center overflow-hidden border border-slate-100 shadow-inner">
-                                        {m.profile?.photoURL ? (
-                                            <img src={m.profile.photoURL} alt="User" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <UserCircle size={32} className="text-slate-200" />
-                                        )}
-                                    </div>
-                                    <div className="flex-1">
-                                        <h3 className="font-black text-slate-800 text-xl truncate">
-                                            {m.profile ? `${m.profile.firstName} ${m.profile.lastName}` : (m.uid?.split('@')[0] || 'משתמש חדש')}
-                                        </h3>
-                                        <div className="flex gap-2 mt-2">
-                                            <span className="text-[10px] font-black bg-white border border-slate-100 px-3 py-1 rounded-full text-slate-500">
-                                                {getRoleLabel(m.role || Role.MEMBER, m.profile?.gender || Gender.MALE)}
-                                            </span>
+                        {requests.map((m, i) => {
+                            const p = m.profile;
+                            const displayName = p ? `${p.firstName} ${p.lastName}` : (m.uid?.includes('@') ? m.uid : 'משתמש חדש');
+                            
+                            return (
+                                <div key={m.id || i} className="p-6 bg-slate-50 rounded-3xl border border-slate-200 flex flex-col justify-between gap-6 hover:shadow-lg transition-all">
+                                    <div className="flex items-start gap-4">
+                                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center overflow-hidden border border-slate-100 shadow-inner">
+                                            {p?.photoURL ? <img src={p.photoURL} alt="User" className="w-full h-full object-cover" /> : <UserCircle size={32} className="text-slate-200" />}
+                                        </div>
+                                        <div className="flex-1 overflow-hidden">
+                                            <h3 className="font-black text-slate-800 text-xl truncate">{displayName}</h3>
+                                            <div className="flex gap-2 mt-2">
+                                                <span className="text-[10px] font-black bg-white border border-slate-100 px-3 py-1 rounded-full text-slate-500 uppercase">
+                                                    {getRoleLabel(m.role || Role.MEMBER, p?.gender || Gender.MALE)}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
+                                    {p?.primaryPhone && <div className="text-xs text-slate-400 bg-white/50 p-2 rounded-xl text-center font-mono" dir="ltr">{p.primaryPhone}</div>}
+                                    <button onClick={() => onApprove(m)} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-3 transition-all active:scale-95">
+                                        <CheckCircle size={24} /> אשר הצטרפות
+                                    </button>
                                 </div>
-                                {m.profile?.primaryPhone && <div className="text-xs text-slate-400 bg-white/50 p-2 rounded-xl text-center font-mono" dir="ltr">{m.profile.primaryPhone}</div>}
-                                <button onClick={() => onApprove(m)} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-3 transition-all active:scale-95">
-                                    <CheckCircle size={24} /> אשר הצטרפות
-                                </button>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>
