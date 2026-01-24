@@ -1,14 +1,14 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAppStore } from '../../store';
-import { saveUserProfile, joinClub } from '../../services/profileService';
+import { saveUserProfile } from '../../services/profileService';
 import { addPersonToClubCloud, addLog } from '../../services/syncService';
 import { UserProfile, Gender, GenderLabel, EmergencyContact, Certification, Role, Person, MembershipStatus } from '../../types';
-import { User, Phone, Calendar, HeartPulse, Plus, Trash2, Save, LogOut, Mail, ShipWheel, Award, UserCircle2 } from 'lucide-react';
+import { User, Phone, Calendar, Save, LogOut, Mail, ShipWheel, UserCircle2, Edit3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const ProfileSetup: React.FC = () => {
-  const { user, userProfile, memberships, setUserProfile, logout, activeClub } = useAppStore();
+  const { user, userProfile, memberships, setUserProfile, logout, activeClub, addPerson } = useAppStore();
   const navigate = useNavigate();
 
   const [firstName, setFirstName] = useState(userProfile?.firstName || '');
@@ -32,6 +32,11 @@ export const ProfileSetup: React.FC = () => {
     if (val.length > 6) formatted = `${val.slice(0, 3)}-${val.slice(3, 6)}-${val.slice(6)}`;
     else if (val.length > 3) formatted = `${val.slice(0, 3)}-${val.slice(3)}`;
     setPrimaryPhone(formatted);
+  };
+
+  const handleManualDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      // Simplified validation for YYYY-MM-DD
+      setBirthDate(e.target.value);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -60,10 +65,11 @@ export const ProfileSetup: React.FC = () => {
     };
 
     try {
+      addLog(`ProfileSetup: Saving profile for ${user.uid}`, 'INFO');
       await saveUserProfile(newProfile);
       setUserProfile(newProfile);
 
-      // Sync existing active memberships to ensure name is updated in participants list
+      // CRITICAL: Automatically add to People list for any ACTIVE membership
       for (const m of memberships) {
           if (m.status === MembershipStatus.ACTIVE) {
               const personData: Person = {
@@ -72,12 +78,17 @@ export const ProfileSetup: React.FC = () => {
                   name: fullName,
                   gender,
                   phone: primaryPhone,
-                  role: m.role,
+                  role: m.role || Role.MEMBER,
                   rank: m.rank || 3,
                   isSkipper: isSkipper,
                   notes: medicalNotes
               };
               await addPersonToClubCloud(m.clubId, personData);
+              // Also update local store if this is the active club
+              if (activeClub === m.clubId) {
+                  addPerson(personData);
+              }
+              addLog(`ProfileSetup: Auto-synced Person object to club ${m.clubId}`, 'SYNC');
           }
       }
 
@@ -102,14 +113,14 @@ export const ProfileSetup: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center py-8 px-4">
-      <div className="max-w-2xl w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
+      <div className="max-w-2xl w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100 animate-in fade-in zoom-in duration-300">
         <div className="p-8 bg-brand-600 text-white relative">
             <div className="flex justify-between items-start mb-4">
                 <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-md"><UserCircle2 size={32} /></div>
                 <button onClick={handleSwitchAccount} className="bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-white/20 flex items-center gap-2"><LogOut size={14} /> החלף משתמש</button>
             </div>
             <h1 className="text-3xl font-black mb-1">פרופיל אישי</h1>
-            <p className="opacity-80 text-sm">אנא מלא את פרטיך להשלמת הרישום</p>
+            <p className="opacity-80 text-sm font-medium">אנא מלא את פרטיך להשלמת הרישום</p>
             {user?.photoURL && <img src={user.photoURL} className="w-20 h-20 rounded-2xl border-4 border-white absolute -bottom-10 left-8 shadow-xl" alt="Profile" />}
         </div>
 
@@ -117,18 +128,18 @@ export const ProfileSetup: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-2"><User size={16} /> שם פרטי</label>
-                    <input required type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none" />
+                    <input required type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none transition-all" />
                 </div>
                 <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-2"><User size={16} /> שם משפחה</label>
-                    <input required type="text" value={lastName} onChange={e => setLastName(e.target.value)} className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none" />
+                    <input required type="text" value={lastName} onChange={e => setLastName(e.target.value)} className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none transition-all" />
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-2"><Mail size={16} /> אימייל קשר</label>
-                    <input required type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none text-left" dir="ltr" />
+                    <input required type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none text-left font-medium" dir="ltr" />
                 </div>
                 <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-2"><Phone size={16} /> טלפון</label>
@@ -137,9 +148,15 @@ export const ProfileSetup: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-2"><Calendar size={16} /> תאריך לידה</label>
-                    <input required type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none" />
+                <div className="space-y-2">
+                    <label className="block text-sm font-bold text-slate-700 flex items-center gap-2"><Calendar size={16} /> תאריך לידה</label>
+                    <div className="flex gap-2">
+                        <input required type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} className="flex-1 border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none" />
+                        <div className="relative group">
+                             <input type="text" value={birthDate} onChange={handleManualDateChange} className="w-32 border rounded-xl p-3 text-center text-xs focus:ring-2 focus:ring-brand-500 outline-none" placeholder="YYYY-MM-DD" dir="ltr" />
+                             <Edit3 className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none group-focus-within:hidden" size={14} />
+                        </div>
+                    </div>
                 </div>
                 <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">מין</label>
@@ -151,14 +168,14 @@ export const ProfileSetup: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex items-center gap-2 border p-4 rounded-2xl bg-slate-50 border-slate-100">
-                <input type="checkbox" id="isSkipper" checked={isSkipper} onChange={e => setIsSkipper(e.target.checked)} className="w-5 h-5 text-brand-600 rounded" />
-                <label htmlFor="isSkipper" className="text-sm font-bold text-slate-700 flex items-center gap-2"><ShipWheel size={18} /> סקיפר / משיט</label>
+            <div className="flex items-center gap-2 border p-4 rounded-2xl bg-slate-50 border-slate-100 group transition-all hover:bg-white hover:shadow-md">
+                <input type="checkbox" id="isSkipper" checked={isSkipper} onChange={e => setIsSkipper(e.target.checked)} className="w-5 h-5 text-brand-600 rounded cursor-pointer" />
+                <label htmlFor="isSkipper" className="text-sm font-bold text-slate-700 flex items-center gap-2 cursor-pointer"><ShipWheel size={18} /> סקיפר / משיט</label>
             </div>
 
-            {error && <div className="text-red-500 text-sm font-bold text-center">{error}</div>}
+            {error && <div className="text-red-500 text-sm font-bold text-center animate-bounce">{error}</div>}
 
-            <button type="submit" disabled={loading} className="w-full bg-brand-600 hover:bg-brand-700 text-white font-black py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+            <button type="submit" disabled={loading} className="w-full bg-brand-600 hover:bg-brand-700 text-white font-black py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 shadow-brand-100">
                 {loading ? 'שומר...' : <><Save size={20} /> שמור וסיים</>}
             </button>
         </form>

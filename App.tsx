@@ -57,7 +57,7 @@ const App: React.FC = () => {
     initializedRef.current = true;
 
     fetchGlobalConfig();
-    addLog("System starting v5.2.3...", 'INFO');
+    addLog("System starting v5.5.5...", 'INFO');
     
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         const state = useAppStore.getState();
@@ -88,7 +88,6 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // WAIT FOR BOTH: Local Data (Hydration) and Cloud Identity (Auth)
   if (!_hasHydrated || !authInitialized) {
     return <LoadingScreen message="מתחבר למערכת..." />;
   }
@@ -100,7 +99,9 @@ const App: React.FC = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/join/:token" element={<InviteLanding />} />
         <Route path="/share" element={<PublicPairingView />} />
-        <Route path="/profile-setup" element={<AuthGuard requireProfile={false}><ProfileSetup /></AuthGuard>} />
+        
+        {/* FIX: Profile Setup must allow AccessLevel.NONE to prevent redirect loops */}
+        <Route path="/profile-setup" element={<AuthGuard requireProfile={false} requiredLevel={AccessLevel.NONE}><ProfileSetup /></AuthGuard>} />
         
         <Route path="/super-admin" element={<AuthGuard requiredLevel={AccessLevel.SUPER_ADMIN}><AppContent><SuperAdminDashboard /></AppContent></AuthGuard>} />
         <Route path="/app" element={<AuthGuard requiredLevel={AccessLevel.STAFF}><AppContent><SessionManager /></AppContent></AuthGuard>} />

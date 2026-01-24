@@ -1,21 +1,14 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { ClubID, APP_VERSION, Role, MembershipStatus, getRoleLabel } from '../types';
-import { Waves, Ship, Settings, Anchor, User, Loader2, LogOut, CheckCircle2, Clock, UserCheck, ShieldAlert, X, AlertCircle } from 'lucide-react';
+import { Waves, Ship, Settings, Anchor, User, Loader2, LogOut, Clock, ShieldAlert, X } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const { setActiveClub, clubs, user, userProfile, memberships, authInitialized, logout } = useAppStore();
   const [authError, setAuthError] = useState<string | null>(null);
-
-  // If logged in but no profile - FORCE them to setup
-  useEffect(() => {
-    if (authInitialized && user && !userProfile && !user.isDev) {
-        navigate('/profile-setup');
-    }
-  }, [authInitialized, user, userProfile, navigate]);
 
   const handleClubSelect = (clubId: ClubID) => {
     setAuthError(null);
@@ -65,15 +58,15 @@ export const LandingPage: React.FC = () => {
                             <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">שלום,</div>
                             <div className="text-xs font-bold text-slate-700">{userProfile ? userProfile.firstName : user.email?.split('@')[0]}</div>
                         </div>
-                        {user.photoURL ? <img src={user.photoURL} alt="U" className="w-8 h-8 rounded-full border" /> : <div className="w-8 h-8 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center"><User size={16} /></div>}
+                        {user.photoURL ? <img src={user.photoURL} alt="U" className="w-8 h-8 rounded-full border shadow-sm" /> : <div className="w-8 h-8 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center"><User size={16} /></div>}
                     </div>
-                    <button onClick={logout} className="text-slate-400 hover:text-red-500 transition-colors"><LogOut size={20} /></button>
+                    <button onClick={logout} className="p-2 text-slate-400 hover:text-red-500 transition-all hover:bg-white rounded-lg"><LogOut size={20} /></button>
                </div>
            ) : null}
       </div>
 
       <div className="w-full flex-1 flex flex-col items-center justify-center">
-          <div className="max-w-4xl w-full space-y-8">
+          <div className="max-w-4xl w-full space-y-8 animate-in fade-in duration-700">
             <div className="text-center space-y-4">
               <h1 className="text-4xl md:text-6xl font-black text-slate-800 tracking-tight">אתגרים: שיבוץ חכם</h1>
               <p className="text-lg text-slate-500 max-w-lg mx-auto leading-relaxed">מערכת הניהול והשיבוץ למועדוני ספורט</p>
@@ -117,7 +110,7 @@ export const LandingPage: React.FC = () => {
                                         {isActive && (m.role === Role.INSTRUCTOR || m.role === Role.VOLUNTEER) && (
                                             <button onClick={() => handleClubSelect(m.clubId)} className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-2xl text-sm font-black transition-all shadow-lg shadow-brand-100">ניהול</button>
                                         )}
-                                        {!isActive && <div className="text-[10px] text-slate-400 italic">בטיפול</div>}
+                                        {!isActive && <div className="text-[10px] text-slate-400 italic font-medium px-4">בטיפול</div>}
                                     </div>
                                 );
                             })}
