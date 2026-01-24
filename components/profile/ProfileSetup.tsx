@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../../store';
 import { saveUserProfile } from '../../services/profileService';
-import { addPersonToClubCloud, addLog } from '../../services/syncService';
+import { addPersonToClubCloud, addLog, sendNotificationToClub } from '../../services/syncService';
 import { UserProfile, Gender, GenderLabel, EmergencyContact, Certification, Role, Person, MembershipStatus } from '../../types';
 import { User, Phone, Calendar, Save, LogOut, Mail, ShipWheel, UserCircle2, Edit3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -35,7 +35,6 @@ export const ProfileSetup: React.FC = () => {
   };
 
   const handleManualDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      // Simplified validation for YYYY-MM-DD
       setBirthDate(e.target.value);
   };
 
@@ -65,12 +64,13 @@ export const ProfileSetup: React.FC = () => {
     };
 
     try {
-      addLog(`ProfileSetup: Saving profile for ${user.uid}`, 'INFO');
       await saveUserProfile(newProfile);
       setUserProfile(newProfile);
 
-      // CRITICAL: Automatically add to People list for any ACTIVE membership
       for (const m of memberships) {
+          // Notify admins of this club
+          await sendNotificationToClub(m.clubId, `משתמש חדש סיים הרשמה: ${fullName}`, 'INFO');
+
           if (m.status === MembershipStatus.ACTIVE) {
               const personData: Person = {
                   id: user.uid,
@@ -84,19 +84,13 @@ export const ProfileSetup: React.FC = () => {
                   notes: medicalNotes
               };
               await addPersonToClubCloud(m.clubId, personData);
-              // Also update local store if this is the active club
               if (activeClub === m.clubId) {
                   addPerson(personData);
               }
-              addLog(`ProfileSetup: Auto-synced Person object to club ${m.clubId}`, 'SYNC');
           }
       }
 
-      if (user.isAdmin) {
-          navigate(activeClub ? '/app' : '/super-admin');
-      } else {
-          navigate('/');
-      }
+      navigate('/registration-status');
     } catch (err: any) {
       setError("שגיאה בשמירה. נסה שנית.");
     } finally {

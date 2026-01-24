@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { Role, Gender, MembershipStatus, ClubID, getRoleLabel } from '../../types';
-import { Clock, CheckCircle, ArrowRight, UserCircle, Loader2, AlertCircle, Mail } from 'lucide-react';
+import { Clock, CheckCircle, ArrowRight, UserCircle, Loader2, AlertCircle, Eye } from 'lucide-react';
+import { RequestReviewModal } from './RequestReviewModal';
 
 interface MembershipRequestsProps {
     clubId: ClubID;
@@ -14,39 +15,31 @@ interface MembershipRequestsProps {
 export const MembershipRequests: React.FC<MembershipRequestsProps> = ({ clubId, onApprove, onBack }) => {
     const [requests, setRequests] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [reviewingRequest, setReviewingRequest] = useState<any | null>(null);
 
     useEffect(() => {
-        const fetchRequests = async () => {
-            setLoading(true);
-            try {
-                const q = query(
-                    collection(db, 'memberships'), 
-                    where('clubId', '==', clubId),
-                    where('status', '==', MembershipStatus.PENDING)
-                );
-                
-                const snap = await getDocs(q);
-                const rawMembers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                
-                const populated = await Promise.all(rawMembers.map(async (m: any) => {
-                    if (!m.uid) return m;
-                    try {
-                        const profileSnap = await getDoc(doc(db, 'profiles', m.uid));
-                        if (profileSnap.exists()) {
-                            return { ...m, profile: profileSnap.data() };
-                        }
-                    } catch (e) { console.error("Profile link failed:", m.uid); }
-                    return m;
-                }));
-                
-                setRequests(populated);
-            } catch (err) { 
-                console.error("Fetch requests failed:", err); 
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchRequests();
+        setLoading(true);
+        const q = query(
+            collection(db, 'memberships'), 
+            where('clubId', '==', clubId),
+            where('status', '==', MembershipStatus.PENDING)
+        );
+        
+        const unsubscribe = onSnapshot(q, async (snap) => {
+            const rawMembers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const populated = await Promise.all(rawMembers.map(async (m: any) => {
+                if (!m.uid) return m;
+                try {
+                    const profileSnap = await getDoc(doc(db, 'profiles', m.uid));
+                    if (profileSnap.exists()) return { ...m, profile: profileSnap.data() };
+                } catch (e) {}
+                return m;
+            }));
+            setRequests(populated);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
     }, [clubId]);
 
     return (
@@ -91,9 +84,8 @@ export const MembershipRequests: React.FC<MembershipRequestsProps> = ({ clubId, 
                                             </div>
                                         </div>
                                     </div>
-                                    {p?.primaryPhone && <div className="text-xs text-slate-400 bg-white/50 p-2 rounded-xl text-center font-mono" dir="ltr">{p.primaryPhone}</div>}
-                                    <button onClick={() => onApprove(m)} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-3 transition-all active:scale-95">
-                                        <CheckCircle size={24} /> אשר הצטרפות
+                                    <button onClick={() => setReviewingRequest(m)} className="w-full bg-slate-800 hover:bg-black text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-3 transition-all active:scale-95">
+                                        <Eye size={24} /> סקור ואשר
                                     </button>
                                 </div>
                             );
@@ -101,6 +93,17 @@ export const MembershipRequests: React.FC<MembershipRequestsProps> = ({ clubId, 
                     </div>
                 )}
             </div>
+
+            {reviewingRequest && (
+                <RequestReviewModal 
+                    request={reviewingRequest} 
+                    onClose={() => setReviewingRequest(null)} 
+                    onApprove={(data) => {
+                        onApprove({ ...reviewingRequest, ...data });
+                        setReviewingRequest(null);
+                    }}
+                />
+            )}
         </div>
     );
 };

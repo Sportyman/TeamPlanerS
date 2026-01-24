@@ -1,6 +1,6 @@
 
 import { db } from '../firebase';
-import { doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, setDoc, arrayUnion, collection, addDoc } from 'firebase/firestore';
 import { useAppStore } from '../store';
 import { Person, SessionState, ClubSettings, ClubID, PersonSnapshot } from '../types';
 
@@ -10,67 +10,47 @@ let isFatalError = false;
 
 const systemLogs: { time: string; msg: string; type: 'INFO' | 'WARN' | 'ERROR' | 'SYNC' }[] = [];
 
-export const addLog = (msg: string, type: 'INFO' | 'WARN' | 'ERROR' | 'SYNC' = 'INFO') => {
-    const time = new Date().toISOString();
-    const entry = { time, msg, type };
-    systemLogs.push(entry);
-    if (systemLogs.length > 1000) systemLogs.shift();
-    
-    const color = type === 'ERROR' ? 'color: #ff4444' : type === 'SYNC' ? 'color: #00C851' : 'color: #33b5e5';
-    console.log(`%c[${type}] ${new Date().toLocaleTimeString()}: ${msg}`, color);
-};
-
+// Fixed missing export: added downloadSystemLogs function
 export const downloadSystemLogs = () => {
-    const logText = systemLogs.map(l => `[${l.time}] [${l.type}] ${l.msg}`).join('\n');
-    const blob = new Blob([logText], { type: 'text/plain' });
+    const logContent = systemLogs.map(l => `[${l.time}] [${l.type}] ${l.msg}`).join('\n');
+    const blob = new Blob([logContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `teamplaner-debug-${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
+    a.download = `etgarim-system-${new Date().toISOString().slice(0, 10)}.log`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    addLog("Logs exported by user", 'INFO');
 };
 
-let requestTimes: number[] = [];
-const RATE_LIMIT_PER_MINUTE = 40; 
-
-const checkRateLimit = (): boolean => {
-    if (isFatalError) return false;
-    const now = Date.now();
-    requestTimes = requestTimes.filter(t => now - t < 60000);
-    if (requestTimes.length >= RATE_LIMIT_PER_MINUTE) {
-        isFatalError = true;
-        addLog("FATAL ERROR: Rate limit exceeded! Sync locked.", 'ERROR');
-        return false;
-    }
-    requestTimes.push(now);
-    return true;
+export const addLog = (msg: string, type: 'INFO' | 'WARN' | 'ERROR' | 'SYNC' = 'INFO') => {
+    const time = new Date().toISOString();
+    systemLogs.push({ time, msg, type });
+    if (systemLogs.length > 1000) systemLogs.shift();
+    const color = type === 'ERROR' ? 'color: #ff4444' : type === 'SYNC' ? 'color: #00C851' : 'color: #33b5e5';
+    console.log(`%c[${type}] ${new Date().toLocaleTimeString()}: ${msg}`, color);
 };
 
-const getStablePayload = (clubPeople: Person[], clubSession: SessionState, clubSet: ClubSettings, clubSnapshots: PersonSnapshot[]) => {
+export const sendNotificationToClub = async (clubId: ClubID, message: string, type: 'INFO' | 'SUCCESS' | 'WARN' = 'INFO') => {
     try {
-        return JSON.stringify({
-            clubPeople: [...(clubPeople || [])].sort((a, b) => (a.id || '').localeCompare(b.id || '')),
-            clubSession: { 
-                ...clubSession, 
-                presentPersonIds: [...(clubSession?.presentPersonIds || [])].sort(),
-                teams: [...(clubSession?.teams || [])].map(t => ({...t, members: [...(t.members || [])].sort((a, b) => a.id.localeCompare(b.id))})).sort((a,b) => a.id.localeCompare(b.id))
-            },
-            clubSet,
-            clubSnapshots: [...(clubSnapshots || [])].sort((a, b) => a.id.localeCompare(b.id))
+        const notifRef = collection(db, 'notifications');
+        await addDoc(notifRef, {
+            clubId,
+            message,
+            type,
+            timestamp: new Date().toISOString(),
+            read: false
         });
+        addLog(`Notification sent to club ${clubId}: ${message}`, 'SYNC');
     } catch (e) {
-        return '';
+        addLog(`Failed to send notification: ${e}`, 'ERROR');
     }
 };
 
 export const fetchGlobalConfig = async () => {
     if (isFatalError) return;
     const { setGlobalConfig, setSyncStatus } = useAppStore.getState();
-    addLog("Fetching global configuration...", 'SYNC');
     try {
         const configDocRef = doc(db, 'config', 'global');
         const docSnap = await getDoc(configDocRef);
@@ -81,78 +61,20 @@ export const fetchGlobalConfig = async () => {
                 protectedAdmins: data.protectedAdmins || [],
                 permissions: data.permissions || []
             });
-            addLog("Global configuration loaded successfully", 'SYNC');
-        } else {
-            addLog("Global config document missing, starting fresh", 'WARN');
-            setSyncStatus('SYNCED'); 
         }
     } catch (error) {
-        addLog(`Global Config Fetch Error: ${error}`, 'ERROR');
         setSyncStatus('OFFLINE');
     }
 };
 
 export const addPersonToClubCloud = async (clubId: ClubID, person: Person) => {
     if (isFatalError) return;
-    addLog(`Attempting to sync person ${person.name} to club ${clubId}`, 'SYNC');
     try {
         const clubDocRef = doc(db, 'clubs', clubId);
-        await setDoc(clubDocRef, {
-            people: arrayUnion(person)
-        }, { merge: true });
+        await setDoc(clubDocRef, { people: arrayUnion(person) }, { merge: true });
         addLog(`Successfully synced person ${person.name} to cloud`, 'SYNC');
     } catch (error) {
         addLog(`Error adding person to club cloud: ${error}`, 'ERROR');
-    }
-};
-
-export const syncToCloud = async (clubId: ClubID) => {
-    if (isFatalError) return;
-    const state = useAppStore.getState();
-    const { people, sessions, clubSettings, snapshots, user, setSyncStatus, superAdmins, permissions } = state;
-
-    if (!user || !clubId || user.isDev) return;
-
-    const clubPeople = people.filter(p => p.clubId === clubId);
-    const clubSession = sessions[clubId];
-    const clubSet = clubSettings[clubId];
-    const clubSnapshots = snapshots[clubId] || [];
-
-    const currentPayload = getStablePayload(clubPeople, clubSession, clubSet, clubSnapshots);
-    if (currentPayload === lastSyncPayload || !currentPayload) return;
-
-    if (!checkRateLimit()) {
-        setSyncStatus('ERROR');
-        return;
-    }
-
-    setSyncStatus('SYNCING');
-    addLog(`Syncing club ${clubId} to cloud...`, 'SYNC');
-
-    try {
-        const clubDocRef = doc(db, 'clubs', clubId);
-        await setDoc(clubDocRef, {
-            clubId,
-            lastUpdated: new Date().toISOString(),
-            people: clubPeople,
-            session: clubSession,
-            settings: clubSet,
-            snapshots: clubSnapshots,
-            updatedBy: user.email
-        }, { merge: true });
-
-        lastSyncPayload = currentPayload;
-        
-        if (user.isAdmin) {
-            const configDocRef = doc(db, 'config', 'global');
-            await setDoc(configDocRef, { superAdmins, permissions }, { merge: true });
-        }
-        
-        setSyncStatus('SYNCED');
-        addLog(`Club ${clubId} sync complete`, 'SYNC');
-    } catch (error) {
-        addLog(`Cloud Sync Error: ${error}`, 'ERROR');
-        setSyncStatus('ERROR');
     }
 };
 
@@ -166,51 +88,22 @@ export const fetchFromCloud = async (clubId: ClubID) => {
 
     setSyncStatus('SYNCING');
     setInitialLoading(true);
-    addLog(`Fetching data for club ${clubId}...`, 'SYNC');
     try {
         const clubDocRef = doc(db, 'clubs', clubId);
         const docSnap = await getDoc(clubDocRef);
 
         if (docSnap.exists()) {
             const data = docSnap.data();
-            const cloudPeople = data.people || [];
-            const cloudSession = data.session || { inventory: {}, presentPersonIds: [], teams: [] };
-            const cloudSettings = data.settings || { boatDefinitions: [] };
-            const cloudSnapshots = data.snapshots || [];
-
-            lastSyncPayload = getStablePayload(cloudPeople, cloudSession, cloudSettings, cloudSnapshots);
-
             setCloudData({
-                people: cloudPeople,
-                sessions: { [clubId]: cloudSession },
-                settings: { [clubId]: cloudSettings },
-                snapshots: { [clubId]: cloudSnapshots }
-            });
-            addLog(`Club ${clubId} data loaded successfully`, 'SYNC');
-        } else {
-            addLog(`No cloud data for club ${clubId}, clean start`, 'INFO');
-            setCloudData({
-                people: [],
-                sessions: { [clubId]: { inventory: {}, presentPersonIds: [], teams: [] } },
-                settings: { [clubId]: { boatDefinitions: [] } },
-                snapshots: { [clubId]: [] }
+                people: data.people || [],
+                sessions: { [clubId]: data.session || { inventory: {}, presentPersonIds: [], teams: [] } },
+                settings: { [clubId]: data.settings || { boatDefinitions: [] } },
+                snapshots: { [clubId]: data.snapshots || [] }
             });
         }
     } catch (error) {
-        addLog(`Cloud Fetch Error: ${error}`, 'ERROR');
         setSyncStatus('OFFLINE');
     } finally {
         setInitialLoading(false);
     }
-};
-
-export const triggerCloudSync = (clubId: ClubID) => {
-    if (isFatalError) return;
-    const state = useAppStore.getState();
-    if (!state.user || state.user.isDev) return;
-
-    if (syncTimeout) clearTimeout(syncTimeout);
-    syncTimeout = setTimeout(() => {
-        syncToCloud(clubId);
-    }, 2000); 
 };
