@@ -2,6 +2,7 @@
 import { db } from '../firebase';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { UserProfile, ClubMembership, ClubID, MembershipStatus, AccessLevel, Role } from '../types';
+import { sendNotificationToClub } from './syncService';
 
 export const getMembershipId = (clubId: string, uid: string) => `${clubId}_${uid}`;
 
@@ -56,6 +57,13 @@ export const approveMembership = async (membershipId: string, updates: Partial<C
             status: MembershipStatus.ACTIVE,
             approvedAt: new Date().toISOString()
         });
+
+        // Trigger notification after approval
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+            const data = snap.data();
+            await sendNotificationToClub(data.clubId, `חבר חדש אושר במועדון`, 'SUCCESS');
+        }
     } catch (error) {
         console.error("Error in approveMembership service:", error);
         throw error;

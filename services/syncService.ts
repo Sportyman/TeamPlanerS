@@ -45,10 +45,14 @@ export const subscribeToClubData = (clubId: ClubID): Unsubscribe => {
             const profileSnap = await getDoc(profileRef);
             const profile = profileSnap.exists() ? profileSnap.data() as UserProfile : null;
 
+            const name = profile ? `${profile.firstName} ${profile.lastName}` : (ms.uid.includes('@') ? ms.uid : 'משתמש ללא פרופיל');
+
             return {
                 id: ms.uid,
                 clubId: ms.clubId,
-                name: profile ? `${profile.firstName} ${profile.lastName}` : (ms.uid.includes('@') ? ms.uid : 'משתמש ללא פרופיל'),
+                name,
+                firstName: profile?.firstName || '',
+                lastName: profile?.lastName || '',
                 gender: profile?.gender || 'MALE' as any,
                 role: ms.role || Role.MEMBER,
                 rank: ms.rank || 3,

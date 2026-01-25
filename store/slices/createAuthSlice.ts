@@ -53,6 +53,23 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
       set({ user: { uid, email, isAdmin: isSuperAdmin, photoURL: result.user.photoURL || undefined, isDev: false } });
       await get().loadUserResources(uid);
+      
+      // Post-load check: if profile is empty, pre-fill from Google info
+      const currentState = get();
+      if (!currentState.userProfile && result.user.displayName) {
+          const parts = result.user.displayName.split(' ');
+          const firstName = parts[0] || '';
+          const lastName = parts.slice(1).join(' ') || '';
+          
+          const skeletonProfile: Partial<UserProfile> = {
+              firstName,
+              lastName,
+              email: result.user.email || '',
+              contactEmail: result.user.email || ''
+          };
+          // We don't save it yet, ProfileSetup will handle it with its local state
+      }
+      
       return true;
     } catch (error) {
       console.error("Login error:", error);

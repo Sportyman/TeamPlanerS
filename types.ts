@@ -151,7 +151,7 @@ export interface UserPermission {
   accessLevel: AccessLevel;
 }
 
-export const APP_VERSION = '5.2.0'; 
+export const APP_VERSION = '6.2.3'; 
 
 export const TEAM_COLORS = [
   'bg-blue-50 border-blue-200',      
@@ -178,6 +178,8 @@ export interface Person {
   id: string;
   clubId: ClubID;
   name: string;
+  firstName?: string;
+  lastName?: string;
   gender: Gender;
   tags?: string[];
   phone?: string;
