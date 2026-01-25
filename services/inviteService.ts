@@ -40,6 +40,7 @@ export const completeInviteFlow = async (
     const fullName = `${profile.firstName} ${profile.lastName}`;
     
     // 1. Create the membership document
+    // This MUST happen first so the user is part of the club for security rules
     const membership = {
         uid: user.uid,
         clubId: invite.clubId,
@@ -51,7 +52,7 @@ export const completeInviteFlow = async (
     };
     await joinClub(membership);
 
-    // 2. If auto-approved, add to the club's active person list immediately
+    // 2. Handle notifications and sync
     if (invite.autoApprove) {
         const personData: Person = {
             id: user.uid,
@@ -67,10 +68,11 @@ export const completeInviteFlow = async (
             notes: profile.medicalNotes || ''
         };
         await addPersonToClubCloud(invite.clubId, personData);
-        await sendNotificationToClub(invite.clubId, `חבר חדש הצטרף אוטומטית: ${fullName}`, 'SUCCESS');
+        // Pass senderId for security rules compliance
+        await sendNotificationToClub(invite.clubId, `חבר חדש הצטרף אוטומטית: ${fullName}`, 'SUCCESS', user.uid);
     } else {
-        // Send a "New Request" notification with the real name
-        await sendNotificationToClub(invite.clubId, `בקשת הצטרפות חדשה מ: ${fullName}`, 'SUCCESS');
+        // Send a "New Request" notification with the real name and senderId
+        await sendNotificationToClub(invite.clubId, `בקשת הצטרפות חדשה מ: ${fullName}`, 'SUCCESS', user.uid);
     }
 
     // 3. Increment the invite usage counter

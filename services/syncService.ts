@@ -147,14 +147,22 @@ export const fetchGlobalConfig = async () => {
     }
 };
 
-export const sendNotificationToClub = async (clubId: ClubID, message: string, type: 'INFO' | 'SUCCESS' | 'WARN' = 'INFO') => {
+export const sendNotificationToClub = async (
+    clubId: ClubID, 
+    message: string, 
+    type: 'INFO' | 'SUCCESS' | 'WARN' = 'INFO',
+    senderId?: string
+) => {
     try {
         await addDoc(collection(db, 'notifications'), {
-            clubId, message, type,
+            clubId, 
+            message, 
+            type,
+            senderId: senderId || null,
             timestamp: new Date().toISOString(),
             read: false
         });
-        addLog(`Notification sent to ${clubId}: ${message}`, 'SYNC');
+        addLog(`Notification sent to ${clubId}: ${message} (sender: ${senderId || 'SYSTEM'})`, 'SYNC');
     } catch (e) {
         addLog(`Failed to send notification: ${e}`, 'ERROR');
     }

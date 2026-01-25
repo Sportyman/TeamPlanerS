@@ -48,9 +48,12 @@ export const InviteLanding: React.FC = () => {
     setError(null);
     
     try {
-        // CRITICAL CHECK: Does user already have a profile?
-        if (userProfile && userProfile.firstName) {
-            // Existing user - Join immediately
+        // SECURE CHECK: Does user already have a complete profile?
+        // We check for firstName AND primaryPhone to ensure we have enough data for the club.
+        const isProfileComplete = userProfile?.firstName && userProfile?.lastName && userProfile?.primaryPhone;
+        
+        if (isProfileComplete) {
+            // Existing user with complete profile - Join immediately
             await completeInviteFlow(user, userProfile, invite);
             setActiveClub(invite.clubId);
             setPendingInvite(null); // Clear context
@@ -61,8 +64,8 @@ export const InviteLanding: React.FC = () => {
                 navigate('/registration-status');
             }
         } else {
-            // New user or missing profile - Redirect to setup
-            // We use the TOKEN in the URL to allow refresh persistence in ProfileSetup
+            // New user or incomplete profile - Redirect to setup
+            // This prevents "Ghost Users" from entering via auto-approve links without a name.
             navigate(`/profile-setup?invite=${invite.token}`);
         }
     } catch (err) {
