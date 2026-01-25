@@ -52,17 +52,19 @@ export const joinClub = async (membership: ClubMembership): Promise<void> => {
 export const approveMembership = async (membershipId: string, updates: Partial<ClubMembership> = {}): Promise<void> => {
     try {
         const docRef = doc(db, 'memberships', membershipId);
+        
+        // 1. Perform the update
         await updateDoc(docRef, {
             ...updates,
             status: MembershipStatus.ACTIVE,
             approvedAt: new Date().toISOString()
         });
 
-        // Trigger notification after approval
-        const snap = await getDoc(docRef);
+        // 2. Trigger notification after approval using fresh data from server
+        const snap = await getDoc(docRef, { source: 'server' });
         if (snap.exists()) {
             const data = snap.data();
-            await sendNotificationToClub(data.clubId, `חבר חדש אושר במועדון`, 'SUCCESS');
+            await sendNotificationToClub(data.clubId, `חבר חדש אושר והצטרף לחוג`, 'SUCCESS');
         }
     } catch (error) {
         console.error("Error in approveMembership service:", error);

@@ -42,7 +42,8 @@ export const subscribeToClubData = (clubId: ClubID): Unsubscribe => {
         
         const peopleList: Person[] = await Promise.all(memberships.map(async (ms: any) => {
             const profileRef = doc(db, 'profiles', ms.uid);
-            const profileSnap = await getDoc(profileRef);
+            // CRITICAL FIX: Force fetch from server to avoid race conditions with local cache
+            const profileSnap = await getDoc(profileRef, { source: 'server' });
             const profile = profileSnap.exists() ? profileSnap.data() as UserProfile : null;
 
             const name = profile ? `${profile.firstName} ${profile.lastName}` : (ms.uid.includes('@') ? ms.uid : 'משתמש ללא פרופיל');
