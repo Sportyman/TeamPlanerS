@@ -1,20 +1,19 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../store';
 import { saveUserProfile } from '../../services/profileService';
-import { addPersonToClubCloud, sendNotificationToClub } from '../../services/syncService';
-import { UserProfile, Gender, Role, Person, MembershipStatus } from '../../types';
+import { validateInviteToken, completeInviteFlow } from '../../services/inviteService';
+import { UserProfile, Gender } from '../../types';
 import { Save, LogOut, UserCircle2, Calendar } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { usePermissions } from '../../hooks/usePermissions';
-import { db } from '../../firebase';
-import { doc, updateDoc } from 'firebase/firestore';
 import { ProfileFormFields } from './ProfileFormFields';
 
 export const ProfileSetup: React.FC = () => {
-  const { user, userProfile, memberships, setUserProfile, logout, refreshMemberships } = useAppStore();
+  const { user, userProfile, memberships, setUserProfile, logout, refreshMemberships, pendingInvite, setPendingInvite, setActiveClub } = useAppStore();
   const { isSuperAdmin } = usePermissions();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [firstName, setFirstName] = useState(userProfile?.firstName || '');
   const [lastName, setLastName] = useState(userProfile?.lastName || '');
@@ -28,13 +27,25 @@ export const ProfileSetup: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Persistence: If refresh happens, restore invite from URL token
+  useEffect(() => {
+    const restoreInvite = async () => {
+        const inviteToken = searchParams.get('invite');
+        if (inviteToken && !pendingInvite) {
+            console.log("Restoring pending invite from URL token...");
+            const invite = await validateInviteToken(inviteToken);
+            if (invite) setPendingInvite(invite);
+        }
+    };
+    restoreInvite();
+  }, [searchParams, pendingInvite]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     
     setLoading(true);
     setError(null);
-    const fullName = `${firstName.trim()} ${lastName.trim()}`;
 
     const newProfile: UserProfile = {
       uid: user.uid,
@@ -54,41 +65,32 @@ export const ProfileSetup: React.FC = () => {
     };
 
     try {
+      // 1. Save the profile first (Authority)
       await saveUserProfile(newProfile);
       setUserProfile(newProfile);
 
-      for (const m of memberships) {
-          if (m.status === MembershipStatus.ACTIVE || isSuperAdmin) {
-              const personData: Person = {
-                  id: user.uid,
-                  clubId: m.clubId,
-                  name: fullName,
-                  firstName: firstName.trim(),
-                  lastName: lastName.trim(),
-                  gender,
-                  phone: primaryPhone,
-                  role: m.role || Role.MEMBER,
-                  rank: m.rank || 3,
-                  isSkipper: isSkipper,
-                  notes: medicalNotes
-              };
-              await addPersonToClubCloud(m.clubId, personData);
-          } else if (m.status === MembershipStatus.PENDING) {
-              const membershipId = `${m.clubId}_${user.uid}`;
-              // Force trigger the admin's listener by updating the membership record
-              await updateDoc(doc(db, 'memberships', membershipId), {
-                  lastProfileUpdate: new Date().toISOString(),
-                  tempStatus: 'PROFILE_COMPLETED' // Signal to admin UI
-              });
-              await sendNotificationToClub(m.clubId, `נשלחה בקשת הצטרפות חדשה מ: ${fullName}`, 'SUCCESS');
-          }
+      // 2. Handle Invitation Flow (if exists)
+      if (pendingInvite) {
+          await completeInviteFlow(user, newProfile, pendingInvite);
+          setActiveClub(pendingInvite.clubId);
+          setPendingInvite(null); // Clear context after success
       }
 
-      // CRITICAL: Refresh the local store memberships before navigating
+      // 3. Refresh memberships in store
       await refreshMemberships();
 
-      if (isSuperAdmin) navigate('/app');
-      else navigate('/registration-status');
+      // 4. Navigate to correct landing
+      if (isSuperAdmin) {
+          navigate('/app');
+      } else if (pendingInvite) {
+          if (pendingInvite.autoApprove) navigate('/app');
+          else navigate('/registration-status');
+      } else if (memberships.length > 0) {
+          navigate('/registration-status');
+      } else {
+          navigate('/');
+      }
+
     } catch (err: any) {
       console.error("Profile Setup Error:", err);
       setError("שגיאה בשמירה. נסה שנית.");

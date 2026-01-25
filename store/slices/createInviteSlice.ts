@@ -7,15 +7,18 @@ import { collection, query, where, getDocs, doc, setDoc, deleteDoc } from 'fireb
 
 export interface InviteSlice {
   invites: ClubInvite[];
+  pendingInvite: ClubInvite | null;
   isLoadingInvites: boolean;
 
   fetchClubInvites: (clubId: ClubID) => Promise<void>;
   createClubInvite: (clubId: ClubID, role: Role, autoApprove: boolean) => Promise<string | null>;
   deleteClubInvite: (inviteId: string) => Promise<void>;
+  setPendingInvite: (invite: ClubInvite | null) => void;
 }
 
 export const createInviteSlice: StateCreator<AppState, [], [], InviteSlice> = (set, get) => ({
   invites: [],
+  pendingInvite: null,
   isLoadingInvites: false,
 
   fetchClubInvites: async (clubId) => {
@@ -66,4 +69,6 @@ export const createInviteSlice: StateCreator<AppState, [], [], InviteSlice> = (s
       console.error("Error deleting invite:", err);
     }
   },
+
+  setPendingInvite: (invite) => set({ pendingInvite: invite }),
 });

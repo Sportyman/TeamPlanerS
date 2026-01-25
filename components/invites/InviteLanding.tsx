@@ -2,16 +2,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store';
-import { validateInviteToken, incrementInviteUsage } from '../../services/inviteService';
-import { joinClub } from '../../services/profileService';
-import { addPersonToClubCloud, addLog, sendNotificationToClub } from '../../services/syncService';
-import { ClubInvite, Role, MembershipStatus, ClubID, Gender, Person } from '../../types';
-import { Waves, Ship, Loader2, ShieldCheck, ArrowLeft, AlertCircle, LogIn, Anchor, LogOut, RefreshCw } from 'lucide-react';
+import { validateInviteToken, completeInviteFlow } from '../../services/inviteService';
+import { ClubInvite } from '../../types';
+import { Waves, Ship, Loader2, ShieldCheck, ArrowLeft, AlertCircle, LogIn, RefreshCw } from 'lucide-react';
 
 export const InviteLanding: React.FC = () => {
   const { token } = useParams();
   const navigate = useNavigate();
-  const { user, userProfile, clubs, loginWithGoogle, logout, setActiveClub, authInitialized } = useAppStore();
+  const { user, userProfile, clubs, loginWithGoogle, logout, setActiveClub, authInitialized, setPendingInvite } = useAppStore();
   
   const [invite, setInvite] = useState<ClubInvite | null>(null);
   const [isValidating, setIsValidating] = useState(true);
@@ -25,10 +23,7 @@ export const InviteLanding: React.FC = () => {
           const validInvite = await validateInviteToken(token);
           if (validInvite) {
             setInvite(validInvite);
-            // Inform manager someone is trying to join
-            if (user) {
-                 sendNotificationToClub(validInvite.clubId, `משתמש התחיל תהליך הצטרפות: ${user.email}`, 'INFO');
-            }
+            setPendingInvite(validInvite);
           } else {
             setError("הלינק אינו תקין, פג תוקף או שבוטל על ידי מנהל.");
           }
@@ -39,7 +34,7 @@ export const InviteLanding: React.FC = () => {
       }
     };
     if (authInitialized) checkToken();
-  }, [token, authInitialized, user]);
+  }, [token, authInitialized]);
 
   const handleLogout = async () => {
       if (confirm('האם להתנתק כדי להחליף משתמש?')) {
@@ -53,47 +48,25 @@ export const InviteLanding: React.FC = () => {
     setError(null);
     
     try {
-        const membership = {
-            uid: user.uid,
-            clubId: invite.clubId,
-            role: invite.role,
-            accessLevel: invite.accessLevel || (invite.role === Role.INSTRUCTOR ? 3 : 2),
-            status: invite.autoApprove ? MembershipStatus.ACTIVE : MembershipStatus.PENDING,
-            joinedClubDate: new Date().toISOString(),
-            rank: 3 
-        };
-
-        await joinClub(membership);
-        await incrementInviteUsage(invite.id);
-        
-        if (invite.autoApprove) {
-            const displayName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}` : user.email.split('@')[0];
-            const personData: Person = {
-                id: user.uid,
-                clubId: invite.clubId,
-                name: displayName,
-                gender: userProfile?.gender || Gender.MALE,
-                phone: userProfile?.primaryPhone || '',
-                role: invite.role,
-                rank: 3,
-                isSkipper: userProfile?.isSkipper || false
-            };
-            await addPersonToClubCloud(invite.clubId, personData);
-            await sendNotificationToClub(invite.clubId, `חבר חדש הצטרף אוטומטית: ${displayName}`, 'SUCCESS');
+        // CRITICAL CHECK: Does user already have a profile?
+        if (userProfile && userProfile.firstName) {
+            // Existing user - Join immediately
+            await completeInviteFlow(user, userProfile, invite);
+            setActiveClub(invite.clubId);
+            setPendingInvite(null); // Clear context
+            
+            if (invite.autoApprove) {
+                navigate('/app');
+            } else {
+                navigate('/registration-status');
+            }
         } else {
-            await sendNotificationToClub(invite.clubId, `בקשת הצטרפות חדשה: ${user.email}`, 'INFO');
-        }
-
-        setActiveClub(invite.clubId);
-
-        if (!userProfile) {
-            navigate('/profile-setup');
-        } else {
-            if (invite.autoApprove) navigate('/app');
-            else navigate('/registration-status');
+            // New user or missing profile - Redirect to setup
+            // We use the TOKEN in the URL to allow refresh persistence in ProfileSetup
+            navigate(`/profile-setup?invite=${invite.token}`);
         }
     } catch (err) {
-        console.error("Join error:", err);
+        console.error("Join action error:", err);
         setError("שגיאה בתהליך ההצטרפות. נסה שנית מאוחר יותר.");
     } finally {
         setIsProcessing(false);
