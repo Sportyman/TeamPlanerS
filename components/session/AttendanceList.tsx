@@ -4,6 +4,7 @@ import { Person, Role, getRoleLabel } from '../../types';
 import { CheckSquare, Square, Shield, ArrowDownAZ, ArrowUpNarrowWide, CheckCircle2, Circle, ShipWheel, ArrowLeft, UserPlus } from 'lucide-react';
 import { PersonEditorModal } from '../dashboard/PersonEditorModal';
 import { useAppStore } from '../../store';
+import { addPersonToClubCloud } from '../../services/syncService';
 
 type SortType = 'ROLE' | 'NAME' | 'RANK';
 
@@ -18,7 +19,7 @@ interface AttendanceListProps {
 export const AttendanceList: React.FC<AttendanceListProps> = ({
   people, presentIds, onToggle, onBulkSelect, onNext
 }) => {
-  const { addPerson, clubSettings, activeClub } = useAppStore();
+  const { clubSettings, activeClub } = useAppStore();
   const [sortBy, setSortBy] = useState<SortType>('ROLE');
   const [isAddingQuickly, setIsAddingQuickly] = useState(false);
 
@@ -47,14 +48,21 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
           case Role.INSTRUCTOR: return `${base} border-cyan-500 bg-cyan-50 text-cyan-900 ring-2 ring-cyan-500/20`;
           case Role.VOLUNTEER: return `${base} border-orange-500 bg-orange-50 text-orange-900 ring-2 ring-orange-500/20`;
           case Role.MEMBER: return `${base} border-sky-500 bg-sky-50 text-sky-900 ring-2 ring-sky-500/20`;
-          default: return `${base} border-emerald-500 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20`;
+          default: return `${base} border-emerald-500 bg-emerald-50 text-emerald-900 ring-2 emerald-500/20`;
       }
   };
 
   const boatDefs = activeClub ? (clubSettings[activeClub]?.boatDefinitions || []) : [];
 
+  const handleQuickSave = async (p: Person) => {
+      if (activeClub) {
+          await addPersonToClubCloud(activeClub, p);
+          setIsAddingQuickly(false);
+      }
+  };
+
   return (
-    <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 animate-in fade-in slide-in-from-bottom-4">
+    <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200">
       <div className="flex flex-col gap-6 mb-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-6">
            <div>
@@ -115,7 +123,7 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
         <button 
             onClick={onNext} 
             disabled={presentIds.length === 0} 
-            className="w-full md:w-auto bg-brand-600 disabled:opacity-50 hover:bg-brand-500 text-white px-10 py-4 rounded-2xl font-black text-xl shadow-xl shadow-brand-100 flex items-center justify-center gap-3 transition-all active:scale-95 transform"
+            className="w-full md:w-auto bg-brand-600 disabled:opacity-50 hover:bg-brand-500 text-white px-10 py-4 rounded-2xl font-black text-xl shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 transform"
         >
             הבא: ציוד <ArrowLeft size={24} />
         </button>
@@ -126,7 +134,7 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
             allPeople={people} 
             boatDefinitions={boatDefs} 
             onClose={() => setIsAddingQuickly(false)} 
-            onSave={(p) => { addPerson(p); setIsAddingQuickly(false); }} 
+            onSave={handleQuickSave} 
           />
       )}
     </div>

@@ -2,14 +2,14 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../../store';
 import { saveUserProfile } from '../../services/profileService';
-import { addPersonToClubCloud, addLog, sendNotificationToClub } from '../../services/syncService';
-import { UserProfile, Gender, GenderLabel, EmergencyContact, Certification, Role, Person, MembershipStatus } from '../../types';
-import { User, Phone, Calendar, Save, LogOut, Mail, ShipWheel, UserCircle2, Edit3 } from 'lucide-react';
+import { addPersonToClubCloud, sendNotificationToClub } from '../../services/syncService';
+import { UserProfile, Gender, GenderLabel, Role, Person, MembershipStatus } from '../../types';
+import { User, Phone, Calendar, Save, LogOut, Mail, ShipWheel, UserCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePermissions } from '../../hooks/usePermissions';
 
 export const ProfileSetup: React.FC = () => {
-  const { user, userProfile, memberships, setUserProfile, logout, activeClub, addPerson } = useAppStore();
+  const { user, userProfile, memberships, setUserProfile, logout } = useAppStore();
   const { isSuperAdmin } = usePermissions();
   const navigate = useNavigate();
 
@@ -60,11 +60,9 @@ export const ProfileSetup: React.FC = () => {
     };
 
     try {
-      // 1. SAVE PROFILE FIRST ( اتھارٹی)
       await saveUserProfile(newProfile);
       setUserProfile(newProfile);
 
-      // 2. NOW NOTIFY AND SYNC (Race Condition Prevented)
       for (const m of memberships) {
           if (m.status === MembershipStatus.ACTIVE || isSuperAdmin) {
               const personData: Person = {
@@ -102,7 +100,7 @@ export const ProfileSetup: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center py-8 px-4">
-      <div className="max-w-2xl w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100 animate-in fade-in zoom-in duration-300">
+      <div className="max-w-2xl w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
         <div className="p-8 bg-brand-600 text-white relative">
             <div className="flex justify-between items-start mb-4">
                 <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-md"><UserCircle2 size={32} /></div>
@@ -117,29 +115,29 @@ export const ProfileSetup: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="text-right">
                     <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-2 justify-end">שם פרטי <User size={16} /></label>
-                    <input required type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none text-right" />
+                    <input required type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full border rounded-xl p-3 outline-none text-right" />
                 </div>
                 <div className="text-right">
                     <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-2 justify-end">שם משפחה <User size={16} /></label>
-                    <input required type="text" value={lastName} onChange={e => setLastName(e.target.value)} className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none text-right" />
+                    <input required type="text" value={lastName} onChange={e => setLastName(e.target.value)} className="w-full border rounded-xl p-3 outline-none text-right" />
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="text-right">
                     <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-2 justify-end">אימייל קשר <Mail size={16} /></label>
-                    <input required type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none text-left font-medium" dir="ltr" />
+                    <input required type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} className="w-full border rounded-xl p-3 outline-none text-left font-medium" dir="ltr" />
                 </div>
                 <div className="text-right">
                     <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-2 justify-end">טלפון <Phone size={16} /></label>
-                    <input required type="tel" value={primaryPhone} onChange={handlePhoneChange} className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none text-left font-mono" dir="ltr" placeholder="050-000-0000" />
+                    <input required type="tel" value={primaryPhone} onChange={handlePhoneChange} className="w-full border rounded-xl p-3 outline-none text-left font-mono" dir="ltr" placeholder="050-000-0000" />
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="text-right">
                     <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-2 justify-end text-right">תאריך לידה <Calendar size={16} /></label>
-                    <input required type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none text-right" />
+                    <input required type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} className="w-full border rounded-xl p-3 outline-none text-right" />
                 </div>
                 <div className="text-right">
                     <label className="block text-sm font-bold text-slate-700 mb-1 text-right">מין</label>
@@ -158,7 +156,7 @@ export const ProfileSetup: React.FC = () => {
 
             {error && <div className="text-red-500 text-sm font-bold text-center animate-bounce">{error}</div>}
 
-            <button type="submit" disabled={loading} className="w-full bg-brand-600 hover:bg-brand-700 text-white font-black py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 shadow-brand-100">
+            <button type="submit" disabled={loading} className="w-full bg-brand-600 hover:bg-brand-700 text-white font-black py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50">
                 {loading ? 'שומר...' : <><Save size={20} /> שמור וסיים</>}
             </button>
         </form>

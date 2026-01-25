@@ -9,7 +9,7 @@ import { addLog, addPersonToClubCloud } from '../../services/syncService';
 export const useAdminActions = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { protectedAdmins, addSuperAdmin, removeSuperAdmin, updatePerson, addPerson, people, activeClub } = useAppStore();
+  const { protectedAdmins, addSuperAdmin, removeSuperAdmin } = useAppStore();
 
   const promoteToSuper = async (email: string) => {
     setIsProcessing(true);
@@ -50,37 +50,25 @@ export const useAdminActions = () => {
       // 1. Update Firestore Membership (The Authority)
       await setClubAccessLevel(clubId, uid, level);
       
-      // 2. Sync to People List
-      let targetPerson = people.find(p => p.id === uid && p.clubId === clubId);
-      
-      let newRole = Role.MEMBER;
-      if (level >= AccessLevel.CLUB_ADMIN) newRole = Role.INSTRUCTOR;
-      else if (level >= AccessLevel.STAFF) newRole = Role.VOLUNTEER;
-      
-      if (targetPerson) {
-          const updated = { ...targetPerson, role: newRole };
-          updatePerson(updated);
-      } else if (level >= AccessLevel.STAFF) {
-          // If NOT in list and gaining staff/admin powers, MUST add as person
+      // 2. Logic for ensuring a Person entry exists if they are now staff/admin
+      if (level >= AccessLevel.STAFF) {
+          let newRole = Role.MEMBER;
+          if (level >= AccessLevel.CLUB_ADMIN) newRole = Role.INSTRUCTOR;
+          else if (level >= AccessLevel.STAFF) newRole = Role.VOLUNTEER;
+
           const displayName = uid.includes('@') ? uid.split('@')[0] : 'מנהל חדש';
           const skeleton: Person = {
               id: uid,
               clubId,
               name: displayName,
-              gender: Gender.MALE, // Default, user can update in profile
+              gender: Gender.MALE, 
               role: newRole,
-              rank: 5, // Admins get high rank by default
+              rank: 5, 
               isSkipper: true
           };
           
-          // Add to cloud
           await addPersonToClubCloud(clubId, skeleton);
-          
-          // Add to local store immediately if it's the current club
-          if (activeClub === clubId) {
-              addPerson(skeleton);
-              addLog(`Admin Sync: Added ${uid} as Person to current club ${clubId}`, 'SYNC');
-          }
+          addLog(`Admin Sync: Ensured ${uid} is synced as Person to club ${clubId} in cloud`, 'SYNC');
       }
 
       return true;

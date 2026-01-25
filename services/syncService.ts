@@ -81,7 +81,6 @@ export const subscribeToClubData = (clubId: ClubID): Unsubscribe => {
  * Adds or updates a person's membership data in Firestore.
  * This is used to sync club-specific data like roles, ranks, and constraints.
  */
-// Fix: Added missing addPersonToClubCloud export to resolve module errors
 export const addPersonToClubCloud = async (clubId: ClubID, person: Person) => {
     try {
         const membershipId = `${clubId}_${person.id}`;
