@@ -20,14 +20,18 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
   const { level, isSuperAdmin } = usePermissions();
   const location = useLocation();
 
-  // 1. Direct Bypass for Super Admin
-  if (isSuperAdmin && location.pathname === '/super-admin') {
-    return <>{children}</>;
-  }
-
-  // 2. Authenticated?
+  // 1. Authenticated?
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // 2. Direct Bypass for Super Admin
+  if (isSuperAdmin) {
+    // Super Admins should always fill profile if missing, but they are never "Pending"
+    if (requireProfile && !userProfile && location.pathname !== '/profile-setup') {
+        return <Navigate to="/profile-setup" replace />;
+    }
+    return <>{children}</>;
   }
 
   // 3. Require Profile Check - Must fill details before anything else
@@ -35,18 +39,18 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
     return <Navigate to="/profile-setup" replace />;
   }
 
-  // 4. Check Permission Level
-  if (!isSuperAdmin && level < requiredLevel) {
-    return <Navigate to="/" replace />;
+  // 4. Check Membership Status for PENDING users
+  // If user is PENDING, they MUST be on registration-status page
+  const currentMembership = activeClub ? memberships.find(ms => ms.clubId === activeClub) : memberships[0];
+  const isPending = currentMembership?.status === MembershipStatus.PENDING;
+
+  if (isPending && location.pathname !== '/registration-status') {
+    return <Navigate to="/registration-status" replace />;
   }
 
-  // 5. Check Membership Status for Staff/ClubAdmin
-  // If user is accessing a club area but their status is not ACTIVE, send to home
-  if (activeClub && !isSuperAdmin) {
-      const m = memberships.find(ms => ms.clubId === activeClub);
-      if (m && m.status !== MembershipStatus.ACTIVE) {
-          return <Navigate to="/" replace />;
-      }
+  // 5. Check Permission Level
+  if (level < requiredLevel) {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;

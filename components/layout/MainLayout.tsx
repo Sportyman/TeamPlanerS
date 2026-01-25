@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '../../store';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -26,6 +26,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const initialLoadRef = useRef(true);
 
   useEffect(() => { setIsMenuOpen(false); }, [location]);
 
@@ -36,9 +37,14 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
           collection(db, 'notifications'),
           where('clubId', '==', activeClub),
           orderBy('timestamp', 'desc'),
-          limit(10)
+          limit(15)
       );
       const unsubscribe = onSnapshot(q, (snap) => {
+          // Skip initial snapshot to avoid duplicate alerts on load
+          if (initialLoadRef.current) {
+              initialLoadRef.current = false;
+              return;
+          }
           snap.docChanges().forEach((change) => {
               if (change.type === "added") {
                   const data = change.doc.data();

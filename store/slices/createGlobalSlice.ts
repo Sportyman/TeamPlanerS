@@ -12,7 +12,7 @@ export interface GlobalSlice {
   people: Person[];
   syncStatus: SyncStatus;
   isInitialLoading: boolean;
-  _hasHydrated: boolean; // Track if store finished reading from localStorage
+  _hasHydrated: boolean; 
 
   setActiveClub: (clubId: ClubID) => void;
   setSyncStatus: (status: SyncStatus) => void;
@@ -25,6 +25,7 @@ export interface GlobalSlice {
   removePerson: (id: string) => void;
   clearClubPeople: () => void;
   restoreDemoData: () => void;
+  hardReset: () => void;
   importClubData: (data: any) => void;
   saveBoatDefinitions: (defs: BoatDefinition[]) => void;
   loadSampleGroup: () => void;
@@ -77,6 +78,7 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
   }),
 
   setCloudData: (data) => set((state) => ({
+    // Anti-ghosting: If cloud people is empty, ensure we clear local people
     people: data.people || [],
     sessions: { ...state.sessions, ...data.sessions },
     clubSettings: { ...state.clubSettings, ...data.settings },
@@ -118,6 +120,11 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
     snapshots: {},
     pairingDirty: false
   })),
+
+  hardReset: () => {
+      localStorage.removeItem('etgarim-storage');
+      window.location.reload();
+  },
 
   importClubData: (data: any) => set((state) => {
     if (!state.activeClub) return state;

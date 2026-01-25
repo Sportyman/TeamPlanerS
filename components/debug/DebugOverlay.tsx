@@ -1,15 +1,21 @@
 
 import React, { useState } from 'react';
 import { useAppStore } from '../../store';
-import { Terminal, Download, X, Bug, Cloud, RefreshCw } from 'lucide-react';
+import { Terminal, Download, X, Bug, Cloud, RefreshCw, Trash2 } from 'lucide-react';
 import { downloadSystemLogs } from '../../services/syncService';
 
 export const DebugOverlay: React.FC = () => {
-  const { user, syncStatus } = useAppStore();
+  const { user, syncStatus, hardReset } = useAppStore();
   const [isOpen, setIsOpen] = useState(false);
 
   // Only show for Super Admins
   if (!user?.isAdmin) return null;
+
+  const handleHardReset = () => {
+      if (confirm('זהירות: פעולה זו תנקה את כל הזיכרון המקומי ותטען את האפליקציה מחדש. להמשיך?')) {
+          hardReset();
+      }
+  };
 
   return (
     <div className="fixed bottom-6 left-6 z-[9999] print:hidden">
@@ -36,10 +42,18 @@ export const DebugOverlay: React.FC = () => {
 
             <button
               onClick={() => downloadSystemLogs()}
-              className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95"
+              className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95"
             >
               <Download size={18} />
               הורד לוג מערכת (.log)
+            </button>
+
+            <button
+              onClick={handleHardReset}
+              className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95"
+            >
+              <Trash2 size={18} />
+              ניקוי זיכרון (Hard Reset)
             </button>
 
             <div className="text-[10px] text-slate-500 italic text-center">
