@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { Role, Person, APP_VERSION } from '../types';
+import { Role, Person, APP_VERSION, AccessLevel } from '../types';
 import { Trash2, UserPlus, Ship, Users, Calendar, Database, Download, Upload, Clock, Sparkles, Wand2, ArrowRight } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { InviteManager } from './invites/InviteManager';
@@ -9,12 +9,13 @@ import { PeopleTable } from './dashboard/PeopleTable';
 import { PersonEditorModal } from './dashboard/PersonEditorModal';
 import { InventoryEditor } from './dashboard/InventoryEditor';
 import { MembershipRequests } from './dashboard/MembershipRequests';
-import { approveMembership } from '../services/profileService';
+import { approveMembership, saveUserProfile } from '../services/profileService';
+import { addPersonToClubCloud } from '../services/syncService';
 
 type ViewMode = 'MENU' | 'PEOPLE' | 'INVENTORY' | 'MEMBERSHIPS' | 'INVITES';
 
 export const Dashboard: React.FC = () => {
-  const { people, activeClub, clubs, addPerson, updatePerson, removePerson, restoreDemoData, clubSettings, loadSampleGroup, addNotification } = useAppStore();
+  const { people, activeClub, clubs, addPerson, updatePerson, removePerson, clubSettings, addNotification } = useAppStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [view, setView] = useState<ViewMode>('MENU');
@@ -34,29 +35,51 @@ export const Dashboard: React.FC = () => {
   const handleApprove = async (m: any) => {
       if (!m.id) return;
       try {
-          // 1. Update Firestore
-          await approveMembership(m.id);
+          // 1. Determine Access Level based on Role
+          let accessLevel = AccessLevel.MEMBER;
+          if (m.role === Role.INSTRUCTOR) accessLevel = AccessLevel.CLUB_ADMIN;
+          else if (m.role === Role.VOLUNTEER) accessLevel = AccessLevel.STAFF;
+
+          // 2. Update Membership in Firestore
+          await approveMembership(m.id, { 
+              role: m.role, 
+              rank: m.rank, 
+              accessLevel,
+              clubSpecificNotes: m.clubSpecificNotes 
+          });
           
-          // 2. Add to Local Store
+          // 3. Update Global Profile if fields like medicalNotes or isSkipper changed
+          if (m.profile) {
+              await saveUserProfile({
+                  ...m.profile,
+                  isSkipper: m.isSkipper,
+                  medicalNotes: m.medicalNotes
+              });
+          }
+
+          // 4. Add to Club People list for Pairing
           const name = m.profile ? `${m.profile.firstName} ${m.profile.lastName}` : m.uid;
-          addPerson({ 
+          const personData: Person = { 
               id: m.uid, 
+              clubId: activeClub,
               name: name, 
               gender: m.profile?.gender || 'MALE', 
               phone: m.profile?.primaryPhone || '', 
               role: m.role || Role.MEMBER, 
-              rank: m.rank || 3 
-          });
-
-          // 3. Notify
-          addNotification(`אושר חבר חדש: ${name}`, 'SUCCESS');
-          alert(`המשתמש ${name} אושר בהצלחה ונוסף לרשימת החוג.`);
+              rank: m.rank || 3,
+              isSkipper: m.isSkipper,
+              notes: m.medicalNotes
+          };
           
-          // Refresh list by toggling view (trigger useEffect in requests)
+          await addPersonToClubCloud(activeClub, personData);
+          addPerson(personData);
+
+          addNotification(`אושר חבר חדש: ${name}`, 'SUCCESS');
+          alert(`המשתמש ${name} אושר בהצלחה ונוסף לרשימה.`);
           navigate('/app/manage');
       } catch (err) {
           console.error("Failed to approve:", err);
-          alert('חלה שגיאה בתהליך האישור. נסה שוב.');
+          alert('חלה שגיאה בתהליך האישור.');
       }
   };
 

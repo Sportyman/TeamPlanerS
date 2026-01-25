@@ -7,7 +7,7 @@ import { Plus, Link as LinkIcon, Copy, Trash2, CheckCircle2, Clock, ShieldAlert,
 export const InviteManager: React.FC = () => {
   const { activeClub, clubs, invites, isLoadingInvites, fetchClubInvites, createClubInvite, deleteClubInvite } = useAppStore();
   
-  const [targetRole, setTargetRole] = useState<Role>(Role.VOLUNTEER);
+  const [targetRole, setTargetRole] = useState<Role>(Role.MEMBER);
   const [autoApprove, setAutoApprove] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -60,11 +60,11 @@ export const InviteManager: React.FC = () => {
                     <select 
                         value={targetRole}
                         onChange={e => setTargetRole(e.target.value as Role)}
-                        className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
+                        className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-brand-500 outline-none font-bold"
                     >
-                        {Object.values(Role).map(r => (
-                            <option key={r} value={r}>{getRoleLabel(r, Gender.MALE)} / {getRoleLabel(r, Gender.FEMALE)}</option>
-                        ))}
+                        <option value={Role.MEMBER}>חבר מועדון (כללי)</option>
+                        <option value={Role.VOLUNTEER}>מתנדב / סייען</option>
+                        <option value={Role.INSTRUCTOR}>מדריך מקצועי</option>
                     </select>
                 </div>
 
@@ -101,7 +101,7 @@ export const InviteManager: React.FC = () => {
                 <ShieldAlert size={16} className="shrink-0 mt-0.5" />
                 <div>
                     <span className="font-bold block mb-1">טיפ בטיחות:</span>
-                    לינקים באישור אוטומטי יכניסו את המשתמש ישירות לרשימת השיבוץ הפעילה. השתמש בהם בזהירות ורק עבור קבוצות מוכרות.
+                    לינקים באישור אוטומטי יכניסו את המשתמש ישירות לרשימת השיבוץ הפעילה. השתמש בהם בזהירות.
                 </div>
             </div>
         </div>

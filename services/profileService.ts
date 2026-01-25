@@ -1,11 +1,8 @@
 
 import { db } from '../firebase';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
-import { UserProfile, ClubMembership, ClubID, MembershipStatus } from '../types';
+import { UserProfile, ClubMembership, ClubID, MembershipStatus, AccessLevel, Role } from '../types';
 
-/**
- * Standardized way to generate membership document IDs
- */
 export const getMembershipId = (clubId: string, uid: string) => `${clubId}_${uid}`;
 
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
@@ -31,7 +28,6 @@ export const saveUserProfile = async (profile: UserProfile): Promise<void> => {
 
 export const getUserMemberships = async (uid: string): Promise<ClubMembership[]> => {
     try {
-        // Query by uid field regardless of document ID format
         const q = query(collection(db, 'memberships'), where('uid', '==', uid));
         const querySnapshot = await getDocs(q);
         return querySnapshot.docs.map(doc => doc.data() as ClubMembership);
@@ -43,7 +39,6 @@ export const getUserMemberships = async (uid: string): Promise<ClubMembership[]>
 
 export const joinClub = async (membership: ClubMembership): Promise<void> => {
     try {
-        // FORCE standardized ID format: clubId_uid
         const membershipId = getMembershipId(membership.clubId, membership.uid);
         const docRef = doc(db, 'memberships', membershipId);
         await setDoc(docRef, membership, { merge: true });
@@ -53,10 +48,11 @@ export const joinClub = async (membership: ClubMembership): Promise<void> => {
     }
 };
 
-export const approveMembership = async (membershipId: string): Promise<void> => {
+export const approveMembership = async (membershipId: string, updates: Partial<ClubMembership> = {}): Promise<void> => {
     try {
         const docRef = doc(db, 'memberships', membershipId);
         await updateDoc(docRef, {
+            ...updates,
             status: MembershipStatus.ACTIVE,
             approvedAt: new Date().toISOString()
         });

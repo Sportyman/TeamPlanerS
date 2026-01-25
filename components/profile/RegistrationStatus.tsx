@@ -13,7 +13,6 @@ export const RegistrationStatus: React.FC = () => {
     return <div className="min-h-screen flex items-center justify-center"><button onClick={() => navigate('/login')} className="bg-brand-600 text-white px-6 py-2 rounded-xl">חזרה להתחברות</button></div>;
   }
 
-  // Find the primary membership (if multiple, find active one or the most recent)
   const membership = memberships[0];
   const club = clubs.find(c => c.id === membership?.clubId);
   const status = membership?.status || MembershipStatus.PENDING;
@@ -21,8 +20,6 @@ export const RegistrationStatus: React.FC = () => {
   const handleAction = () => {
     if (status === MembershipStatus.ACTIVE) {
         navigate('/app');
-    } else {
-        navigate('/');
     }
   };
 
@@ -68,10 +65,13 @@ export const RegistrationStatus: React.FC = () => {
             </div>
 
             <div className="flex flex-col gap-3">
-                <button onClick={handleAction} className="w-full bg-slate-900 hover:bg-black text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg">
-                    {status === MembershipStatus.ACTIVE ? 'כניסה למערכת' : 'חזרה לדף הבית'}
-                    <ArrowRight size={20} />
-                </button>
+                {status === MembershipStatus.ACTIVE ? (
+                    <button onClick={handleAction} className="w-full bg-slate-900 hover:bg-black text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg">
+                        כניסה למערכת <ArrowRight size={20} />
+                    </button>
+                ) : (
+                    <div className="text-center bg-slate-100 p-4 rounded-2xl text-slate-400 font-bold text-sm">המערכת תהיה זמינה עבורך לאחר האישור</div>
+                )}
                 <button onClick={logout} className="text-slate-400 hover:text-red-500 text-xs font-bold py-2 flex items-center justify-center gap-2"><LogOut size={14} /> התנתקות והחלפת חשבון</button>
             </div>
         </div>
