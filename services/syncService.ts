@@ -1,16 +1,12 @@
 
 import { db } from '../firebase';
-import { doc, getDoc, setDoc, arrayUnion, collection, addDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, arrayUnion, arrayRemove, collection, addDoc, updateDoc } from 'firebase/firestore';
 import { useAppStore } from '../store';
 import { Person, SessionState, ClubSettings, ClubID, PersonSnapshot } from '../types';
 
-let syncTimeout: any = null;
-let lastSyncPayload: string = '';
 let isFatalError = false; 
-
 const systemLogs: { time: string; msg: string; type: 'INFO' | 'WARN' | 'ERROR' | 'SYNC' }[] = [];
 
-// Fixed missing export: added downloadSystemLogs function
 export const downloadSystemLogs = () => {
     const logContent = systemLogs.map(l => `[${l.time}] [${l.type}] ${l.msg}`).join('\n');
     const blob = new Blob([logContent], { type: 'text/plain' });
@@ -78,6 +74,28 @@ export const addPersonToClubCloud = async (clubId: ClubID, person: Person) => {
     }
 };
 
+// Fix for "Ghosts": This physically removes the person object from the array in Firestore
+export const removePersonFromClubCloud = async (clubId: ClubID, personId: string) => {
+    if (isFatalError) return;
+    try {
+        const clubDocRef = doc(db, 'clubs', clubId);
+        const docSnap = await getDoc(clubDocRef);
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            const people = data.people || [];
+            const personToRemove = people.find((p: any) => p.id === personId);
+            if (personToRemove) {
+                await updateDoc(clubDocRef, {
+                    people: arrayRemove(personToRemove)
+                });
+                addLog(`Successfully removed person ${personId} from cloud club ${clubId}`, 'SYNC');
+            }
+        }
+    } catch (error) {
+        addLog(`Error removing person from cloud: ${error}`, 'ERROR');
+    }
+};
+
 export const fetchFromCloud = async (clubId: ClubID) => {
     if (isFatalError) return;
     const { setCloudData, setSyncStatus, setInitialLoading, user } = useAppStore.getState();
@@ -100,6 +118,8 @@ export const fetchFromCloud = async (clubId: ClubID) => {
                 settings: { [clubId]: data.settings || { boatDefinitions: [] } },
                 snapshots: { [clubId]: data.snapshots || [] }
             });
+        } else {
+             setCloudData({ people: [], sessions: {}, settings: {}, snapshots: {} });
         }
     } catch (error) {
         setSyncStatus('OFFLINE');

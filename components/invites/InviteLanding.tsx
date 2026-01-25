@@ -11,7 +11,7 @@ import { Waves, Ship, Loader2, ShieldCheck, ArrowLeft, AlertCircle, LogIn, Ancho
 export const InviteLanding: React.FC = () => {
   const { token } = useParams();
   const navigate = useNavigate();
-  const { user, userProfile, clubs, loginWithGoogle, logout, setActiveClub } = useAppStore();
+  const { user, userProfile, clubs, loginWithGoogle, logout, setActiveClub, authInitialized } = useAppStore();
   
   const [invite, setInvite] = useState<ClubInvite | null>(null);
   const [isValidating, setIsValidating] = useState(true);
@@ -20,17 +20,22 @@ export const InviteLanding: React.FC = () => {
 
   useEffect(() => {
     const checkToken = async () => {
-      if (!token) return;
-      const validInvite = await validateInviteToken(token);
-      if (validInvite) {
-        setInvite(validInvite);
-      } else {
-        setError("הלינק אינו תקין, פג תוקף או שבוטל על ידי מנהל.");
+      if (!token || !authInitialized) return;
+      try {
+          const validInvite = await validateInviteToken(token);
+          if (validInvite) {
+            setInvite(validInvite);
+          } else {
+            setError("הלינק אינו תקין, פג תוקף או שבוטל על ידי מנהל.");
+          }
+      } catch (err) {
+          setError("חלה שגיאה בבדיקת הקישור.");
+      } finally {
+          setIsValidating(false);
       }
-      setIsValidating(false);
     };
-    checkToken();
-  }, [token]);
+    if (authInitialized) checkToken();
+  }, [token, authInitialized]);
 
   const handleLogout = async () => {
       if (confirm('האם להתנתק כדי להחליף משתמש?')) {
@@ -41,6 +46,7 @@ export const InviteLanding: React.FC = () => {
   const handleJoin = async () => {
     if (!user || !invite) return;
     setIsProcessing(true);
+    setError(null);
     
     try {
         const membership = {
@@ -53,11 +59,9 @@ export const InviteLanding: React.FC = () => {
             rank: 3 
         };
 
-        // 1. Update Membership Collection (Auth)
         await joinClub(membership);
         await incrementInviteUsage(invite.id);
         
-        // 2. If Auto-Approve, Sync to People List (Display/Pairing)
         if (invite.autoApprove) {
             const displayName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}` : user.email.split('@')[0];
             const personData: Person = {
@@ -71,7 +75,6 @@ export const InviteLanding: React.FC = () => {
                 isSkipper: userProfile?.isSkipper || false
             };
             await addPersonToClubCloud(invite.clubId, personData);
-            addLog(`InviteLanding: User ${user.uid} synced to People list of ${invite.clubId}`, 'SYNC');
         }
 
         setActiveClub(invite.clubId);
@@ -79,7 +82,8 @@ export const InviteLanding: React.FC = () => {
         if (!userProfile) {
             navigate('/profile-setup');
         } else {
-            navigate('/app');
+            if (invite.autoApprove) navigate('/app');
+            else navigate('/registration-status');
         }
     } catch (err) {
         console.error("Join error:", err);
@@ -89,7 +93,7 @@ export const InviteLanding: React.FC = () => {
     }
   };
 
-  if (isValidating) {
+  if (!authInitialized || (isValidating && !error)) {
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
             <Loader2 className="animate-spin text-brand-600 mb-4" size={48} />
@@ -122,7 +126,7 @@ export const InviteLanding: React.FC = () => {
                 {clubName.includes('שייט') ? <Ship size={48} /> : <Waves size={48} />}
             </div>
             <div className="mt-8 space-y-2">
-                <h1 className="text-3xl font-black leading-tight">הוזמנת להצטרף ל{clubName}!</h1>
+                <h1 className="text-3xl font-black leading-tight">הוזמנת ל{clubName}!</h1>
                 <p className="opacity-80 font-medium">אנחנו מחכים לך במים</p>
             </div>
         </div>
@@ -133,43 +137,27 @@ export const InviteLanding: React.FC = () => {
                     <div className="bg-brand-50 p-2 rounded-lg text-brand-600"><ShieldCheck size={20} /></div>
                     <div>
                         <h4 className="font-bold text-slate-800">הצטרפות מאובטחת</h4>
-                        <p className="text-xs text-slate-400">הזדהות עם חשבון Google לשמירה על פרטיותך</p>
-                    </div>
-                </div>
-                <div className="flex items-start gap-4">
-                    <div className="bg-brand-50 p-2 rounded-lg text-brand-600"><Anchor size={20} /></div>
-                    <div>
-                        <h4 className="font-bold text-slate-800">פרופיל אישי</h4>
-                        <p className="text-xs text-slate-400">לאחר הכניסה תתבקש למלא תעודת זהות קצרה</p>
+                        <p className="text-xs text-slate-400">הזדהות עם חשבון Google</p>
                     </div>
                 </div>
             </div>
 
             {!user ? (
-                <button 
-                    onClick={loginWithGoogle}
-                    className="w-full flex items-center justify-center gap-4 bg-white border-2 border-slate-100 hover:border-brand-500 py-4 rounded-2xl font-black text-slate-800 transition-all group"
-                >
+                <button onClick={loginWithGoogle} className="w-full flex items-center justify-center gap-4 bg-white border-2 border-slate-100 hover:border-brand-500 py-4 rounded-2xl font-black text-slate-800 transition-all group">
                     <LogIn size={20} className="group-hover:translate-x-1 transition-transform" />
-                    התחבר עם Google כדי להצטרף
+                    התחבר עם Google
                 </button>
             ) : (
                 <div className="space-y-4">
                     <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 overflow-hidden">
                             {user.photoURL && <img src={user.photoURL} alt="User" className="w-10 h-10 rounded-full border-2 border-white shadow-sm shrink-0" />}
-                            <div className="overflow-hidden">
+                            <div className="overflow-hidden text-right">
                                 <p className="text-[10px] text-slate-400 font-bold uppercase">מחובר כרגע</p>
                                 <p className="font-bold text-slate-800 truncate text-sm">{user.email}</p>
                             </div>
                         </div>
-                        <button 
-                            onClick={handleLogout}
-                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-white rounded-lg transition-all shadow-sm border border-transparent hover:border-red-100 shrink-0"
-                            title="החלף חשבון"
-                        >
-                            <RefreshCw size={18} />
-                        </button>
+                        <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 hover:bg-white rounded-lg transition-all shadow-sm border border-transparent hover:border-red-100 shrink-0"><RefreshCw size={18} /></button>
                     </div>
                     <button 
                         onClick={handleJoin}

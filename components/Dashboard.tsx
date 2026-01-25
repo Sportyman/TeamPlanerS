@@ -10,7 +10,7 @@ import { PersonEditorModal } from './dashboard/PersonEditorModal';
 import { InventoryEditor } from './dashboard/InventoryEditor';
 import { MembershipRequests } from './dashboard/MembershipRequests';
 import { approveMembership, saveUserProfile } from '../services/profileService';
-import { addPersonToClubCloud } from '../services/syncService';
+import { addPersonToClubCloud, removePersonFromClubCloud } from '../services/syncService';
 
 type ViewMode = 'MENU' | 'PEOPLE' | 'INVENTORY' | 'MEMBERSHIPS' | 'INVITES';
 
@@ -35,12 +35,10 @@ export const Dashboard: React.FC = () => {
   const handleApprove = async (m: any) => {
       if (!m.id) return;
       try {
-          // 1. Determine Access Level based on Role
           let accessLevel = AccessLevel.MEMBER;
           if (m.role === Role.INSTRUCTOR) accessLevel = AccessLevel.CLUB_ADMIN;
           else if (m.role === Role.VOLUNTEER) accessLevel = AccessLevel.STAFF;
 
-          // 2. Update Membership in Firestore
           await approveMembership(m.id, { 
               role: m.role, 
               rank: m.rank, 
@@ -48,7 +46,6 @@ export const Dashboard: React.FC = () => {
               clubSpecificNotes: m.clubSpecificNotes 
           });
           
-          // 3. Update Global Profile if fields like medicalNotes or isSkipper changed
           if (m.profile) {
               await saveUserProfile({
                   ...m.profile,
@@ -57,7 +54,6 @@ export const Dashboard: React.FC = () => {
               });
           }
 
-          // 4. Add to Club People list for Pairing
           const name = m.profile ? `${m.profile.firstName} ${m.profile.lastName}` : m.uid;
           const personData: Person = { 
               id: m.uid, 
@@ -83,6 +79,14 @@ export const Dashboard: React.FC = () => {
       }
   };
 
+  const handleRemovePerson = async (id: string) => {
+      if (confirm('למחוק את המשתתף מהחוג? (ימחק גם מהשרת)')) {
+          await removePersonFromClubCloud(activeClub, id);
+          removePerson(id);
+          addNotification('משתתף הוסר מהחוג', 'INFO');
+      }
+  };
+
   const handleExport = () => {
       const blob = new Blob([JSON.stringify({ version: APP_VERSION, clubId: activeClub, people: clubPeople, settings }, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
@@ -105,7 +109,7 @@ export const Dashboard: React.FC = () => {
              <button onClick={handleExport} className="bg-white border p-3 rounded-xl shadow-sm" title="גיבוי"><Download size={18} /></button>
           </div>
       </div>
-      <PeopleTable people={clubPeople} onEdit={setEditingPerson} onDelete={(id) => confirm('למחוק?') && removePerson(id)} />
+      <PeopleTable people={clubPeople} onEdit={setEditingPerson} onDelete={handleRemovePerson} />
       {(isAdding || editingPerson) && <PersonEditorModal person={editingPerson} allPeople={clubPeople} boatDefinitions={settings.boatDefinitions} onClose={() => { setIsAdding(false); setEditingPerson(null); }} onSave={(p) => { editingPerson ? updatePerson(p) : addPerson(p); setIsAdding(false); setEditingPerson(null); }} />}
     </div>
   );

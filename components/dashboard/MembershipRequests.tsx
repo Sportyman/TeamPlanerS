@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { Role, Gender, MembershipStatus, ClubID, getRoleLabel } from '../../types';
-import { Clock, CheckCircle, ArrowRight, UserCircle, Loader2, AlertCircle, Eye } from 'lucide-react';
+import { Clock, CheckCircle, ArrowRight, UserCircle, Loader2, AlertCircle, Eye, User } from 'lucide-react';
 import { RequestReviewModal } from './RequestReviewModal';
 
 interface MembershipRequestsProps {
@@ -32,7 +32,9 @@ export const MembershipRequests: React.FC<MembershipRequestsProps> = ({ clubId, 
                 try {
                     const profileSnap = await getDoc(doc(db, 'profiles', m.uid));
                     if (profileSnap.exists()) return { ...m, profile: profileSnap.data() };
-                } catch (e) {}
+                } catch (e) {
+                    console.error("Profile fetch error in Requests:", e);
+                }
                 return m;
             }));
             setRequests(populated);
@@ -67,25 +69,31 @@ export const MembershipRequests: React.FC<MembershipRequestsProps> = ({ clubId, 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {requests.map((m, i) => {
                             const p = m.profile;
-                            const displayName = p ? `${p.firstName} ${p.lastName}` : (m.uid?.includes('@') ? m.uid : 'משתמש חדש');
+                            const hasProfile = !!p;
+                            const displayName = hasProfile ? `${p.firstName} ${p.lastName}` : (m.uid?.includes('@') ? m.uid : 'ממתין לפרטים...');
                             
                             return (
-                                <div key={m.id || i} className="p-6 bg-slate-50 rounded-3xl border border-slate-200 flex flex-col justify-between gap-6 hover:shadow-lg transition-all">
-                                    <div className="flex items-start gap-4">
-                                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center overflow-hidden border border-slate-100 shadow-inner">
+                                <div key={m.id || i} className="p-6 bg-white rounded-3xl border border-slate-200 flex flex-col justify-between gap-6 hover:shadow-lg transition-all shadow-sm">
+                                    <div className="flex items-start gap-4 flex-row-reverse">
+                                        <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center overflow-hidden border border-slate-100 shadow-inner shrink-0">
                                             {p?.photoURL ? <img src={p.photoURL} alt="User" className="w-full h-full object-cover" /> : <UserCircle size={32} className="text-slate-200" />}
                                         </div>
-                                        <div className="flex-1 overflow-hidden">
+                                        <div className="flex-1 overflow-hidden text-right">
                                             <h3 className="font-black text-slate-800 text-xl truncate">{displayName}</h3>
-                                            <div className="flex gap-2 mt-2">
-                                                <span className="text-[10px] font-black bg-white border border-slate-100 px-3 py-1 rounded-full text-slate-500 uppercase">
+                                            {!hasProfile && <p className="text-[10px] text-amber-600 font-bold">המשתמש טרם סיים למלא פרופיל</p>}
+                                            <div className="flex gap-2 mt-2 justify-end">
+                                                <span className="text-[10px] font-black bg-slate-50 border border-slate-100 px-3 py-1 rounded-full text-slate-500 uppercase">
                                                     {getRoleLabel(m.role || Role.MEMBER, p?.gender || Gender.MALE)}
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
-                                    <button onClick={() => setReviewingRequest(m)} className="w-full bg-slate-800 hover:bg-black text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-3 transition-all active:scale-95">
-                                        <Eye size={24} /> סקור ואשר
+                                    <button 
+                                        onClick={() => setReviewingRequest(m)} 
+                                        disabled={!hasProfile}
+                                        className="w-full bg-slate-900 hover:bg-black text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50"
+                                    >
+                                        <Eye size={24} /> {hasProfile ? 'סקור ואשר' : 'ממתין לפרופיל'}
                                     </button>
                                 </div>
                             );
