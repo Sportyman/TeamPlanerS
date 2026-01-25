@@ -6,6 +6,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { Waves, LogOut, Menu, X, Ship, LayoutGrid, Calendar, Shield, Sparkles, Home, ChevronLeft, Cloud, RefreshCw, Bell, User, Clock } from 'lucide-react';
 import { db } from '../../firebase';
 import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { ensureAdminMembership } from '../../services/syncService';
 
 const NavLink: React.FC<{ to: string; icon: React.ReactNode; text: string; onClick?: () => void; className?: string }> = ({ to, icon, text, onClick, className }) => {
   const location = useLocation();
@@ -30,6 +31,13 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
   useEffect(() => { setIsMenuOpen(false); }, [location]);
 
+  // Ensure Admin Presence in participant lists
+  useEffect(() => {
+    if (user && user.isAdmin && activeClub) {
+        ensureAdminMembership(activeClub, user);
+    }
+  }, [user, activeClub]);
+
   // Real-time notifications from Firestore
   useEffect(() => {
       if (!activeClub || !user) return;
@@ -40,7 +48,6 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
           limit(15)
       );
       const unsubscribe = onSnapshot(q, (snap) => {
-          // Skip initial snapshot to avoid duplicate alerts on load
           if (initialLoadRef.current) {
               initialLoadRef.current = false;
               return;

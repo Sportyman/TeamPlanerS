@@ -7,6 +7,8 @@ import { UserProfile, Gender, GenderLabel, Role, Person, MembershipStatus } from
 import { User, Phone, Calendar, Save, LogOut, Mail, ShipWheel, UserCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePermissions } from '../../hooks/usePermissions';
+import { db } from '../../firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 export const ProfileSetup: React.FC = () => {
   const { user, userProfile, memberships, setUserProfile, logout } = useAppStore();
@@ -78,7 +80,12 @@ export const ProfileSetup: React.FC = () => {
               };
               await addPersonToClubCloud(m.clubId, personData);
           } else if (m.status === MembershipStatus.PENDING) {
-              await sendNotificationToClub(m.clubId, `משתמש חדש סיים הרשמה: ${fullName}`, 'INFO');
+              // TOUCH: Update membership timestamp to trigger reactive listeners for the manager
+              const membershipId = `${m.clubId}_${user.uid}`;
+              await updateDoc(doc(db, 'memberships', membershipId), {
+                  lastProfileUpdate: new Date().toISOString()
+              });
+              await sendNotificationToClub(m.clubId, `משתמש סיים למלא פרופיל: ${fullName}`, 'SUCCESS');
           }
       }
 

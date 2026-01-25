@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store';
 import { validateInviteToken, incrementInviteUsage } from '../../services/inviteService';
 import { joinClub } from '../../services/profileService';
-import { addPersonToClubCloud, addLog } from '../../services/syncService';
+import { addPersonToClubCloud, addLog, sendNotificationToClub } from '../../services/syncService';
 import { ClubInvite, Role, MembershipStatus, ClubID, Gender, Person } from '../../types';
 import { Waves, Ship, Loader2, ShieldCheck, ArrowLeft, AlertCircle, LogIn, Anchor, LogOut, RefreshCw } from 'lucide-react';
 
@@ -25,6 +25,10 @@ export const InviteLanding: React.FC = () => {
           const validInvite = await validateInviteToken(token);
           if (validInvite) {
             setInvite(validInvite);
+            // Inform manager someone is trying to join
+            if (user) {
+                 sendNotificationToClub(validInvite.clubId, `משתמש התחיל תהליך הצטרפות: ${user.email}`, 'INFO');
+            }
           } else {
             setError("הלינק אינו תקין, פג תוקף או שבוטל על ידי מנהל.");
           }
@@ -35,7 +39,7 @@ export const InviteLanding: React.FC = () => {
       }
     };
     if (authInitialized) checkToken();
-  }, [token, authInitialized]);
+  }, [token, authInitialized, user]);
 
   const handleLogout = async () => {
       if (confirm('האם להתנתק כדי להחליף משתמש?')) {
@@ -75,6 +79,9 @@ export const InviteLanding: React.FC = () => {
                 isSkipper: userProfile?.isSkipper || false
             };
             await addPersonToClubCloud(invite.clubId, personData);
+            await sendNotificationToClub(invite.clubId, `חבר חדש הצטרף אוטומטית: ${displayName}`, 'SUCCESS');
+        } else {
+            await sendNotificationToClub(invite.clubId, `בקשת הצטרפות חדשה: ${user.email}`, 'INFO');
         }
 
         setActiveClub(invite.clubId);

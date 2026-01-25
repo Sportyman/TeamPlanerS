@@ -1,6 +1,6 @@
 
 import { db } from '../firebase';
-import { doc, getDoc, setDoc, collection, query, where, onSnapshot, Unsubscribe, addDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, onSnapshot, Unsubscribe, addDoc, updateDoc } from 'firebase/firestore';
 import { useAppStore } from '../store';
 import { Person, ClubID, MembershipStatus, UserProfile, Role, AccessLevel } from '../types';
 
@@ -24,7 +24,6 @@ export const downloadSystemLogs = () => {
     a.click();
 };
 
-// Real-time Club Data Subscription
 export const subscribeToClubData = (clubId: ClubID): Unsubscribe => {
     const { setPeople, setSyncStatus, setInitialLoading } = useAppStore.getState();
     addLog(`Starting reactive subscription for club: ${clubId}`, 'SYNC');
@@ -32,7 +31,6 @@ export const subscribeToClubData = (clubId: ClubID): Unsubscribe => {
     setSyncStatus('SYNCING');
     setInitialLoading(true);
 
-    // 1. Listen to active memberships for this club
     const membershipsQuery = query(
         collection(db, 'memberships'), 
         where('clubId', '==', clubId),
@@ -42,13 +40,11 @@ export const subscribeToClubData = (clubId: ClubID): Unsubscribe => {
     return onSnapshot(membershipsQuery, async (snapshot) => {
         const memberships = snapshot.docs.map(d => d.data());
         
-        // 2. Hydrate profiles for each member
         const peopleList: Person[] = await Promise.all(memberships.map(async (ms: any) => {
             const profileRef = doc(db, 'profiles', ms.uid);
             const profileSnap = await getDoc(profileRef);
             const profile = profileSnap.exists() ? profileSnap.data() as UserProfile : null;
 
-            // Merge Identity (Profile) + Role (Membership)
             return {
                 id: ms.uid,
                 clubId: ms.clubId,
@@ -59,7 +55,6 @@ export const subscribeToClubData = (clubId: ClubID): Unsubscribe => {
                 isSkipper: profile?.isSkipper || ms.isSkipper || false,
                 phone: profile?.primaryPhone || '',
                 notes: profile?.medicalNotes || '',
-                // Preserve additional constraints from membership if they exist
                 mustPairWith: ms.mustPairWith || [],
                 preferPairWith: ms.preferPairWith || [],
                 cannotPairWith: ms.cannotPairWith || []
@@ -77,16 +72,11 @@ export const subscribeToClubData = (clubId: ClubID): Unsubscribe => {
     });
 };
 
-/**
- * Adds or updates a person's membership data in Firestore.
- * This is used to sync club-specific data like roles, ranks, and constraints.
- */
 export const addPersonToClubCloud = async (clubId: ClubID, person: Person) => {
     try {
         const membershipId = `${clubId}_${person.id}`;
         const docRef = doc(db, 'memberships', membershipId);
         
-        // We merge the data to preserve fields like joinedClubDate or accessLevel if they already exist
         await setDoc(docRef, {
             uid: person.id,
             clubId: clubId,
@@ -103,6 +93,35 @@ export const addPersonToClubCloud = async (clubId: ClubID, person: Person) => {
     } catch (error) {
         addLog(`Failed to sync person to club cloud: ${error}`, 'ERROR');
         throw error;
+    }
+};
+
+/**
+ * Ensures an admin/staff user has a valid active membership in a club 
+ * so they appear in pairing lists and dashboards.
+ */
+export const ensureAdminMembership = async (clubId: ClubID, user: { uid: string; email: string; isAdmin: boolean }) => {
+    if (!user || !clubId) return;
+    try {
+        const membershipId = `${clubId}_${user.uid}`;
+        const docRef = doc(db, 'memberships', membershipId);
+        const snap = await getDoc(docRef);
+
+        if (!snap.exists()) {
+            await setDoc(docRef, {
+                uid: user.uid,
+                clubId: clubId,
+                role: Role.INSTRUCTOR,
+                accessLevel: AccessLevel.CLUB_ADMIN,
+                status: MembershipStatus.ACTIVE,
+                joinedClubDate: new Date().toISOString(),
+                rank: 5,
+                lastUpdate: new Date().toISOString()
+            });
+            addLog(`Ensured admin membership for ${user.email} in ${clubId}`, 'SYNC');
+        }
+    } catch (error) {
+        addLog(`Error ensuring admin membership: ${error}`, 'ERROR');
     }
 };
 
@@ -130,6 +149,7 @@ export const sendNotificationToClub = async (clubId: ClubID, message: string, ty
             timestamp: new Date().toISOString(),
             read: false
         });
+        addLog(`Notification sent to ${clubId}: ${message}`, 'SYNC');
     } catch (e) {
         addLog(`Failed to send notification: ${e}`, 'ERROR');
     }
