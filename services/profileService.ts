@@ -1,6 +1,6 @@
 
 import { db } from '../firebase';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocFromServer, setDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { UserProfile, ClubMembership, ClubID, MembershipStatus, AccessLevel, Role } from '../types';
 import { sendNotificationToClub } from './syncService';
 
@@ -60,8 +60,8 @@ export const approveMembership = async (membershipId: string, updates: Partial<C
             approvedAt: new Date().toISOString()
         });
 
-        // 2. Trigger notification after approval using fresh data from server
-        const snap = await getDoc(docRef, { source: 'server' });
+        // 2. Trigger notification after approval using getDocFromServer to satisfy TS
+        const snap = await getDocFromServer(docRef);
         if (snap.exists()) {
             const data = snap.data();
             await sendNotificationToClub(data.clubId, `חבר חדש אושר והצטרף לחוג`, 'SUCCESS');

@@ -1,6 +1,6 @@
 
 import { db } from '../firebase';
-import { doc, getDoc, setDoc, collection, query, where, onSnapshot, Unsubscribe, addDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocFromServer, setDoc, collection, query, where, onSnapshot, Unsubscribe, addDoc, updateDoc } from 'firebase/firestore';
 import { useAppStore } from '../store';
 import { Person, ClubID, MembershipStatus, UserProfile, Role, AccessLevel } from '../types';
 
@@ -42,8 +42,8 @@ export const subscribeToClubData = (clubId: ClubID): Unsubscribe => {
         
         const peopleList: Person[] = await Promise.all(memberships.map(async (ms: any) => {
             const profileRef = doc(db, 'profiles', ms.uid);
-            // CRITICAL FIX: Force fetch from server to avoid race conditions with local cache
-            const profileSnap = await getDoc(profileRef, { source: 'server' });
+            // CRITICAL FIX: Use getDocFromServer to satisfy TS and avoid stale cache
+            const profileSnap = await getDocFromServer(profileRef);
             const profile = profileSnap.exists() ? profileSnap.data() as UserProfile : null;
 
             const name = profile ? `${profile.firstName} ${profile.lastName}` : (ms.uid.includes('@') ? ms.uid : 'משתמש ללא פרופיל');
