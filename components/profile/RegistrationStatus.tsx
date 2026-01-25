@@ -8,19 +8,45 @@ import { db } from '../../firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 
 export const RegistrationStatus: React.FC = () => {
-  const { user, userProfile, memberships, clubs, logout } = useAppStore();
-  const [liveMembership, setLiveMembership] = useState<ClubMembership | null>(memberships[0] || null);
-  const [loading, setLoading] = useState(!memberships[0]);
+  const { user, userProfile, memberships, clubs, logout, activeClub } = useAppStore();
+  const [liveMembership, setLiveMembership] = useState<ClubMembership | null>(null);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // 1. Resolve which membership to show
+  useEffect(() => {
+    if (!user) return;
+
+    // Try to find membership for active club, or just the first one available
+    const target = (activeClub ? memberships.find(m => m.clubId === activeClub) : null) || memberships[0];
+    
+    if (target) {
+        setLiveMembership(target);
+        setLoading(false);
+    } else {
+        // If no memberships in store, wait a bit or keep loading
+        const timeout = setTimeout(() => {
+            if (loading) setLoading(false);
+        }, 3000);
+        return () => clearTimeout(timeout);
+    }
+  }, [user, memberships, activeClub]);
+
+  // 2. Listen to the specific membership document for status changes
   useEffect(() => {
     if (!user || !liveMembership) return;
     
     const membershipId = `${liveMembership.clubId}_${user.uid}`;
     const unsubscribe = onSnapshot(doc(db, 'memberships', membershipId), (snap) => {
         if (snap.exists()) {
-            setLiveMembership(snap.data() as ClubMembership);
+            const data = snap.data() as ClubMembership;
+            setLiveMembership(data);
             setLoading(false);
+            
+            // Auto-navigate if approved while on this page
+            if (data.status === MembershipStatus.ACTIVE) {
+                // We give the user a moment to see the "Approved" state
+            }
         }
     });
     
@@ -28,24 +54,55 @@ export const RegistrationStatus: React.FC = () => {
   }, [user, liveMembership?.clubId]);
 
   if (!user || !userProfile) {
-    return <div className="min-h-screen flex items-center justify-center"><button onClick={() => navigate('/login')} className="bg-brand-600 text-white px-6 py-2 rounded-xl">חזרה להתחברות</button></div>;
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50">
+            <div className="text-center">
+                <Loader2 className="animate-spin text-brand-600 mb-4 mx-auto" size={48} />
+                <p className="text-slate-500">טוען נתוני משתמש...</p>
+                <button onClick={() => navigate('/login')} className="mt-4 text-brand-600 font-bold underline">חזרה להתחברות</button>
+            </div>
+        </div>
+    );
   }
 
-  if (loading) {
+  if (loading && !liveMembership) {
       return (
           <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center">
               <Loader2 className="animate-spin text-brand-600 mb-4" size={48} />
-              <p className="text-slate-500 font-bold">בודק סטטוס הצטרפות...</p>
+              <div className="text-center">
+                  <h2 className="text-xl font-bold text-slate-800">בודק סטטוס הצטרפות...</h2>
+                  <p className="text-slate-400 text-sm mt-1">אנחנו מוודאים את פרטי הרישום שלך</p>
+              </div>
           </div>
       );
   }
 
-  const club = clubs.find(c => c.id === liveMembership?.clubId);
-  const status = liveMembership?.status || MembershipStatus.PENDING;
+  // Final fallback if no membership found at all
+  if (!liveMembership) {
+      return (
+          <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+              <div className="bg-white p-8 rounded-3xl shadow-xl max-w-sm">
+                  <h2 className="text-xl font-bold text-slate-800 mb-4">לא נמצאה בקשת הצטרפות</h2>
+                  <p className="text-slate-500 mb-6 text-sm">נראה שלא הצטרפת לאף חוג עדיין. השתמש בלינק הזמנה כדי להצטרף.</p>
+                  <button onClick={() => navigate('/')} className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold">חזרה לדף הבית</button>
+              </div>
+          </div>
+      );
+  }
+
+  const club = clubs.find(c => c.id === liveMembership.clubId);
+  const status = liveMembership.status;
 
   const handleAction = () => {
     if (status === MembershipStatus.ACTIVE) {
         navigate('/app');
+    }
+  };
+
+  const handleSwitchAccount = async () => {
+    if (confirm('להתנתק ולהחליף חשבון?')) {
+        await logout();
+        navigate('/login');
     }
   };
 
@@ -68,14 +125,14 @@ export const RegistrationStatus: React.FC = () => {
                     <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-slate-400 shadow-sm">
                         {club?.label.includes('שייט') ? <Ship size={24} /> : <Waves size={24} />}
                     </div>
-                    <div>
-                        <h4 className="font-bold text-slate-800">{club?.label || 'המועדון'}</h4>
-                        <span className="text-xs text-slate-400">{getRoleLabel(liveMembership?.role || 'MEMBER' as any, userProfile.gender)}</span>
+                    <div className="overflow-hidden">
+                        <h4 className="font-bold text-slate-800 truncate">{club?.label || 'המועדון'}</h4>
+                        <span className="text-xs text-slate-400">{getRoleLabel(liveMembership.role || 'MEMBER' as any, userProfile.gender)}</span>
                     </div>
                 </div>
 
                 <div className={`flex items-center gap-3 p-4 rounded-xl font-bold text-sm transition-all ${
-                    status === MembershipStatus.ACTIVE ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                    status === MembershipStatus.ACTIVE ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'
                 }`}>
                     {status === MembershipStatus.ACTIVE ? <UserCheck size={20} /> : <Clock size={20} />}
                     <span>סטטוס: {status === MembershipStatus.ACTIVE ? 'פעיל ומאושר' : 'ממתין לאישור מנהל'}</span>
@@ -96,19 +153,14 @@ export const RegistrationStatus: React.FC = () => {
                         כניסה למערכת <ArrowRight size={20} />
                     </button>
                 ) : (
-                    <div className="text-center bg-slate-100 p-4 rounded-2xl text-slate-400 font-bold text-sm">המערכת תהיה זמינה עבורך לאחר האישור</div>
+                    <div className="text-center bg-slate-100 p-4 rounded-2xl text-slate-400 font-bold text-sm border-2 border-dashed border-slate-200">
+                        המערכת תהיה זמינה עבורך לאחר האישור
+                    </div>
                 )}
-                <button onClick={handleSwitchAccount} className="text-slate-400 hover:text-red-500 text-xs font-bold py-2 flex items-center justify-center gap-2"><LogOut size={14} /> התנתקות והחלפת חשבון</button>
+                <button onClick={handleSwitchAccount} className="text-slate-400 hover:text-red-500 text-xs font-bold py-2 flex items-center justify-center gap-2 transition-colors"><LogOut size={14} /> התנתקות והחלפת חשבון</button>
             </div>
         </div>
       </div>
     </div>
   );
-
-  async function handleSwitchAccount() {
-    if (confirm('להתנתק ולהחליף חשבון?')) {
-        await logout();
-        navigate('/login');
-    }
-  }
 };

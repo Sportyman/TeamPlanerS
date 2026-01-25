@@ -12,7 +12,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { ProfileFormFields } from './ProfileFormFields';
 
 export const ProfileSetup: React.FC = () => {
-  const { user, userProfile, memberships, setUserProfile, logout } = useAppStore();
+  const { user, userProfile, memberships, setUserProfile, logout, refreshMemberships } = useAppStore();
   const { isSuperAdmin } = usePermissions();
   const navigate = useNavigate();
 
@@ -75,16 +75,22 @@ export const ProfileSetup: React.FC = () => {
               await addPersonToClubCloud(m.clubId, personData);
           } else if (m.status === MembershipStatus.PENDING) {
               const membershipId = `${m.clubId}_${user.uid}`;
+              // Force trigger the admin's listener by updating the membership record
               await updateDoc(doc(db, 'memberships', membershipId), {
-                  lastProfileUpdate: new Date().toISOString()
+                  lastProfileUpdate: new Date().toISOString(),
+                  tempStatus: 'PROFILE_COMPLETED' // Signal to admin UI
               });
-              await sendNotificationToClub(m.clubId, `משתמש סיים למלא פרופיל: ${fullName}`, 'SUCCESS');
+              await sendNotificationToClub(m.clubId, `נשלחה בקשת הצטרפות חדשה מ: ${fullName}`, 'SUCCESS');
           }
       }
+
+      // CRITICAL: Refresh the local store memberships before navigating
+      await refreshMemberships();
 
       if (isSuperAdmin) navigate('/app');
       else navigate('/registration-status');
     } catch (err: any) {
+      console.error("Profile Setup Error:", err);
       setError("שגיאה בשמירה. נסה שנית.");
     } finally {
       setLoading(false);
