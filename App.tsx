@@ -16,7 +16,7 @@ import { DebugOverlay } from './components/debug/DebugOverlay';
 import { MainLayout } from './components/layout/MainLayout';
 import { LoadingScreen } from './components/layout/LoadingScreen';
 import { AccessLevel } from './types';
-import { fetchFromCloud, fetchGlobalConfig, addLog } from './services/syncService';
+import { fetchGlobalConfig, addLog, subscribeToClubData } from './services/syncService';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -24,9 +24,11 @@ const AppContent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, activeClub, isInitialLoading } = useAppStore();
   
   useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
     if (user && activeClub && !user.isDev) {
-        fetchFromCloud(activeClub);
+        unsubscribe = subscribeToClubData(activeClub);
     }
+    return () => { if (unsubscribe) unsubscribe(); };
   }, [user, activeClub]);
 
   if (activeClub && isInitialLoading) {
@@ -45,7 +47,7 @@ const App: React.FC = () => {
     initializedRef.current = true;
 
     fetchGlobalConfig();
-    addLog("System starting v5.6.0...", 'INFO');
+    addLog("System starting v6.0.0 (Reactive)", 'INFO');
     
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         const state = useAppStore.getState();

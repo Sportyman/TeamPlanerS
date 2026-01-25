@@ -2,7 +2,7 @@
   "name": "TeamPlaner - Smart Pairing",
   "description": "A management tool for disability water sports clubs to pair volunteers with members and assign equipment efficiently.",
   "requestFramePermissions": [],
-  "buildNumber": 19,
-  "lastUpdate": "2024-03-25T05:00:00Z",
-  "version": "5.9.0"
+  "buildNumber": 20,
+  "lastUpdate": "2024-03-25T06:00:00Z",
+  "version": "6.0.0"
 }
