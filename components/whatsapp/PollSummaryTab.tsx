@@ -12,6 +12,7 @@ interface PollSummaryTabProps {
   voteAlerts: VoteChangeAlert[];
   onLinkVoter: (voter: ResolvedVoter, personId: string) => Promise<void>;
   onAddGuest: (voter: ResolvedVoter, persistToClub: boolean) => Promise<any>;
+  onUpdatePersonRole: (person: Person, role: Role, isSkipper?: boolean) => Promise<void>;
 }
 
 const INTENT_LABELS: Record<string, { label: string; className: string }> = {
@@ -22,28 +23,21 @@ const INTENT_LABELS: Record<string, { label: string; className: string }> = {
 };
 
 export const PollSummaryTab: React.FC<PollSummaryTabProps> = ({
-  summary,
-  people,
-  voteAlerts,
-  onLinkVoter,
-  onAddGuest,
+  summary, people, voteAlerts, onLinkVoter, onAddGuest, onUpdatePersonRole,
 }) => {
   const [filter, setFilter] = useState<SummaryFilter>('ALL');
   const [quickSelect, setQuickSelect] = useState<Record<string, string>>({});
 
-  const filteredVoters = useMemo(() => {
-    return summary.voters.filter((v) => {
-      if (filter === 'ALL') return true;
-      if (filter === 'ATTENDING') return v.intent === 'ATTENDING';
-      if (filter === 'DECLINING') return v.intent === 'DECLINING';
-      if (filter === 'UNMAPPED') return v.matchSource === 'UNMAPPED';
-      if (filter === 'VOLUNTEER')
-        return v.intent === 'ATTENDING' && (v.effectiveRole === Role.VOLUNTEER || v.effectiveRole === Role.INSTRUCTOR);
-      if (filter === 'MEMBER') return v.intent === 'ATTENDING' && v.effectiveRole === Role.MEMBER;
-      if (filter === 'GUEST') return v.intent === 'ATTENDING' && v.effectiveRole === Role.GUEST;
-      return true;
-    });
-  }, [summary.voters, filter]);
+  const filteredVoters = useMemo(() => summary.voters.filter((v) => {
+    if (filter === 'ALL') return true;
+    if (filter === 'ATTENDING') return v.intent === 'ATTENDING';
+    if (filter === 'DECLINING') return v.intent === 'DECLINING';
+    if (filter === 'UNMAPPED') return v.matchSource === 'UNMAPPED';
+    if (filter === 'VOLUNTEER') return v.intent === 'ATTENDING' && (v.effectiveRole === Role.VOLUNTEER || v.effectiveRole === Role.INSTRUCTOR);
+    if (filter === 'MEMBER') return v.intent === 'ATTENDING' && v.effectiveRole === Role.MEMBER;
+    if (filter === 'GUEST') return v.intent === 'ATTENDING' && v.effectiveRole === Role.GUEST;
+    return true;
+  }), [summary.voters, filter]);
 
   const filters: { id: SummaryFilter; label: string }[] = [
     { id: 'ALL', label: `הכל (${summary.voters.length})` },
@@ -60,12 +54,8 @@ export const PollSummaryTab: React.FC<PollSummaryTabProps> = ({
       <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl overflow-x-auto">
         {filters.map((f) => (
           <button
-            key={f.id}
-            type="button"
-            onClick={() => setFilter(f.id)}
-            className={`px-3 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap shrink-0 transition-colors tabular-nums ${
-              filter === f.id ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-            }`}
+            key={f.id} type="button" onClick={() => setFilter(f.id)}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap shrink-0 transition-colors tabular-nums ${filter === f.id ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
           >
             {f.label}
           </button>
@@ -78,22 +68,19 @@ export const PollSummaryTab: React.FC<PollSummaryTabProps> = ({
             <tr>
               <th className="py-3 px-4 font-bold">משתתף בוואטסאפ</th>
               <th className="py-3 px-4 font-bold">סטטוס ובחירה בסקר</th>
-              <th className="py-3 px-4 font-bold">תפקיד</th>
+              <th className="py-3 px-4 font-bold">תואר / תפקיד בחוג</th>
               <th className="py-3 px-4 font-bold">שיוך במערכת</th>
               <th className="py-3 px-4 font-bold">עדכון</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filteredVoters.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="py-10 text-center text-sm text-slate-500">
-                  אין מצביעים התואמים לסינון זה.
-                </td>
-              </tr>
+              <tr><td colSpan={5} className="py-10 text-center text-sm text-slate-500">אין מצביעים התואמים לסינון זה.</td></tr>
             ) : (
               filteredVoters.map((voter) => {
                 const intentInfo = INTENT_LABELS[voter.intent];
                 const chosenId = quickSelect[voter.voterId] || voter.suggestedPerson?.id || '';
+                const person = voter.person;
                 return (
                   <tr key={voter.voterId} className="hover:bg-slate-50/70">
                     <td className="py-3 px-4">
@@ -101,9 +88,7 @@ export const PollSummaryTab: React.FC<PollSummaryTabProps> = ({
                         <WhatsAppAvatar name={voter.displayName} src={voter.profilePicUrl} />
                         <div className="min-w-0">
                           <div className="font-bold text-slate-900 truncate">{voter.displayName}</div>
-                          <div className="text-xs text-slate-500 font-mono tabular-nums" dir="ltr">
-                            {voter.phone || voter.voterId.split('@')[0]}
-                          </div>
+                          <div className="text-xs text-slate-500 font-mono tabular-nums" dir="ltr">{voter.phone || voter.voterId.split('@')[0]}</div>
                         </div>
                       </div>
                     </td>
@@ -112,57 +97,63 @@ export const PollSummaryTab: React.FC<PollSummaryTabProps> = ({
                         {intentInfo.label}
                         {voter.updatedRecently && <span className="mr-1.5 text-amber-700">· שונה כעת</span>}
                       </div>
-                      <div className="text-xs text-slate-600 mt-0.5">
-                        {voter.selectedOptions.join(', ') || 'ללא בחירה'}
-                      </div>
+                      <div className="text-xs text-slate-600 mt-0.5">{voter.selectedOptions.join(', ') || 'ללא בחירה'}</div>
                     </td>
-                    <td className="py-3 px-4 text-xs font-semibold text-slate-700">
-                      {getRoleLabel(voter.effectiveRole, voter.person?.gender || Gender.MALE)}
+                    <td className="py-3 px-4 text-xs">
+                      {person ? (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <select
+                              value={person.role}
+                              onChange={(e) => onUpdatePersonRole(person, e.target.value as Role)}
+                              className="border border-slate-200 rounded-lg px-2 py-1 bg-white font-semibold text-slate-800"
+                            >
+                              <option value={Role.MEMBER}>{getRoleLabel(Role.MEMBER, person.gender)}</option>
+                              <option value={Role.VOLUNTEER}>{getRoleLabel(Role.VOLUNTEER, person.gender)}</option>
+                              <option value={Role.INSTRUCTOR}>{getRoleLabel(Role.INSTRUCTOR, person.gender)}</option>
+                              <option value={Role.GUEST}>{getRoleLabel(Role.GUEST, person.gender)}</option>
+                            </select>
+                            <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer">
+                              <input type="checkbox" checked={Boolean(person.isSkipper)} onChange={(e) => onUpdatePersonRole(person, person.role, e.target.checked)} className="rounded border-slate-300" />
+                              <span>סקיפר</span>
+                            </label>
+                          </div>
+                          {voter.pollRole && voter.pollRole !== person.role && (
+                            <div className="text-[11px] text-amber-700">
+                              בסקר סומן: {getRoleLabel(voter.pollRole, person.gender)}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="font-semibold text-slate-700">
+                          {getRoleLabel(voter.effectiveRole, Gender.MALE)}
+                          {voter.detectedIsSkipper ? ' · מפקד סירה' : ''}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-4">
-                      {voter.person ? (
+                      {person ? (
                         <div className="text-xs">
-                          <span className="font-bold text-slate-900">{voter.person.name}</span>
-                          <span className="text-slate-500 mr-1.5">
-                            · {voter.matchSource === 'PHONE_AUTO' ? 'זיהוי טלפון' : 'משויך'}
-                          </span>
+                          <span className="font-bold text-slate-900">{person.name}</span>
+                          <span className="text-slate-500 mr-1.5">· {voter.matchSource === 'PHONE_AUTO' ? 'זיהוי טלפון' : 'משויך'}</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <select
-                            value={chosenId}
-                            onChange={(e) => setQuickSelect((p) => ({ ...p, [voter.voterId]: e.target.value }))}
-                            className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white max-w-[145px]"
-                          >
+                          <select value={chosenId} onChange={(e) => setQuickSelect((p) => ({ ...p, [voter.voterId]: e.target.value }))} className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white max-w-[145px]">
                             <option value="">בחר חבר...</option>
-                            {people.map((p) => (
-                              <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
+                            {people.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
                           </select>
-                          <button
-                            type="button"
-                            disabled={!chosenId}
-                            onClick={() => onLinkVoter(voter, chosenId)}
-                            className="p-1.5 rounded-lg bg-brand-600 disabled:opacity-40 text-white hover:bg-brand-700"
-                            title="שייך חבר"
-                          >
+                          <button type="button" disabled={!chosenId} onClick={() => onLinkVoter(voter, chosenId)} className="p-1.5 rounded-lg bg-brand-600 disabled:opacity-40 text-white hover:bg-brand-700" title="שייך חבר">
                             <Link2 size={13} />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => onAddGuest(voter, false)}
-                            className="p-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100"
-                            title="הוסף כאורח לאימון"
-                          >
+                          <button type="button" onClick={() => onAddGuest(voter, false)} className="p-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100" title="הוסף כאורח לאימון">
                             <UserPlus size={13} />
                           </button>
                         </div>
                       )}
                     </td>
                     <td className="py-3 px-4 text-xs text-slate-500 tabular-nums whitespace-nowrap">
-                      {voter.timestampMs
-                        ? new Date(voter.timestampMs).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
-                        : '—'}
+                      {voter.timestampMs ? new Date(voter.timestampMs).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) : '—'}
                     </td>
                   </tr>
                 );
@@ -181,9 +172,7 @@ export const PollSummaryTab: React.FC<PollSummaryTabProps> = ({
                 <span className="text-slate-800">
                   <strong>{a.displayName}</strong> שינה מ״{a.previousOptions.join(', ') || 'לא הצביע'}״ ל״{a.newOptions.join(', ') || 'ביטל'}״
                 </span>
-                <span className="text-slate-500 tabular-nums">
-                  {new Date(a.detectedAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                <span className="text-slate-500 tabular-nums">{new Date(a.detectedAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</span>
               </div>
             ))}
           </div>

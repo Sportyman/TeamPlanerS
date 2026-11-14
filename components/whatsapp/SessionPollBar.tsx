@@ -14,10 +14,13 @@ interface SessionPollBarProps {
   summary: ResolvedPollSummary | null;
   people: Person[];
   presentIds: string[];
+  linkedGroups: string[];
+  availableGroups: string[];
   voteAlerts: VoteChangeAlert[];
   isLoading: boolean;
   error: string | null;
   onSelectPoll: (pollId: string) => void;
+  onLinkGroup: (groupName: string) => Promise<void>;
   onApplyAttendance: (mode: 'REPLACE' | 'MERGE') => void;
   onTogglePerson: (personId: string) => void;
   onLinkVoter: (voter: any, personId: string) => Promise<void>;
@@ -28,8 +31,8 @@ interface SessionPollBarProps {
 }
 
 export const SessionPollBar: React.FC<SessionPollBarProps> = ({
-  polls, activePoll, summary, people, presentIds, voteAlerts, isLoading, error,
-  onSelectPoll, onApplyAttendance, onTogglePerson, onLinkVoter, onAddGuest, onDismissAlert, onClearAlerts, onRetry,
+  polls, activePoll, summary, people, presentIds, linkedGroups, availableGroups, voteAlerts, isLoading, error,
+  onSelectPoll, onLinkGroup, onApplyAttendance, onTogglePerson, onLinkVoter, onAddGuest, onDismissAlert, onClearAlerts, onRetry,
 }) => {
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showModeChoice, setShowModeChoice] = useState(false);
@@ -60,15 +63,40 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
     );
   }
 
+  if (linkedGroups.length === 0) {
+    return (
+      <div className="border border-amber-200 rounded-2xl p-4 bg-amber-50/60 space-y-2.5">
+        <div className="flex items-center justify-between gap-3 flex-wrap text-xs">
+          <div className="flex items-center gap-2 font-bold text-amber-900">
+            <MessageSquare size={16} className="text-amber-700 shrink-0" />
+            <span>כדי להציג סקרים וחברים רק עבור חוג זה, יש לשייך קבוצת וואטסאפ לחוג:</span>
+          </div>
+          <Link to="/app/whatsapp" className="text-brand-700 font-bold hover:underline flex items-center gap-1">
+            <Settings2 size={13} /> <span>הגדרות וואטסאפ</span>
+          </Link>
+        </div>
+        {availableGroups.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {availableGroups.map((g) => (
+              <button key={g} type="button" onClick={() => onLinkGroup(g)} className="px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-xs font-bold text-amber-900 hover:bg-amber-100">
+                + שייך לחוג: {g}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (polls.length === 0 || !activePoll || !summary) {
     return (
       <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/70 flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2.5 text-sm text-slate-600">
           <MessageSquare size={18} className="text-slate-400 shrink-0" />
-          <span>עדיין לא התקבלו סקרי וואטסאפ מקושרים לחוג זה.</span>
+          <span>עדיין לא התקבלו סקרים מהקבוצות המקושרות ({linkedGroups.join(', ')}).</span>
         </div>
         <Link to="/app/whatsapp" className="text-xs font-bold text-brand-700 hover:text-brand-800 flex items-center gap-1.5 whitespace-nowrap">
-          <Settings2 size={14} /> <span>הגדר קבוצות וואטסאפ</span>
+          <Settings2 size={14} /> <span>ניהול וואטסאפ</span>
         </Link>
       </div>
     );
@@ -117,20 +145,11 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 border-t border-slate-100 pt-3 tabular-nums">
         <span className="font-bold text-emerald-700">מגיעים בסקר: {counts.totalAttending}</span>
-        <span aria-hidden="true">·</span>
-        <span>מתנדבים: {counts.volunteers + counts.instructors}</span>
-        <span aria-hidden="true">·</span>
-        <span>חברים: {counts.members}</span>
-        <span aria-hidden="true">·</span>
-        <span>אורחים: {counts.guests}</span>
-        <span aria-hidden="true">·</span>
-        <span className="text-red-700">לא מגיעים: {counts.declining}</span>
-        {counts.unmappedAttending > 0 && (
-          <>
-            <span aria-hidden="true">·</span>
-            <span className="font-semibold text-amber-800">ממתינים לזיהוי: {counts.unmappedAttending}</span>
-          </>
-        )}
+        <span aria-hidden="true">·</span><span>מתנדבים: {counts.volunteers + counts.instructors}</span>
+        <span aria-hidden="true">·</span><span>חברים: {counts.members}</span>
+        <span aria-hidden="true">·</span><span>אורחים: {counts.guests}</span>
+        <span aria-hidden="true">·</span><span className="text-red-700">לא מגיעים: {counts.declining}</span>
+        {counts.unmappedAttending > 0 && (<><span aria-hidden="true">·</span><span className="font-semibold text-amber-800">ממתינים לזיהוי: {counts.unmappedAttending}</span></>)}
       </div>
 
       <VoteAlertsBanner alerts={voteAlerts} presentIds={presentIds} onTogglePerson={onTogglePerson} onDismiss={onDismissAlert} onClearAll={onClearAlerts} />

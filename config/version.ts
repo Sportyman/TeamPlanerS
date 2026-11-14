@@ -1,3 +1,3 @@
-export const APP_VERSION = '6.3.3';
+export const APP_VERSION = '6.3.5';
 export const LAST_COMMIT_MESSAGE =
-  'fix(whatsapp): store club whatsapp config on clubs collection to match existing Firestore rules and parse object-shaped poll options';
+  'feat(whatsapp,pairing): enforce per-club group isolation & clubLinks, inline role editing during sync/Step 2, recommended inventory default, and single-kayak buddy pods (pairs/trios)';

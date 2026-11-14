@@ -20,9 +20,10 @@ export const WhatsAppDashboardView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('SUMMARY');
 
   const {
-    polls, activePoll, setSelectedPollId, summary, clubConfig, clubPeople, mappings,
+    polls, activePoll, setSelectedPollId, summary, clubConfig, clubPeople, mappings, syncCandidates,
     availableGroups, voteAlerts, dismissAlert, clearAlerts, isLoading, error, retry,
-    applyPollAttendance, linkVoterToPerson, unlinkVoter, addGuestFromVoter, saveConfig, setPollColor,
+    applyPollAttendance, linkVoterToPerson, confirmSyncCandidate, importRosterMembers,
+    unlinkVoter, addGuestFromVoter, saveConfig, setPollColor, linkClubGroup, updateMemberRole,
   } = useWhatsAppPolls();
 
   const presentIds = activeClub ? sessions[activeClub]?.presentPersonIds || [] : [];
@@ -77,6 +78,7 @@ export const WhatsAppDashboardView: React.FC = () => {
                 <span>חברים: {summary.counts.members}</span>
                 <span aria-hidden="true">·</span>
                 <span>אורחים: {summary.counts.guests}</span>
+                {summary.counts.skippers > 0 && (<><span aria-hidden="true">·</span><span className="font-semibold text-blue-700">מפקדי סירה: {summary.counts.skippers}</span></>)}
                 <span aria-hidden="true">·</span>
                 <span className="text-red-700">לא מגיעים: {summary.counts.declining}</span>
               </div>
@@ -88,7 +90,7 @@ export const WhatsAppDashboardView: React.FC = () => {
 
       <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl w-fit">
         <button type="button" onClick={() => setActiveTab('SUMMARY')} className={`px-4 py-2 text-xs font-bold rounded-lg whitespace-nowrap ${activeTab === 'SUMMARY' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}>סיכום סקר ומצביעים</button>
-        <button type="button" onClick={() => setActiveTab('MAPPING')} className={`px-4 py-2 text-xs font-bold rounded-lg whitespace-nowrap ${activeTab === 'MAPPING' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}>שיוך מצביעים ({mappings.length})</button>
+        <button type="button" onClick={() => setActiveTab('MAPPING')} className={`px-4 py-2 text-xs font-bold rounded-lg whitespace-nowrap ${activeTab === 'MAPPING' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}>שיוך וסנכרון ({mappings.length})</button>
         <button type="button" onClick={() => setActiveTab('SETTINGS')} className={`px-4 py-2 text-xs font-bold rounded-lg whitespace-nowrap ${activeTab === 'SETTINGS' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}>הגדרות קבוצות ומילות מפתח</button>
       </div>
 
@@ -100,15 +102,32 @@ export const WhatsAppDashboardView: React.FC = () => {
       ) : (
         <>
           {activeTab === 'SUMMARY' && summary && (
-            <PollSummaryTab summary={summary} people={clubPeople} voteAlerts={voteAlerts} onLinkVoter={linkVoterToPerson} onAddGuest={addGuestFromVoter} />
+            <PollSummaryTab summary={summary} people={clubPeople} voteAlerts={voteAlerts} onLinkVoter={linkVoterToPerson} onAddGuest={addGuestFromVoter} onUpdatePersonRole={updateMemberRole} />
           )}
           {activeTab === 'SUMMARY' && !summary && (
-            <div className="border border-slate-200 rounded-2xl bg-white p-10 text-center text-sm text-slate-500">
-              עדיין לא נקלטו סקרים ב-Firestore. ברגע שסקר יישלח בקבוצת הוואטסאפ המקושרת הוא יופיע כאן.
+            <div className="border border-slate-200 rounded-2xl bg-white p-8 text-center text-sm text-slate-500 space-y-3">
+              <div>
+                {clubConfig.linkedGroups.length === 0
+                  ? 'טרם שויכה קבוצת וואטסאפ לחוג זה. יש לבחור את הקבוצה הרלוונטית לחוג:'
+                  : 'עדיין לא נקלטו סקרים מקבוצת הוואטסאפ של חוג זה.'}
+              </div>
+              {clubConfig.linkedGroups.length === 0 && availableGroups.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-2">
+                  {availableGroups.map((g) => (
+                    <button key={g} type="button" onClick={() => linkClubGroup(g)} className="px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-bold hover:bg-brand-700">+ שייך קבוצה: {g}</button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
-          {activeTab === 'MAPPING' && (
-            <VoterMappingTab voters={summary?.voters || []} mappings={mappings} people={clubPeople} onLinkVoter={linkVoterToPerson} onUnlinkVoter={unlinkVoter} onAddGuest={addGuestFromVoter} />
+          {activeTab === 'MAPPING' && activeClub && (
+            <VoterMappingTab
+              activeClub={activeClub} linkedGroups={clubConfig.linkedGroups} availableGroups={availableGroups}
+              voters={summary?.voters || []} mappings={mappings} people={clubPeople} syncCandidates={syncCandidates}
+              onLinkVoter={linkVoterToPerson} onUnlinkVoter={unlinkVoter} onAddGuest={addGuestFromVoter}
+              onConfirmCandidate={confirmSyncCandidate} onImportRoster={importRosterMembers}
+              onUpdatePersonRole={updateMemberRole} onLinkGroup={linkClubGroup}
+            />
           )}
           {activeTab === 'SETTINGS' && (
             <WhatsAppSettingsTab config={clubConfig} availableGroups={availableGroups} onSave={saveConfig} />

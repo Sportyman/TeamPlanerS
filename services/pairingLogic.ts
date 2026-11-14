@@ -1,281 +1,164 @@
+import { BoatDefinition, BoatInventory, DefaultBoatTypes, Person, Role, Team } from '../types';
+import {
+  buildClusters,
+  groupSingleKayaksIntoPods,
+  hasAffinityWithTeam,
+  isClusterCompatible,
+  PairingCluster,
+  personRequiresDouble,
+} from './pairingHelpers';
 
-import { Person, Role, BoatInventory, Team, BoatDefinition, GenderPrefType } from '../types';
-
-interface Cluster {
-  id: string;
-  members: Person[];
-  hasVolunteer: boolean;
-  skipperCount: number; 
-  totalRank: number;
-  roles: Role[];
-  size: number;
-}
+const newId = () => Math.random().toString(36).slice(2, 11);
 
 export const generateSmartPairings = (
-  people: Person[], 
+  people: Person[],
   inventory: BoatInventory,
   boatDefinitions: BoatDefinition[]
 ): Team[] => {
-  if (!people || people.length === 0) return [];
-  if (!boatDefinitions || boatDefinitions.length === 0) return [];
+  if (!people?.length || !boatDefinitions?.length) return [];
 
-  const teams: Team[] = [];
+  const multiTeams: Team[] = [];
+  const singleTeams: Team[] = [];
   const currentInventory = { ...inventory };
-  
-  const sortedBoatDefs = [...boatDefinitions].sort((a, b) => {
-      if (b.capacity !== a.capacity) return b.capacity - a.capacity;
-      return (a.isStable === b.isStable) ? 0 : a.isStable ? 1 : -1;
-  });
+  const sortedDefs = [...boatDefinitions].sort((a, b) =>
+    b.capacity !== a.capacity ? b.capacity - a.capacity : a.isStable === b.isStable ? 0 : a.isStable ? 1 : -1
+  );
 
-  let availablePeople = [...people];
-  const clusters: Cluster[] = [];
-
-  while (availablePeople.length > 0) {
-      const root = availablePeople[0];
-      const clusterMembers = [root];
-      availablePeople.shift(); 
-
-      let changed = true;
-      while (changed) {
-          changed = false;
-          for (const member of clusterMembers) {
-              if (member?.mustPairWith) {
-                  for (const targetId of member.mustPairWith) {
-                      const targetIdx = availablePeople.findIndex(p => p.id === targetId);
-                      if (targetIdx !== -1) {
-                          clusterMembers.push(availablePeople[targetIdx]);
-                          availablePeople.splice(targetIdx, 1);
-                          changed = true;
-                      }
-                  }
-              }
-          }
-          
-          for (let i = 0; i < availablePeople.length; i++) {
-              const candidate = availablePeople[i];
-              if (candidate?.mustPairWith) {
-                  const matchFound = candidate.mustPairWith.some(targetId => 
-                      clusterMembers.some(m => m.id === targetId)
-                  );
-                  if (matchFound) {
-                      clusterMembers.push(candidate);
-                      availablePeople.splice(i, 1);
-                      i--; 
-                      changed = true;
-                  }
-              }
-          }
-      }
-      
-      clusters.push({
-          id: `cluster-${root.id}`,
-          members: clusterMembers,
-          hasVolunteer: clusterMembers.some(m => m.role === Role.VOLUNTEER || m.role === Role.INSTRUCTOR),
-          skipperCount: clusterMembers.filter(m => m.isSkipper).length,
-          totalRank: clusterMembers.reduce((sum, m) => sum + (m.rank || 0), 0),
-          roles: clusterMembers.map(m => m.role),
-          size: clusterMembers.length
-      });
-  }
-
-  let captainClusters = clusters.filter(c => c.hasVolunteer);
-  let passengerClusters = clusters.filter(c => !c.hasVolunteer);
-
-  captainClusters.sort((a, b) => b.totalRank - a.totalRank);
-  passengerClusters.sort((a, b) => a.totalRank - b.totalRank);
-
-  const useBoat = (boatTypeId: string) => {
-      if ((currentInventory[boatTypeId] || 0) > 0) {
-          currentInventory[boatTypeId] -= 1;
-          return true;
-      }
-      return false;
-  };
-
-  const newId = () => Math.random().toString(36).substr(2, 9);
-
-  const isCompatible = (cluster: Cluster, currentTeamMembers: Person[]): boolean => {
-      for (const newPerson of cluster.members) {
-          for (const existingPerson of currentTeamMembers) {
-              if (newPerson.cannotPairWith?.includes(existingPerson.id)) return false;
-              if (existingPerson.cannotPairWith?.includes(newPerson.id)) return false;
-
-              if (newPerson.genderConstraint?.type !== 'NONE' && newPerson.genderConstraint?.strength === 'MUST') {
-                  const req = newPerson.genderConstraint.type; 
-                  if (req === 'MALE' && existingPerson.gender !== 'MALE') return false;
-                  if (req === 'FEMALE' && existingPerson.gender !== 'FEMALE') return false;
-              }
-
-              if (existingPerson.genderConstraint?.type !== 'NONE' && existingPerson.genderConstraint?.strength === 'MUST') {
-                  const req = existingPerson.genderConstraint.type;
-                   if (req === 'MALE' && newPerson.gender !== 'MALE') return false;
-                   if (req === 'FEMALE' && newPerson.gender !== 'FEMALE') return false;
-              }
-          }
-      }
+  const useBoat = (boatId: string) => {
+    if ((currentInventory[boatId] || 0) > 0) {
+      currentInventory[boatId] -= 1;
       return true;
+    }
+    return false;
   };
 
-  const multiSeatBoats = sortedBoatDefs.filter(b => b.capacity > 1);
+  let allClusters = buildClusters(people);
 
-  for (const boatDef of multiSeatBoats) {
-      let availableCount = currentInventory[boatDef.id] || 0;
-      const requiresSkipper = (boatDef.minSkippers || 0) > 0;
-
-      while (availableCount > 0) {
-          let teamMembers: Person[] = [];
-          let remainingCapacity = boatDef.capacity;
-          let currentSkipperCount = 0;
-
-          let capIndex = -1;
-          if (requiresSkipper) {
-               capIndex = captainClusters.findIndex(c => 
-                   c.size <= remainingCapacity && 
-                   c.skipperCount > 0 &&
-                   (c.members[0]?.preferredBoatType ? c.members[0].preferredBoatType === boatDef.id : true)
-               );
-               if (capIndex === -1) {
-                   capIndex = captainClusters.findIndex(c => c.size <= remainingCapacity && c.skipperCount > 0);
-               }
-          } 
-          
-          if (capIndex === -1) {
-             capIndex = captainClusters.findIndex(c => 
-                  c.size <= remainingCapacity && 
-                  (c.members[0]?.preferredBoatType ? c.members[0].preferredBoatType === boatDef.id : true)
-              );
-              if (capIndex === -1) {
-                  capIndex = captainClusters.findIndex(c => c.size <= remainingCapacity);
-              }
-          }
-
-          if (capIndex !== -1) {
-              const capCluster = captainClusters[capIndex];
-              captainClusters.splice(capIndex, 1); 
-              teamMembers.push(...capCluster.members);
-              remainingCapacity -= capCluster.size;
-              currentSkipperCount += capCluster.skipperCount;
-          } else {
-              break; 
-          }
-
-          while (remainingCapacity > 0) {
-              let bestPassIdx = -1;
-              bestPassIdx = passengerClusters.findIndex(c => {
-                  if (c.size > remainingCapacity) return false;
-                  if (!isCompatible(c, teamMembers)) return false;
-                  const hasAffinity = c.members.some(m => 
-                      m.preferPairWith?.some(pid => teamMembers.find(tm => tm.id === pid))
-                  ) || teamMembers.some(tm => 
-                      tm.preferPairWith?.some(pid => c.members.find(cm => cm.id === pid))
-                  );
-                  return hasAffinity;
-              });
-
-              if (bestPassIdx === -1) {
-                  bestPassIdx = passengerClusters.findIndex(c => 
-                      c.size <= remainingCapacity && isCompatible(c, teamMembers)
-                  );
-              }
-              
-              if (bestPassIdx === -1 && captainClusters.length > 0) {
-                  const needMoreSkippers = requiresSkipper && currentSkipperCount < (boatDef.minSkippers || 0);
-                  let extraCapIdx = -1;
-                  if (needMoreSkippers) {
-                       extraCapIdx = captainClusters.findIndex(c => 
-                          c.size <= remainingCapacity && c.skipperCount > 0 && isCompatible(c, teamMembers)
-                       );
-                  }
-                  if (extraCapIdx === -1) {
-                      extraCapIdx = captainClusters.findIndex(c => 
-                          c.size <= remainingCapacity && isCompatible(c, teamMembers)
-                      );
-                  }
-                  if (extraCapIdx !== -1) {
-                      const extra = captainClusters[extraCapIdx];
-                      captainClusters.splice(extraCapIdx, 1);
-                      teamMembers.push(...extra.members);
-                      remainingCapacity -= extra.size;
-                      currentSkipperCount += extra.skipperCount;
-                      continue; 
-                  }
-              }
-
-              if (bestPassIdx !== -1) {
-                  const passCluster = passengerClusters[bestPassIdx];
-                  passengerClusters.splice(bestPassIdx, 1);
-                  teamMembers.push(...passCluster.members);
-                  remainingCapacity -= passCluster.size;
-                  currentSkipperCount += passCluster.skipperCount;
-              } else {
-                  break;
-              }
-          }
-
-          if (teamMembers.length > 0) {
-             const warnings: string[] = [];
-             const hasVol = teamMembers.some(m => m.role === Role.VOLUNTEER || m.role === Role.INSTRUCTOR);
-             if (boatDef.capacity > 1 && !hasVol) warnings.push('צוות ללא מתנדב');
-             if (teamMembers.length === 1 && boatDef.capacity > 1) warnings.push('חותר בודד בסירה זוגית');
-             const totalSkippers = teamMembers.filter(m => m.isSkipper).length;
-             if ((boatDef.minSkippers || 0) > 0 && totalSkippers < (boatDef.minSkippers || 0)) warnings.push('חסר סקיפר בסירה');
-
-             teams.push({
-                id: newId(),
-                members: teamMembers,
-                boatType: boatDef.id,
-                boatCount: 1,
-                warnings: warnings.length > 0 ? warnings : undefined
-             });
-             useBoat(boatDef.id);
-             availableCount--;
-          } else {
-              break;
-          }
+  // 1. PRIVATE boats first (will join single buddy pods so nobody goes out alone)
+  const privateDef = sortedDefs.find((b) => b.id === DefaultBoatTypes.PRIVATE);
+  if (privateDef && (currentInventory[privateDef.id] || 0) > 0) {
+    const remaining: PairingCluster[] = [];
+    for (const c of allClusters) {
+      if (c.requiresPrivate && useBoat(privateDef.id)) {
+        singleTeams.push({ id: newId(), members: c.members, boatType: privateDef.id, boatCount: 1 });
+      } else {
+        remaining.push(c);
       }
+    }
+    allClusters = remaining;
   }
 
-  const singleSeatBoats = sortedBoatDefs.filter(b => b.capacity === 1);
-  const leftovers = [...captainClusters, ...passengerClusters];
-
-  for (const boatDef of singleSeatBoats) {
-      let availableCount = currentInventory[boatDef.id] || 0;
-      while (availableCount > 0 && leftovers.length > 0) {
-          let candidateIdx = leftovers.findIndex(c => 
-              c.size === 1 && c.members[0]?.preferredBoatType === boatDef.id
-          );
-          if (candidateIdx === -1) candidateIdx = leftovers.findIndex(c => c.size === 1);
-          if (candidateIdx !== -1) {
-              const cluster = leftovers[candidateIdx];
-              leftovers.splice(candidateIdx, 1);
-              const warnings: string[] = [];
-              if (cluster.totalRank <= 2 && !cluster.hasVolunteer && !boatDef.isStable) warnings.push('חותר מתחיל בקיאק יחיד');
-              teams.push({
-                  id: newId(),
-                  members: cluster.members,
-                  boatType: boatDef.id,
-                  boatCount: 1,
-                  warnings: warnings.length > 0 ? warnings : undefined
-              });
-              useBoat(boatDef.id);
-              availableCount--;
-          } else {
-              break; 
-          }
-      }
-  }
-
-  leftovers.forEach(cluster => {
-      cluster.members.forEach(p => {
-          teams.push({
-              id: newId(),
-              members: [p],
-              boatType: 'UNKNOWN',
-              boatCount: 0,
-              warnings: ['אין סירה פנויה (או התנגשות)']
-          });
-      });
+  const captainClusters = allClusters.filter((c) => c.hasVolunteer).sort((a, b) => b.totalRank - a.totalRank);
+  const passengerClusters = allClusters.filter((c) => !c.hasVolunteer).sort((a, b) => {
+    const aDouble = a.size > 1 || a.members.some(personRequiresDouble) ? 0 : 1;
+    const bDouble = b.size > 1 || b.members.some(personRequiresDouble) ? 0 : 1;
+    return aDouble !== bDouble ? aDouble - bDouble : a.totalRank - b.totalRank;
   });
 
-  return teams;
+  // 2. Multi-seat boats (DOUBLE = always prefer Volunteer + Member; fallback to highest-rank pairs)
+  for (const boatDef of sortedDefs.filter((b) => b.capacity > 1)) {
+    let availableCount = currentInventory[boatDef.id] || 0;
+    const reqSkippers = boatDef.minSkippers || 0;
+
+    while (availableCount > 0) {
+      const teamMembers: Person[] = [];
+      let remainingCap = boatDef.capacity;
+      let skipperCount = 0;
+
+      const pickCaptainIdx = (): number => {
+        if (reqSkippers > 0) {
+          const skipIdx = captainClusters.findIndex((c) => c.size <= remainingCap && c.skipperCount > 0 && !c.prefersSingle);
+          if (skipIdx !== -1) return skipIdx;
+          const skipAny = captainClusters.findIndex((c) => c.size <= remainingCap && c.skipperCount > 0);
+          if (skipAny !== -1) return skipAny;
+        }
+        const nonSingle = captainClusters.findIndex((c) => c.size <= remainingCap && !c.prefersSingle);
+        if (nonSingle !== -1) return nonSingle;
+        return passengerClusters.length > 0 ? captainClusters.findIndex((c) => c.size <= remainingCap) : -1;
+      };
+
+      const capIdx = pickCaptainIdx();
+      if (capIdx !== -1) {
+        const cap = captainClusters.splice(capIdx, 1)[0];
+        teamMembers.push(...cap.members);
+        remainingCap -= cap.size;
+        skipperCount += cap.skipperCount;
+      } else if (passengerClusters.some((c) => c.size <= remainingCap)) {
+        // Fallback: pick highest-rank member first if no volunteers remain
+        const bestPassIdx = passengerClusters.reduce((best, c, idx, arr) =>
+          c.size <= remainingCap && (best === -1 || c.totalRank > arr[best].totalRank) ? idx : best, -1);
+        if (bestPassIdx === -1) break;
+        const pass = passengerClusters.splice(bestPassIdx, 1)[0];
+        teamMembers.push(...pass.members);
+        remainingCap -= pass.size;
+      } else {
+        break;
+      }
+
+      while (remainingCap > 0) {
+        let passIdx = passengerClusters.findIndex((c) => c.size <= remainingCap && isClusterCompatible(c, teamMembers) && hasAffinityWithTeam(c, teamMembers));
+        if (passIdx === -1) passIdx = passengerClusters.findIndex((c) => c.size <= remainingCap && !c.prefersSingle && isClusterCompatible(c, teamMembers));
+        if (passIdx === -1) passIdx = passengerClusters.findIndex((c) => c.size <= remainingCap && isClusterCompatible(c, teamMembers));
+
+        if (passIdx !== -1) {
+          const pass = passengerClusters.splice(passIdx, 1)[0];
+          teamMembers.push(...pass.members);
+          remainingCap -= pass.size;
+          skipperCount += pass.skipperCount;
+          continue;
+        }
+
+        const needSkip = reqSkippers > 0 && skipperCount < reqSkippers;
+        let extraIdx = needSkip ? captainClusters.findIndex((c) => c.size <= remainingCap && c.skipperCount > 0 && isClusterCompatible(c, teamMembers)) : -1;
+        if (extraIdx === -1) extraIdx = captainClusters.findIndex((c) => c.size <= remainingCap && !c.prefersSingle && isClusterCompatible(c, teamMembers));
+        if (extraIdx === -1 && teamMembers.length === 1) extraIdx = captainClusters.findIndex((c) => c.size <= remainingCap && isClusterCompatible(c, teamMembers));
+        if (extraIdx !== -1) {
+          const extra = captainClusters.splice(extraIdx, 1)[0];
+          teamMembers.push(...extra.members);
+          remainingCap -= extra.size;
+          skipperCount += extra.skipperCount;
+          continue;
+        }
+        break;
+      }
+
+      const warnings: string[] = [];
+      const hasVol = teamMembers.some((m) => m.role === Role.VOLUNTEER || m.role === Role.INSTRUCTOR);
+      if (!hasVol) warnings.push('צוות ללא מתנדב');
+      if (teamMembers.length === 1) warnings.push('חותר בודד בסירה זוגית');
+      if (reqSkippers > 0 && skipperCount < reqSkippers) warnings.push('חסר סקיפר בסירה');
+
+      multiTeams.push({ id: newId(), members: teamMembers, boatType: boatDef.id, boatCount: 1, warnings: warnings.length ? warnings : undefined });
+      useBoat(boatDef.id);
+      availableCount--;
+    }
+  }
+
+  // 3. Single-seat boats grouped into safety buddy pairs/trios (never solo)
+  const leftovers = [...captainClusters, ...passengerClusters];
+  for (const boatDef of sortedDefs.filter((b) => b.capacity === 1 && b.id !== DefaultBoatTypes.PRIVATE)) {
+    let availableCount = currentInventory[boatDef.id] || 0;
+    while (availableCount > 0 && leftovers.length > 0) {
+      let idx = leftovers.findIndex((c) => c.size === 1 && c.prefersSingle);
+      if (idx === -1) idx = leftovers.findIndex((c) => c.size === 1 && (boatDef.isStable || !personRequiresDouble(c.members[0])));
+      if (idx === -1) break;
+
+      const cluster = leftovers.splice(idx, 1)[0];
+      const warnings: string[] = [];
+      if (cluster.totalRank <= 2 && !cluster.hasVolunteer && !boatDef.isStable) warnings.push('חותר מתחיל בקיאק יחיד');
+      singleTeams.push({ id: newId(), members: cluster.members, boatType: boatDef.id, boatCount: 1, warnings: warnings.length ? warnings : undefined });
+      useBoat(boatDef.id);
+      availableCount--;
+    }
+  }
+
+  const groupedSingles = groupSingleKayaksIntoPods(singleTeams);
+  const unassigned: Team[] = leftovers.flatMap((cluster) =>
+    cluster.members.map((p) => ({
+      id: newId(), members: [p], boatType: 'UNKNOWN', boatCount: 0,
+      warnings: [personRequiresDouble(p) ? 'נדרש קיאק זוגי (חסר כלי שיט זוגי / מתנדב)' : 'אין סירה פנויה (או התנגשות)'],
+    }))
+  );
+
+  return [...multiTeams, ...groupedSingles, ...unassigned];
 };

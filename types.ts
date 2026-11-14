@@ -207,6 +207,7 @@ export interface Team {
   members: Person[];
   boatType: BoatType;
   boatCount: number;
+  buddyGroup?: string;
   warnings?: string[];
 }
 

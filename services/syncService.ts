@@ -1,10 +1,8 @@
-
 import { db } from '../firebase';
-import { doc, getDoc, getDocFromServer, setDoc, collection, query, where, onSnapshot, Unsubscribe, addDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocFromServer, setDoc, collection, query, where, onSnapshot, Unsubscribe, addDoc } from 'firebase/firestore';
 import { useAppStore } from '../store';
-import { Person, ClubID, MembershipStatus, UserProfile, Role, AccessLevel } from '../types';
+import { Person, ClubID, MembershipStatus, UserProfile, Role, AccessLevel, Gender } from '../types';
 
-let isFatalError = false; 
 const systemLogs: { time: string; msg: string; type: 'INFO' | 'WARN' | 'ERROR' | 'SYNC' }[] = [];
 
 export const addLog = (msg: string, type: 'INFO' | 'WARN' | 'ERROR' | 'SYNC' = 'INFO') => {
@@ -27,43 +25,52 @@ export const downloadSystemLogs = () => {
 export const subscribeToClubData = (clubId: ClubID): Unsubscribe => {
     const { setPeople, setSyncStatus, setInitialLoading } = useAppStore.getState();
     addLog(`Starting reactive subscription for club: ${clubId}`, 'SYNC');
-    
     setSyncStatus('SYNCING');
     setInitialLoading(true);
 
     const membershipsQuery = query(
-        collection(db, 'memberships'), 
+        collection(db, 'memberships'),
         where('clubId', '==', clubId),
         where('status', '==', MembershipStatus.ACTIVE)
     );
 
     return onSnapshot(membershipsQuery, async (snapshot) => {
         const memberships = snapshot.docs.map(d => d.data());
-        
-        const peopleList: Person[] = await Promise.all(memberships.map(async (ms: any) => {
-            const profileRef = doc(db, 'profiles', ms.uid);
-            // CRITICAL FIX: Use getDocFromServer to satisfy TS and avoid stale cache
-            const profileSnap = await getDocFromServer(profileRef);
-            const profile = profileSnap.exists() ? profileSnap.data() as UserProfile : null;
 
-            const name = profile ? `${profile.firstName} ${profile.lastName}` : (ms.uid.includes('@') ? ms.uid : 'משתמש ללא פרופיל');
+        const peopleList: Person[] = await Promise.all(memberships.map(async (ms: any) => {
+            let profile: UserProfile | null = null;
+            try {
+                const profileRef = doc(db, 'profiles', ms.uid);
+                const profileSnap = await getDocFromServer(profileRef).catch(() => getDoc(profileRef));
+                profile = profileSnap.exists() ? (profileSnap.data() as UserProfile) : null;
+            } catch {
+                profile = null;
+            }
+
+            const fallbackName = ms.displayName || (ms.firstName ? `${ms.firstName} ${ms.lastName || ''}`.trim() : '');
+            const name = profile
+                ? `${profile.firstName} ${profile.lastName}`.trim()
+                : fallbackName || (ms.uid.includes('@') ? ms.uid : 'משתמש ללא פרופיל');
 
             return {
                 id: ms.uid,
                 clubId: ms.clubId,
                 name,
-                firstName: profile?.firstName || '',
-                lastName: profile?.lastName || '',
-                gender: profile?.gender || 'MALE' as any,
+                firstName: profile?.firstName || ms.firstName || '',
+                lastName: profile?.lastName || ms.lastName || '',
+                gender: profile?.gender || ms.gender || Gender.MALE,
                 role: ms.role || Role.MEMBER,
                 rank: ms.rank || 3,
-                isSkipper: profile?.isSkipper || ms.isSkipper || false,
-                phone: profile?.primaryPhone || '',
-                notes: profile?.medicalNotes || '',
-                photoURL: profile?.photoURL || undefined,
+                isSkipper: Boolean(profile?.isSkipper || ms.isSkipper),
+                phone: profile?.primaryPhone || ms.phone || '',
+                notes: profile?.medicalNotes || ms.notes || '',
+                tags: Array.isArray(ms.tags) ? ms.tags : [],
+                photoURL: profile?.photoURL || ms.photoURL || undefined,
+                preferredBoatType: ms.preferredBoatType || undefined,
+                genderConstraint: ms.genderConstraint || undefined,
                 mustPairWith: ms.mustPairWith || [],
                 preferPairWith: ms.preferPairWith || [],
-                cannotPairWith: ms.cannotPairWith || []
+                cannotPairWith: ms.cannotPairWith || [],
             } as Person;
         }));
 
@@ -82,19 +89,31 @@ export const addPersonToClubCloud = async (clubId: ClubID, person: Person) => {
     try {
         const membershipId = `${clubId}_${person.id}`;
         const docRef = doc(db, 'memberships', membershipId);
-        
-        await setDoc(docRef, {
+
+        const payload: Record<string, any> = {
             uid: person.id,
-            clubId: clubId,
+            clubId,
+            displayName: person.name,
+            firstName: person.firstName || person.name.split(' ')[0] || '',
+            lastName: person.lastName || person.name.split(' ').slice(1).join(' ') || '',
+            gender: person.gender || Gender.MALE,
             role: person.role,
-            rank: person.rank,
+            rank: person.rank ?? 3,
+            isSkipper: Boolean(person.isSkipper),
+            phone: person.phone || '',
+            notes: person.notes || '',
+            tags: person.tags || [],
             mustPairWith: person.mustPairWith || [],
             preferPairWith: person.preferPairWith || [],
             cannotPairWith: person.cannotPairWith || [],
             status: MembershipStatus.ACTIVE,
-            lastUpdate: new Date().toISOString()
-        }, { merge: true });
-        
+            lastUpdate: new Date().toISOString(),
+        };
+        if (person.photoURL) payload.photoURL = person.photoURL;
+        if (person.preferredBoatType) payload.preferredBoatType = person.preferredBoatType;
+        if (person.genderConstraint) payload.genderConstraint = person.genderConstraint;
+
+        await setDoc(docRef, payload, { merge: true });
         addLog(`Person ${person.name} (${person.id}) synced to club ${clubId} in cloud`, 'SYNC');
     } catch (error) {
         addLog(`Failed to sync person to club cloud: ${error}`, 'ERROR');
@@ -102,27 +121,22 @@ export const addPersonToClubCloud = async (clubId: ClubID, person: Person) => {
     }
 };
 
-/**
- * Ensures an admin/staff user has a valid active membership in a club 
- * so they appear in pairing lists and dashboards.
- */
 export const ensureAdminMembership = async (clubId: ClubID, user: { uid: string; email: string; isAdmin: boolean }) => {
     if (!user || !clubId) return;
     try {
         const membershipId = `${clubId}_${user.uid}`;
         const docRef = doc(db, 'memberships', membershipId);
         const snap = await getDoc(docRef);
-
         if (!snap.exists()) {
             await setDoc(docRef, {
                 uid: user.uid,
-                clubId: clubId,
+                clubId,
                 role: Role.INSTRUCTOR,
                 accessLevel: AccessLevel.CLUB_ADMIN,
                 status: MembershipStatus.ACTIVE,
                 joinedClubDate: new Date().toISOString(),
                 rank: 5,
-                lastUpdate: new Date().toISOString()
+                lastUpdate: new Date().toISOString(),
             });
             addLog(`Ensured admin membership for ${user.email} in ${clubId}`, 'SYNC');
         }
@@ -140,7 +154,7 @@ export const fetchGlobalConfig = async () => {
             setGlobalConfig({
                 superAdmins: data.superAdmins || [],
                 protectedAdmins: data.protectedAdmins || [],
-                permissions: data.permissions || []
+                permissions: data.permissions || [],
             });
         }
     } catch (error) {
@@ -149,21 +163,21 @@ export const fetchGlobalConfig = async () => {
 };
 
 export const sendNotificationToClub = async (
-    clubId: ClubID, 
-    message: string, 
+    clubId: ClubID,
+    message: string,
     type: 'INFO' | 'SUCCESS' | 'WARN' = 'INFO',
     senderId?: string
 ) => {
     try {
         await addDoc(collection(db, 'notifications'), {
-            clubId, 
-            message, 
+            clubId,
+            message,
             type,
             senderId: senderId || null,
             timestamp: new Date().toISOString(),
-            read: false
+            read: false,
         });
-        addLog(`Notification sent to ${clubId}: ${message} (sender: ${senderId || 'SYSTEM'})`, 'SYNC');
+        addLog(`Notification sent to ${clubId}: ${message}`, 'SYNC');
     } catch (e) {
         addLog(`Failed to send notification: ${e}`, 'ERROR');
     }

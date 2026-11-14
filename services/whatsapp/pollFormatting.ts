@@ -1,3 +1,4 @@
+import { Role } from '../../types';
 import {
   KeywordRule,
   PollColorToken,
@@ -9,13 +10,27 @@ export const normalizePhone = (phone?: string): string => {
   if (!phone) return '';
   const digits = phone.replace(/\D/g, '');
   if (!digits) return '';
-  if (digits.startsWith('972') && digits.length >= 11) {
-    return '0' + digits.slice(3);
-  }
-  if (digits.length === 9 && digits.startsWith('5')) {
-    return '0' + digits;
-  }
+  if (digits.startsWith('972') && digits.length >= 11) return '0' + digits.slice(3);
+  if (digits.length === 9 && digits.startsWith('5')) return '0' + digits;
   return digits;
+};
+
+export const normalizeName = (name?: string): string =>
+  (name || '')
+    .toLowerCase()
+    .replace(/[\u0591-\u05C7]/g, '')
+    .replace(/[^a-zA-Z0-9\u05D0-\u05EA\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+export const namesMatch = (a?: string, b?: string): boolean => {
+  const na = normalizeName(a);
+  const nb = normalizeName(b);
+  if (!na || !nb || na.length < 3) return false;
+  if (na === nb) return true;
+  const pa = na.split(' ').sort().join(' ');
+  const pb = nb.split(' ').sort().join(' ');
+  return pa === pb && na.split(' ').length >= 2;
 };
 
 export const extractPhoneFromVoterId = (voterId: string): string | undefined => {
@@ -60,10 +75,15 @@ export const getPollColorToken = (pollId: string, customColorId?: string): PollC
     if (found) return found;
   }
   let hash = 0;
-  for (let i = 0; i < pollId.length; i++) {
-    hash = (hash * 31 + pollId.charCodeAt(i)) >>> 0;
-  }
+  for (let i = 0; i < pollId.length; i++) hash = (hash * 31 + pollId.charCodeAt(i)) >>> 0;
   return POLL_COLOR_PALETTE[hash % POLL_COLOR_PALETTE.length];
+};
+
+const ROLE_PRIORITY: Record<Role, number> = {
+  [Role.INSTRUCTOR]: 4,
+  [Role.VOLUNTEER]: 3,
+  [Role.MEMBER]: 2,
+  [Role.GUEST]: 1,
 };
 
 export const classifyOption = (
@@ -74,27 +94,39 @@ export const classifyOption = (
   if (!normalized) return { intent: 'UNVOTED' };
 
   const sortedRules = [...rules].sort((a, b) => b.keyword.length - a.keyword.length);
-  const decliningMatch = sortedRules.find(
+  const declining = sortedRules.find(
     (r) => r.intent === 'DECLINING' && normalized.includes(r.keyword.trim().toLowerCase())
   );
-  if (decliningMatch) return { intent: 'DECLINING' };
+  if (declining) return { intent: 'DECLINING' };
 
-  const maybeMatch = sortedRules.find(
+  const maybe = sortedRules.find(
     (r) => r.intent === 'MAYBE' && normalized.includes(r.keyword.trim().toLowerCase())
   );
-  if (maybeMatch) return { intent: 'MAYBE' };
+  if (maybe) return { intent: 'MAYBE' };
 
-  const roleAttending = sortedRules.find(
-    (r) => r.intent === 'ATTENDING' && r.role && normalized.includes(r.keyword.trim().toLowerCase())
-  );
-  if (roleAttending) return { intent: 'ATTENDING', detectedRole: roleAttending.role };
-
-  const genericAttending = sortedRules.find(
+  const matchedAttending = sortedRules.filter(
     (r) => r.intent === 'ATTENDING' && normalized.includes(r.keyword.trim().toLowerCase())
   );
-  if (genericAttending) return { intent: 'ATTENDING' };
+  if (matchedAttending.length === 0) return { intent: 'MAYBE' };
 
-  return { intent: 'MAYBE' };
+  let detectedRole: Role | undefined;
+  let detectedIsSkipper = false;
+  const tagSet = new Set<string>();
+
+  matchedAttending.forEach((rule) => {
+    if (rule.role && (!detectedRole || ROLE_PRIORITY[rule.role] > ROLE_PRIORITY[detectedRole])) {
+      detectedRole = rule.role;
+    }
+    if (rule.isSkipper) detectedIsSkipper = true;
+    (rule.grantedTags || []).forEach((t) => tagSet.add(t));
+  });
+
+  return {
+    intent: 'ATTENDING',
+    detectedRole,
+    detectedIsSkipper: detectedIsSkipper || undefined,
+    detectedTags: tagSet.size > 0 ? Array.from(tagSet) : undefined,
+  };
 };
 
 export const classifySelectedOptions = (
@@ -103,7 +135,28 @@ export const classifySelectedOptions = (
 ): PollOptionClassification => {
   if (!selectedOptions || selectedOptions.length === 0) return { intent: 'UNVOTED' };
   const results = selectedOptions.map((opt) => classifyOption(opt, rules));
-  return results.find((r) => r.intent === 'ATTENDING') || results.find((r) => r.intent === 'MAYBE') || results[0];
+  const attendingList = results.filter((r) => r.intent === 'ATTENDING');
+  if (attendingList.length === 0) {
+    return results.find((r) => r.intent === 'MAYBE') || results[0];
+  }
+
+  let detectedRole: Role | undefined;
+  let detectedIsSkipper = false;
+  const tagSet = new Set<string>();
+  attendingList.forEach((res) => {
+    if (res.detectedRole && (!detectedRole || ROLE_PRIORITY[res.detectedRole] > ROLE_PRIORITY[detectedRole])) {
+      detectedRole = res.detectedRole;
+    }
+    if (res.detectedIsSkipper) detectedIsSkipper = true;
+    (res.detectedTags || []).forEach((t) => tagSet.add(t));
+  });
+
+  return {
+    intent: 'ATTENDING',
+    detectedRole,
+    detectedIsSkipper: detectedIsSkipper || undefined,
+    detectedTags: tagSet.size > 0 ? Array.from(tagSet) : undefined,
+  };
 };
 
 export const extractOptionLabels = (raw: unknown): string[] => {
@@ -124,12 +177,9 @@ export const extractOptionLabels = (raw: unknown): string[] => {
 export const formatFirestoreErrorMessage = (raw: string): string => {
   try {
     const parsed = JSON.parse(raw) as { error?: string; path?: string };
-    if (parsed?.error) {
-      return parsed.path ? `${parsed.path}: ${parsed.error}` : parsed.error;
-    }
+    if (parsed?.error) return parsed.path ? `${parsed.path}: ${parsed.error}` : parsed.error;
   } catch {
     // plain string
   }
   return raw;
 };
-

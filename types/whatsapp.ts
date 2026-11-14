@@ -5,6 +5,8 @@ export type PollIntent = 'ATTENDING' | 'DECLINING' | 'MAYBE' | 'UNVOTED';
 export interface PollOptionClassification {
   intent: PollIntent;
   detectedRole?: Role;
+  detectedIsSkipper?: boolean;
+  detectedTags?: string[];
 }
 
 export interface PollColorToken {
@@ -45,9 +47,11 @@ export interface WhatsAppMemberMapping {
   pushName?: string;
   profilePicUrl?: string;
   phone?: string;
+  groups?: string[];
   uid?: string;
   clubId?: ClubID;
-  matchedBy?: 'PHONE' | 'MANUAL' | 'BOT_SYNC';
+  clubLinks?: Record<ClubID, string>;
+  matchedBy?: 'PHONE' | 'MANUAL' | 'BOT_SYNC' | 'NAME';
   updatedAt?: string;
   updatedBy?: string;
 }
@@ -57,6 +61,8 @@ export interface KeywordRule {
   keyword: string;
   intent: 'ATTENDING' | 'DECLINING' | 'MAYBE';
   role?: Role;
+  isSkipper?: boolean;
+  grantedTags?: string[];
 }
 
 export interface ClubWhatsAppConfig {
@@ -76,6 +82,8 @@ export interface ResolvedVoter {
   selectedOptions: string[];
   intent: PollIntent;
   pollRole?: Role;
+  detectedIsSkipper?: boolean;
+  detectedTags?: string[];
   effectiveRole: Role;
   person?: Person;
   mapping?: WhatsAppMemberMapping;
@@ -83,6 +91,12 @@ export interface ResolvedVoter {
   matchSource: 'MANUAL_MAP' | 'PHONE_AUTO' | 'UNMAPPED';
   timestampMs: number;
   updatedRecently?: boolean;
+}
+
+export interface MatchCandidate {
+  mapping: WhatsAppMemberMapping;
+  person: Person;
+  confidence: 'PHONE_EXACT' | 'NAME_EXACT';
 }
 
 export interface VoteChangeAlert {
@@ -104,6 +118,8 @@ export interface VoteChangeAlert {
 export interface PersonPollStatus {
   intent: PollIntent;
   pollRole?: Role;
+  detectedIsSkipper?: boolean;
+  detectedTags?: string[];
   selectedOptions: string[];
   updatedRecently: boolean;
 }
@@ -114,6 +130,7 @@ export interface ResolvedPollCounts {
   members: number;
   guests: number;
   instructors: number;
+  skippers: number;
   declining: number;
   maybe: number;
   unmappedAttending: number;

@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Person, Role, getRoleLabel } from '../../types';
 import { CheckSquare, Square, Shield, ArrowDownAZ, ArrowUpNarrowWide, CheckCircle2, Circle, ShipWheel, ArrowLeft, UserPlus } from 'lucide-react';
 import { PersonEditorModal } from '../dashboard/PersonEditorModal';
@@ -19,134 +18,122 @@ interface AttendanceListProps {
 }
 
 export const AttendanceList: React.FC<AttendanceListProps> = ({
-  people, presentIds, onToggle, onBulkSelect, onNext
+  people, presentIds, onToggle, onBulkSelect, onNext,
 }) => {
   const { clubSettings, activeClub } = useAppStore();
   const [sortBy, setSortBy] = useState<SortType>('ROLE');
   const [isAddingQuickly, setIsAddingQuickly] = useState(false);
 
   const {
-    polls,
-    activePoll,
-    setSelectedPollId,
-    summary,
-    voteAlerts,
-    dismissAlert,
-    clearAlerts,
-    isLoading: isPollLoading,
-    error: pollError,
-    retry: retryPolls,
-    applyPollAttendance,
-    linkVoterToPerson,
-    addGuestFromVoter,
+    polls, activePoll, setSelectedPollId, summary, clubConfig, availableGroups, effectiveClubPeople,
+    voteAlerts, dismissAlert, clearAlerts, isLoading: isPollLoading, error: pollError, retry: retryPolls,
+    applyPollAttendance, linkVoterToPerson, addGuestFromVoter, linkClubGroup,
   } = useWhatsAppPolls();
 
+  const displayPeople = useMemo(() => {
+    const effectiveMap = new Map(effectiveClubPeople.map((p) => [p.id, p]));
+    return people.map((p) => effectiveMap.get(p.id) || p);
+  }, [people, effectiveClubPeople]);
+
   const getSortedPeople = () => {
-    const sorted = [...people];
+    const sorted = [...displayPeople];
     switch (sortBy) {
-        case 'NAME': return sorted.sort((a, b) => a.name.localeCompare(b.name));
-        case 'RANK': return sorted.sort((a, b) => b.rank - a.rank);
-        default: return sorted.sort((a, b) => {
-            const roleOrder = { [Role.INSTRUCTOR]: -1, [Role.VOLUNTEER]: 0, [Role.MEMBER]: 1, [Role.GUEST]: 2 };
-            if (roleOrder[a.role] !== roleOrder[b.role]) return roleOrder[a.role] - roleOrder[b.role];
-            return a.name.localeCompare(b.name);
-        });
+      case 'NAME': return sorted.sort((a, b) => a.name.localeCompare(b.name));
+      case 'RANK': return sorted.sort((a, b) => b.rank - a.rank);
+      default: return sorted.sort((a, b) => {
+        const roleOrder = { [Role.INSTRUCTOR]: -1, [Role.VOLUNTEER]: 0, [Role.MEMBER]: 1, [Role.GUEST]: 2 };
+        if (roleOrder[a.role] !== roleOrder[b.role]) return roleOrder[a.role] - roleOrder[b.role];
+        return a.name.localeCompare(b.name);
+      });
     }
   };
 
   const stats = {
-    vols: people.filter(p => presentIds.includes(p.id) && (p.role === Role.VOLUNTEER || p.role === Role.INSTRUCTOR)).length,
-    mems: people.filter(p => presentIds.includes(p.id) && p.role === Role.MEMBER).length
+    vols: displayPeople.filter((p) => presentIds.includes(p.id) && (p.role === Role.VOLUNTEER || p.role === Role.INSTRUCTOR)).length,
+    mems: displayPeople.filter((p) => presentIds.includes(p.id) && p.role === Role.MEMBER).length,
+    skippers: displayPeople.filter((p) => presentIds.includes(p.id) && p.isSkipper).length,
   };
 
   const getCardStyle = (role: Role, isPresent: boolean) => {
-      const base = "flex items-center justify-between p-4 rounded-2xl border text-right transition-all duration-300 select-none shadow-sm group relative overflow-hidden";
-      if (!isPresent) return `${base} border-slate-100 bg-white text-slate-400 hover:border-slate-300 hover:text-slate-600 grayscale`;
-      switch(role) {
-          case Role.INSTRUCTOR: return `${base} border-cyan-500 bg-cyan-50 text-cyan-900 ring-2 ring-cyan-500/20`;
-          case Role.VOLUNTEER: return `${base} border-orange-500 bg-orange-50 text-orange-900 ring-2 ring-orange-500/20`;
-          case Role.MEMBER: return `${base} border-sky-500 bg-sky-50 text-sky-900 ring-2 ring-sky-500/20`;
-          default: return `${base} border-emerald-500 bg-emerald-50 text-emerald-900 ring-2 emerald-500/20`;
-      }
+    const base = 'flex items-center justify-between p-4 rounded-2xl border text-right transition-all duration-300 select-none shadow-sm group relative overflow-hidden';
+    if (!isPresent) return `${base} border-slate-100 bg-white text-slate-400 hover:border-slate-300 hover:text-slate-600 grayscale`;
+    switch (role) {
+      case Role.INSTRUCTOR: return `${base} border-cyan-500 bg-cyan-50 text-cyan-900 ring-2 ring-cyan-500/20`;
+      case Role.VOLUNTEER: return `${base} border-orange-500 bg-orange-50 text-orange-900 ring-2 ring-orange-500/20`;
+      case Role.MEMBER: return `${base} border-sky-500 bg-sky-50 text-sky-900 ring-2 ring-sky-500/20`;
+      default: return `${base} border-emerald-500 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20`;
+    }
   };
 
   const boatDefs = activeClub ? (clubSettings[activeClub]?.boatDefinitions || []) : [];
 
   const handleQuickSave = async (p: Person) => {
-      if (activeClub) {
-          await addPersonToClubCloud(activeClub, p);
-          setIsAddingQuickly(false);
-      }
+    if (activeClub) {
+      await addPersonToClubCloud(activeClub, p);
+      setIsAddingQuickly(false);
+    }
   };
 
   return (
     <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-6">
       <SessionPollBar
-        polls={polls}
-        activePoll={activePoll}
-        summary={summary}
-        people={people}
-        presentIds={presentIds}
-        voteAlerts={voteAlerts}
-        isLoading={isPollLoading}
-        error={pollError}
-        onSelectPoll={setSelectedPollId}
-        onApplyAttendance={applyPollAttendance}
-        onTogglePerson={onToggle}
-        onLinkVoter={linkVoterToPerson}
-        onAddGuest={addGuestFromVoter}
-        onDismissAlert={dismissAlert}
-        onClearAlerts={clearAlerts}
-        onRetry={retryPolls}
+        polls={polls} activePoll={activePoll} summary={summary} people={displayPeople}
+        presentIds={presentIds} linkedGroups={clubConfig.linkedGroups} availableGroups={availableGroups}
+        voteAlerts={voteAlerts} isLoading={isPollLoading} error={pollError}
+        onSelectPoll={setSelectedPollId} onLinkGroup={linkClubGroup} onApplyAttendance={applyPollAttendance}
+        onTogglePerson={onToggle} onLinkVoter={linkVoterToPerson} onAddGuest={addGuestFromVoter}
+        onDismissAlert={dismissAlert} onClearAlerts={clearAlerts} onRetry={retryPolls}
       />
 
       <div className="flex flex-col gap-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-6">
-           <div>
-             <div className="flex items-center gap-3">
-                <h2 className="text-3xl font-black text-slate-800 tracking-tight">מי הגיע היום?</h2>
-                <button 
-                    onClick={() => setIsAddingQuickly(true)}
-                    className="bg-brand-100 text-brand-700 p-2 rounded-xl hover:bg-brand-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-xs font-black"
-                >
-                    <UserPlus size={18} /> הוספת משתתף
-                </button>
-             </div>
-             <div className="flex flex-wrap gap-2 mt-2">
-                <span className="text-orange-700 bg-orange-50 px-3 py-1 rounded-full border border-orange-200 text-xs font-bold uppercase tabular-nums">מתנדבים: {stats.vols}</span>
-                <span className="text-sky-700 bg-sky-50 px-3 py-1 rounded-full border border-sky-200 text-xs font-bold uppercase tabular-nums">חברים: {stats.mems}</span>
-                <span className="text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200 text-xs font-bold uppercase tabular-nums">סה"כ: {presentIds.length}</span>
+          <div>
+            <div className="flex items-center gap-3">
+              <h2 className="text-3xl font-black text-slate-800 tracking-tight">מי הגיע היום?</h2>
+              <button onClick={() => setIsAddingQuickly(true)} className="bg-brand-100 text-brand-700 p-2 rounded-xl hover:bg-brand-600 hover:text-white transition-all shadow-sm flex items-center gap-1 text-xs font-black">
+                <UserPlus size={18} /> הוספת משתתף / אורח
+              </button>
             </div>
-           </div>
-            <div className="flex gap-2 shrink-0">
-                <button onClick={() => onBulkSelect(people.map(p => p.id))} className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all font-bold text-sm shadow-inner"><CheckSquare size={16} /> בחר הכל</button>
-                <button onClick={() => onBulkSelect([])} className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all font-bold text-sm shadow-inner"><Square size={16} /> נקה</button>
+            <div className="flex flex-wrap gap-2 mt-2">
+              <span className="text-orange-700 bg-orange-50 px-3 py-1 rounded-full border border-orange-200 text-xs font-bold uppercase tabular-nums">מתנדבים: {stats.vols}</span>
+              <span className="text-sky-700 bg-sky-50 px-3 py-1 rounded-full border border-sky-200 text-xs font-bold uppercase tabular-nums">חברים: {stats.mems}</span>
+              {stats.skippers > 0 && <span className="text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200 text-xs font-bold tabular-nums">מפקדי סירה: {stats.skippers}</span>}
+              <span className="text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200 text-xs font-bold uppercase tabular-nums">סה"כ: {presentIds.length}</span>
             </div>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button onClick={() => onBulkSelect(displayPeople.map((p) => p.id))} className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all font-bold text-sm shadow-inner"><CheckSquare size={16} /> בחר הכל</button>
+            <button onClick={() => onBulkSelect([])} className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all font-bold text-sm shadow-inner"><Square size={16} /> נקה</button>
+          </div>
         </div>
-        
+
         <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
-            <span>מיון לפי:</span>
-            <button onClick={() => setSortBy('ROLE')} className={`px-4 py-1.5 rounded-full border transition-all ${sortBy === 'ROLE' ? 'bg-slate-800 border-slate-800 text-white shadow-md' : 'bg-white hover:bg-slate-50'}`}><Shield size={12} /> תפקיד</button>
-            <button onClick={() => setSortBy('NAME')} className={`px-4 py-1.5 rounded-full border transition-all ${sortBy === 'NAME' ? 'bg-slate-800 border-slate-800 text-white shadow-md' : 'bg-white hover:bg-slate-50'}`}><ArrowDownAZ size={12} /> שם</button>
-            <button onClick={() => setSortBy('RANK')} className={`px-4 py-1.5 rounded-full border transition-all ${sortBy === 'RANK' ? 'bg-slate-800 border-slate-800 text-white shadow-md' : 'bg-white hover:bg-slate-50'}`}><ArrowUpNarrowWide size={12} /> דירוג</button>
+          <span>מיון לפי:</span>
+          <button onClick={() => setSortBy('ROLE')} className={`px-4 py-1.5 rounded-full border transition-all ${sortBy === 'ROLE' ? 'bg-slate-800 border-slate-800 text-white shadow-md' : 'bg-white hover:bg-slate-50'}`}><Shield size={12} /> תפקיד</button>
+          <button onClick={() => setSortBy('NAME')} className={`px-4 py-1.5 rounded-full border transition-all ${sortBy === 'NAME' ? 'bg-slate-800 border-slate-800 text-white shadow-md' : 'bg-white hover:bg-slate-50'}`}><ArrowDownAZ size={12} /> שם</button>
+          <button onClick={() => setSortBy('RANK')} className={`px-4 py-1.5 rounded-full border transition-all ${sortBy === 'RANK' ? 'bg-slate-800 border-slate-800 text-white shadow-md' : 'bg-white hover:bg-slate-50'}`}><ArrowUpNarrowWide size={12} /> דירוג</button>
         </div>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {getSortedPeople().map(person => {
+        {getSortedPeople().map((person) => {
           const isPresent = presentIds.includes(person.id);
           const pollStatus = summary?.personStatusMap[person.id];
           return (
             <button key={person.id} onClick={() => onToggle(person.id)} className={getCardStyle(person.role, isPresent)}>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                    <span className="font-black text-xl leading-none truncate">{person.name}</span>
-                    {person.isSkipper && <ShipWheel size={16} className={isPresent ? "text-brand-600" : "text-slate-300"} />}
+                  <span className="font-black text-xl leading-none truncate">{person.name}</span>
+                  {person.isSkipper && <ShipWheel size={16} className={isPresent ? 'text-brand-600' : 'text-slate-300'} />}
                 </div>
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${isPresent ? 'bg-white/50 border border-current/20' : 'bg-slate-200'}`}>
                     {getRoleLabel(person.role, person.gender)}
                   </span>
+                  {person.isSkipper && <span className="text-[10px] font-bold text-blue-700">· מפקד סירה</span>}
+                  {pollStatus?.detectedTags && pollStatus.detectedTags.length > 0 && (
+                    <span className="text-[10px] font-bold text-slate-700">· {pollStatus.detectedTags.join(', ')}</span>
+                  )}
                   {person.phone && <span className="text-[10px] opacity-60 font-mono" dir="ltr">{person.phone}</span>}
                   {pollStatus && (
                     <span className={`text-[10px] font-bold ${pollStatus.intent === 'ATTENDING' ? 'text-emerald-700' : pollStatus.intent === 'DECLINING' ? 'text-red-700' : 'text-amber-700'}`}>
@@ -163,23 +150,15 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
           );
         })}
       </div>
+
       <div className="mt-12 flex justify-end">
-        <button 
-            onClick={onNext} 
-            disabled={presentIds.length === 0} 
-            className="w-full md:w-auto bg-brand-600 disabled:opacity-50 hover:bg-brand-500 text-white px-10 py-4 rounded-2xl font-black text-xl shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 transform"
-        >
-            הבא: ציוד <ArrowLeft size={24} />
+        <button onClick={onNext} disabled={presentIds.length === 0} className="w-full md:w-auto bg-brand-600 disabled:opacity-50 hover:bg-brand-500 text-white px-10 py-4 rounded-2xl font-black text-xl shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 transform">
+          הבא: ציוד <ArrowLeft size={24} />
         </button>
       </div>
 
       {isAddingQuickly && (
-          <PersonEditorModal 
-            allPeople={people} 
-            boatDefinitions={boatDefs} 
-            onClose={() => setIsAddingQuickly(false)} 
-            onSave={handleQuickSave} 
-          />
+        <PersonEditorModal allPeople={displayPeople} boatDefinitions={boatDefs} onClose={() => setIsAddingQuickly(false)} onSave={handleQuickSave} />
       )}
     </div>
   );

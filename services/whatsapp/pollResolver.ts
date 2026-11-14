@@ -1,31 +1,28 @@
 import { Person, Role } from '../../types';
 import {
   ClubWhatsAppConfig,
-  KeywordRule,
   PersonPollStatus,
   PollEvent,
-  PollIntent,
   PollVote,
   ResolvedPollCounts,
   ResolvedPollSummary,
   ResolvedVoter,
-  VoteChangeAlert,
   WhatsAppMemberMapping,
 } from '../../types/whatsapp';
 import { DEFAULT_KEYWORD_RULES } from '../../config/whatsappDefaults';
 import {
   classifySelectedOptions,
   extractPhoneFromVoterId,
+  namesMatch,
   normalizePhone,
 } from './pollFormatting';
+import { getMappingUidForClub } from './pollMatching';
 
 export const deduplicateLatestVotes = (votes: PollVote[]): PollVote[] => {
   const map = new Map<string, PollVote>();
   votes.forEach((vote) => {
     const prev = map.get(vote.voter);
-    if (!prev || vote.timestampMs >= prev.timestampMs) {
-      map.set(vote.voter, vote);
-    }
+    if (!prev || vote.timestampMs >= prev.timestampMs) map.set(vote.voter, vote);
   });
   return Array.from(map.values());
 };
@@ -55,14 +52,8 @@ export const resolvePollSummary = (params: {
   });
 
   const counts: ResolvedPollCounts = {
-    totalAttending: 0,
-    volunteers: 0,
-    members: 0,
-    guests: 0,
-    instructors: 0,
-    declining: 0,
-    maybe: 0,
-    unmappedAttending: 0,
+    totalAttending: 0, volunteers: 0, members: 0, guests: 0,
+    instructors: 0, skippers: 0, declining: 0, maybe: 0, unmappedAttending: 0,
   };
   const personStatusMap: Record<string, PersonPollStatus> = {};
   const attendingSet = new Set<string>();
@@ -71,8 +62,12 @@ export const resolvePollSummary = (params: {
     const mapping = mappingByVoter.get(vote.voter);
     const rawPhone = vote.phone || mapping?.phone || extractPhoneFromVoterId(vote.voter);
     const normPhone = normalizePhone(rawPhone);
-    const manualPerson = mapping?.uid ? peopleById.get(mapping.uid) : undefined;
+    const clubUid = mapping ? getMappingUidForClub(mapping, config.clubId) : undefined;
+    const manualPerson = clubUid ? peopleById.get(clubUid) : undefined;
     const phonePerson = normPhone ? peopleByPhone.get(normPhone) : undefined;
+    const namePerson = !manualPerson && !phonePerson && (vote.pushName || mapping?.pushName)
+      ? people.find((p) => namesMatch(vote.pushName || mapping?.pushName, p.name))
+      : undefined;
 
     const person = manualPerson || phonePerson;
     const matchSource: ResolvedVoter['matchSource'] = manualPerson
@@ -82,11 +77,10 @@ export const resolvePollSummary = (params: {
       : 'UNMAPPED';
 
     const classification = classifySelectedOptions(vote.selectedOptions, rules);
-    const effectiveRole = classification.detectedRole || person?.role || Role.GUEST;
-    const displayName =
-      person?.name || vote.pushName || mapping?.pushName || rawPhone || vote.voter.split('@')[0];
-    const profilePicUrl =
-      vote.profilePicUrl || mapping?.profilePicUrl || (person ? profilePhotos[person.id] : undefined);
+    // Preserve existing club role by default when person exists; pollRole remains visible for 1-click switch
+    const effectiveRole = person?.role || classification.detectedRole || Role.GUEST;
+    const displayName = person?.name || vote.pushName || mapping?.pushName || rawPhone || vote.voter.split('@')[0];
+    const profilePicUrl = vote.profilePicUrl || mapping?.profilePicUrl || (person ? profilePhotos[person.id] : undefined);
     const updatedRecently = recentlyChangedVoterIds.has(vote.voter);
 
     if (classification.intent === 'ATTENDING') {
@@ -96,6 +90,7 @@ export const resolvePollSummary = (params: {
       else if (effectiveRole === Role.GUEST) counts.guests++;
       else counts.members++;
 
+      if (classification.detectedIsSkipper || person?.isSkipper) counts.skippers++;
       if (person) attendingSet.add(person.id);
       else counts.unmappedAttending++;
     } else if (classification.intent === 'DECLINING') {
@@ -108,6 +103,8 @@ export const resolvePollSummary = (params: {
       personStatusMap[person.id] = {
         intent: classification.intent,
         pollRole: classification.detectedRole,
+        detectedIsSkipper: classification.detectedIsSkipper,
+        detectedTags: classification.detectedTags,
         selectedOptions: vote.selectedOptions,
         updatedRecently,
       };
@@ -121,10 +118,12 @@ export const resolvePollSummary = (params: {
       selectedOptions: vote.selectedOptions,
       intent: classification.intent,
       pollRole: classification.detectedRole,
+      detectedIsSkipper: classification.detectedIsSkipper,
+      detectedTags: classification.detectedTags,
       effectiveRole,
       person,
       mapping,
-      suggestedPerson: !manualPerson ? phonePerson : undefined,
+      suggestedPerson: !manualPerson ? phonePerson || namePerson : undefined,
       matchSource,
       timestampMs: vote.timestampMs,
       updatedRecently,
@@ -138,47 +137,4 @@ export const resolvePollSummary = (params: {
     attendingPersonIds: Array.from(attendingSet),
     personStatusMap,
   };
-};
-
-export const detectVoteChanges = (
-  prevVotesByVoter: Map<string, PollVote>,
-  nextVotes: PollVote[],
-  resolvedVoters: ResolvedVoter[],
-  rules: KeywordRule[],
-  pollId: string
-): VoteChangeAlert[] => {
-  const latestNext = deduplicateLatestVotes(nextVotes);
-  const voterLookup = new Map(resolvedVoters.map((v) => [v.voterId, v]));
-  const alerts: VoteChangeAlert[] = [];
-
-  latestNext.forEach((next) => {
-    const prev = prevVotesByVoter.get(next.voter);
-    const prevOpts = prev ? [...prev.selectedOptions].sort().join('|') : '';
-    const nextOpts = [...next.selectedOptions].sort().join('|');
-    if (prev && prevOpts === nextOpts) return;
-    if (!prev && next.selectedOptions.length === 0) return;
-
-    const resolved = voterLookup.get(next.voter);
-    const prevClass = prev
-      ? classifySelectedOptions(prev.selectedOptions, rules)
-      : { intent: 'UNVOTED' as PollIntent };
-    const nextClass = classifySelectedOptions(next.selectedOptions, rules);
-
-    alerts.push({
-      id: `${pollId}_${next.voter}_${next.timestampMs || Date.now()}`,
-      pollId,
-      voterId: next.voter,
-      displayName: resolved?.displayName || next.pushName || next.voter.split('@')[0],
-      profilePicUrl: resolved?.profilePicUrl || next.profilePicUrl,
-      personId: resolved?.person?.id,
-      previousOptions: prev?.selectedOptions || [],
-      newOptions: next.selectedOptions,
-      previousIntent: prevClass.intent,
-      newIntent: nextClass.intent,
-      newRole: nextClass.detectedRole,
-      detectedAt: new Date().toISOString(),
-    });
-  });
-
-  return alerts;
 };

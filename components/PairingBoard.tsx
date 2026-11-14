@@ -632,6 +632,12 @@ export const PairingBoard: React.FC = () => {
                     </div>
                 )}
 
+                {team.buddyGroup && (
+                    <div className="px-3 py-1 text-xs font-bold bg-sky-100/80 text-sky-900 border-b border-sky-200">
+                      {team.buddyGroup}
+                    </div>
+                )}
+
                 <Droppable droppableId={team.id}>
                     {(provided, snapshot) => (
                     <div

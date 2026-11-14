@@ -1,192 +1,186 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '../store';
-import { Person } from '../types';
-import { ClubWhatsAppConfig, ResolvedVoter } from '../types/whatsapp';
+import { Person, Role } from '../types';
+import { ClubWhatsAppConfig, MatchCandidate, ResolvedVoter, WhatsAppMemberMapping } from '../types/whatsapp';
 import { resolvePollSummary } from '../services/whatsapp/pollResolver';
+import { findAutoSyncCandidates, getMappingUidForClub, mappingBelongsToClub } from '../services/whatsapp/pollMatching';
 import {
-  createClubGuestFromVoter,
-  saveClubWhatsAppConfig,
-  saveWhatsAppMemberMapping,
-  unlinkWhatsAppMember,
+  autoLinkPhoneMatches, createClubGuestFromVoter, importWhatsAppRosterToClub,
+  saveClubWhatsAppConfig, saveWhatsAppMemberMapping, unlinkWhatsAppMember, updateClubPersonRole,
 } from '../services/whatsapp/whatsappMutations';
 import { useWhatsAppSubscriptions } from './useWhatsAppSubscriptions';
 
+const autoCheckedPollByClub = new Map<string, string>();
+
 export const useWhatsAppPolls = () => {
+  const { user, activeClub, people, sessions, setBulkAttendance, setPeople, addNotification } = useAppStore();
   const {
-    user,
-    activeClub,
-    people,
-    sessions,
-    setBulkAttendance,
-    setPeople,
-    addNotification,
-  } = useAppStore();
+    polls, relevantPolls, votes, mappings, clubConfig, selectedPollId, setSelectedPollId,
+    voteAlerts, setVoteAlerts, recentChangedVoters, isLoading, error, retry, setResolvedVotersRef,
+  } = useWhatsAppSubscriptions({ userId: user?.uid, activeClub, onNotify: addNotification });
 
-  const {
-    polls,
-    relevantPolls,
-    votes,
-    mappings,
-    clubConfig,
-    selectedPollId,
-    setSelectedPollId,
-    voteAlerts,
-    setVoteAlerts,
-    recentChangedVoters,
-    isLoading,
-    error,
-    retry,
-    setResolvedVotersRef,
-  } = useWhatsAppSubscriptions({
-    userId: user?.uid,
-    activeClub,
-    onNotify: addNotification,
-  });
-
-  const clubPeople = useMemo(
-    () => people.filter((p) => p.clubId === activeClub),
-    [people, activeClub]
-  );
-
+  const attemptedAutoLinkRef = useRef<Set<string>>(new Set());
+  const clubPeople = useMemo(() => people.filter((p) => p.clubId === activeClub), [people, activeClub]);
   const profilePhotos = useMemo(() => {
     const map: Record<string, string> = {};
-    clubPeople.forEach((p) => {
-      if (p.photoURL) map[p.id] = p.photoURL;
-    });
+    clubPeople.forEach((p) => { if (p.photoURL) map[p.id] = p.photoURL; });
     return map;
   }, [clubPeople]);
 
-  const activePoll = useMemo(
-    () => polls.find((p) => p.pollId === selectedPollId) || null,
-    [polls, selectedPollId]
-  );
+  const activePoll = useMemo(() => relevantPolls.find((p) => p.pollId === selectedPollId) || null, [relevantPolls, selectedPollId]);
+
+  const clubMappings = useMemo(() => {
+    if (!activeClub) return [];
+    const pollVoters = new Set(votes.map((v) => v.voter));
+    if (!clubConfig.linkedGroups.length) {
+      return mappings.filter((m) => Boolean(getMappingUidForClub(m, activeClub)) || pollVoters.has(m.voterId));
+    }
+    return mappings.filter((m) => mappingBelongsToClub(m, activeClub, clubConfig.linkedGroups, pollVoters));
+  }, [mappings, activeClub, clubConfig.linkedGroups, votes]);
 
   const summary = useMemo(() => {
     if (!activePoll) return null;
     return resolvePollSummary({
-      poll: activePoll,
-      votes,
-      mappings,
-      people: clubPeople,
-      profilePhotos,
-      config: clubConfig,
-      recentlyChangedVoterIds: recentChangedVoters,
+      poll: activePoll, votes, mappings: clubMappings, people: clubPeople, profilePhotos,
+      config: clubConfig, recentlyChangedVoterIds: recentChangedVoters,
     });
-  }, [activePoll, votes, mappings, clubPeople, profilePhotos, clubConfig, recentChangedVoters]);
+  }, [activePoll, votes, clubMappings, clubPeople, profilePhotos, clubConfig, recentChangedVoters]);
+
+  const effectiveClubPeople = useMemo(() => {
+    if (!summary) return clubPeople;
+    return clubPeople.map((person) => {
+      const status = summary.personStatusMap[person.id];
+      if (!status || status.intent !== 'ATTENDING') return person;
+      return {
+        ...person,
+        isSkipper: Boolean(person.isSkipper || status.detectedIsSkipper),
+        tags: Array.from(new Set([...(person.tags || []), ...(status.detectedTags || [])])),
+      };
+    });
+  }, [clubPeople, summary]);
+
+  const syncCandidates = useMemo(
+    () => findAutoSyncCandidates(clubMappings, clubPeople, activeClub || undefined),
+    [clubMappings, clubPeople, activeClub]
+  );
+
+  useEffect(() => { setResolvedVotersRef(summary?.voters || []); }, [summary, setResolvedVotersRef]);
 
   useEffect(() => {
-    setResolvedVotersRef(summary?.voters || []);
-  }, [summary, setResolvedVotersRef]);
+    if (!activeClub || !summary || !selectedPollId) return;
+    if (summary.poll.pollId !== selectedPollId || autoCheckedPollByClub.get(activeClub) === selectedPollId) return;
+    if (summary.attendingPersonIds.length === 0) return;
 
-  const availableGroups = useMemo(
-    () => Array.from(new Set(polls.map((p) => p.group).filter(Boolean))),
-    [polls]
-  );
+    autoCheckedPollByClub.set(activeClub, selectedPollId);
+    const currentIds = sessions[activeClub]?.presentPersonIds || [];
+    const merged = Array.from(new Set([...currentIds, ...summary.attendingPersonIds]));
+    if (merged.length !== currentIds.length) {
+      setBulkAttendance(merged);
+      addNotification(`סומנו אוטומטית ${summary.attendingPersonIds.length} משתתפים מהסקר`, 'INFO');
+    }
+  }, [activeClub, selectedPollId, summary, sessions, setBulkAttendance, addNotification]);
 
-  const applyPollAttendance = useCallback(
-    (mode: 'REPLACE' | 'MERGE') => {
-      if (!activeClub || !summary) return 0;
-      const currentIds = sessions[activeClub]?.presentPersonIds || [];
-      const nextIds =
-        mode === 'REPLACE'
-          ? summary.attendingPersonIds
-          : Array.from(new Set([...currentIds, ...summary.attendingPersonIds]));
-      setBulkAttendance(nextIds);
-      addNotification(`נטענו ${summary.attendingPersonIds.length} משתתפים מאושרים מהסקר`, 'SUCCESS');
-      return summary.attendingPersonIds.length;
-    },
-    [activeClub, summary, sessions, setBulkAttendance, addNotification]
-  );
+  useEffect(() => {
+    if (!activeClub || !user || user.isDev) return;
+    const phoneMatches = syncCandidates.filter(
+      (c) => c.confidence === 'PHONE_EXACT' && !attemptedAutoLinkRef.current.has(`${activeClub}:${c.mapping.voterId}:${c.person.id}`)
+    );
+    if (phoneMatches.length === 0) return;
+    phoneMatches.forEach((c) => attemptedAutoLinkRef.current.add(`${activeClub}:${c.mapping.voterId}:${c.person.id}`));
+    autoLinkPhoneMatches(phoneMatches, activeClub, user.email || user.uid).then((count) => {
+      if (count > 0) addNotification(`סונכרנו אוטומטית ${count} חברים לפי טלפון וואטסאפ`, 'SUCCESS');
+    }).catch(() => {});
+  }, [activeClub, user, syncCandidates, addNotification]);
 
-  const linkVoterToPerson = useCallback(
-    async (voter: ResolvedVoter, personId: string) => {
-      if (!activeClub) return;
-      await saveWhatsAppMemberMapping({
-        voterId: voter.voterId,
-        pushName: voter.displayName,
-        profilePicUrl: voter.profilePicUrl,
-        phone: voter.phone,
-        uid: personId,
-        clubId: activeClub,
-        matchedBy: 'MANUAL',
-        updatedBy: user?.email || user?.uid,
-      });
-      addNotification(`שויך מצביע (${voter.displayName}) לחבר בחוג`, 'SUCCESS');
-    },
-    [activeClub, user, addNotification]
-  );
+  const availableGroups = useMemo(() => {
+    const set = new Set<string>();
+    polls.forEach((p) => { if (p.group) set.add(p.group); });
+    mappings.forEach((m) => (m.groups || []).forEach((g) => set.add(g)));
+    return Array.from(set);
+  }, [polls, mappings]);
 
-  const unlinkVoter = useCallback(
-    async (voterId: string) => {
-      await unlinkWhatsAppMember(voterId);
-      addNotification('השיוך הוסר', 'INFO');
-    },
-    [addNotification]
-  );
+  const linkClubGroup = useCallback(async (groupName: string) => {
+    if (!activeClub || !groupName.trim()) return;
+    const nextGroups = Array.from(new Set([...clubConfig.linkedGroups, groupName.trim()]));
+    await saveClubWhatsAppConfig({ ...clubConfig, clubId: activeClub, linkedGroups: nextGroups });
+    addNotification(`קבוצת "${groupName}" שויכה לחוג`, 'SUCCESS');
+  }, [activeClub, clubConfig, addNotification]);
 
-  const addGuestFromVoter = useCallback(
-    async (voter: ResolvedVoter, persistToClub: boolean) => {
-      if (!activeClub) return null;
-      const guest: Person = await createClubGuestFromVoter({
-        clubId: activeClub,
-        voterId: voter.voterId,
-        displayName: voter.displayName,
-        phone: voter.phone,
-        profilePicUrl: voter.profilePicUrl,
-        persistToClub,
-        updatedBy: user?.email || user?.uid,
-      });
-      if (!persistToClub) setPeople([...people, guest]);
-      const currentIds = sessions[activeClub]?.presentPersonIds || [];
-      setBulkAttendance(Array.from(new Set([...currentIds, guest.id])));
-      addNotification(`נוסף כאורח לאימון: ${guest.name}`, 'SUCCESS');
-      return guest;
-    },
-    [activeClub, user, people, sessions, setPeople, setBulkAttendance, addNotification]
-  );
+  const updateMemberRole = useCallback(async (person: Person, nextRole: Role, nextIsSkipper?: boolean) => {
+    if (!activeClub) return;
+    const updated = await updateClubPersonRole(activeClub, person, nextRole, nextIsSkipper);
+    setPeople(people.map((p) => (p.id === updated.id && p.clubId === activeClub ? updated : p)));
+    addNotification(`עודכן תפקיד עבור ${person.name}`, 'SUCCESS');
+  }, [activeClub, people, setPeople, addNotification]);
 
-  const saveConfig = useCallback(
-    async (nextConfig: ClubWhatsAppConfig) => {
-      await saveClubWhatsAppConfig(nextConfig);
-      addNotification('הגדרות וואטסאפ של החוג נשמרו', 'SUCCESS');
-    },
-    [addNotification]
-  );
+  const applyPollAttendance = useCallback((mode: 'REPLACE' | 'MERGE') => {
+    if (!activeClub || !summary) return 0;
+    const currentIds = sessions[activeClub]?.presentPersonIds || [];
+    const nextIds = mode === 'REPLACE' ? summary.attendingPersonIds : Array.from(new Set([...currentIds, ...summary.attendingPersonIds]));
+    setBulkAttendance(nextIds);
+    addNotification(`נטענו ${summary.attendingPersonIds.length} משתתפים מאושרים מהסקר`, 'SUCCESS');
+    return summary.attendingPersonIds.length;
+  }, [activeClub, summary, sessions, setBulkAttendance, addNotification]);
 
-  const setPollColor = useCallback(
-    async (pollId: string, colorId: string) => {
-      if (!activeClub) return;
-      await saveClubWhatsAppConfig({
-        ...clubConfig,
-        clubId: activeClub,
-        pollColors: { ...(clubConfig.pollColors || {}), [pollId]: colorId },
-      });
-    },
-    [activeClub, clubConfig]
-  );
+  const linkVoterToPerson = useCallback(async (voter: ResolvedVoter, personId: string) => {
+    if (!activeClub) return;
+    await saveWhatsAppMemberMapping({
+      voterId: voter.voterId, pushName: voter.displayName, profilePicUrl: voter.profilePicUrl,
+      phone: voter.phone, uid: personId, clubId: activeClub, matchedBy: 'MANUAL', updatedBy: user?.email || user?.uid,
+    });
+    addNotification(`שויך מצביע (${voter.displayName}) לחבר בחוג`, 'SUCCESS');
+  }, [activeClub, user, addNotification]);
+
+  const confirmSyncCandidate = useCallback(async (candidate: MatchCandidate, roleOverride?: Role) => {
+    if (!activeClub) return;
+    if (roleOverride && roleOverride !== candidate.person.role) {
+      await updateMemberRole(candidate.person, roleOverride);
+    }
+    await autoLinkPhoneMatches([candidate], activeClub, user?.email || user?.uid);
+    addNotification(`אומת סנכרון: ${candidate.person.name}`, 'SUCCESS');
+  }, [activeClub, user, updateMemberRole, addNotification]);
+
+  const importRosterMembers = useCallback(async (entries: Array<{ mapping: WhatsAppMemberMapping; role: Role; isSkipper?: boolean }>) => {
+    if (!activeClub || entries.length === 0) return 0;
+    const created = await importWhatsAppRosterToClub(activeClub, entries, user?.email || user?.uid);
+    addNotification(`יובאו ${created.length} חברים מקבוצת הוואטסאפ למאגר החוג`, 'SUCCESS');
+    return created.length;
+  }, [activeClub, user, addNotification]);
+
+  const unlinkVoter = useCallback(async (voterId: string) => {
+    await unlinkWhatsAppMember(voterId, activeClub || undefined);
+    addNotification('השיוך הוסר מהחוג הנוכחי', 'INFO');
+  }, [activeClub, addNotification]);
+
+  const addGuestFromVoter = useCallback(async (voter: ResolvedVoter, persistToClub: boolean) => {
+    if (!activeClub) return null;
+    const guest: Person = await createClubGuestFromVoter({
+      clubId: activeClub, voterId: voter.voterId, displayName: voter.displayName,
+      phone: voter.phone, profilePicUrl: voter.profilePicUrl, persistToClub, updatedBy: user?.email || user?.uid,
+    });
+    if (!persistToClub) setPeople([...people, guest]);
+    const currentIds = sessions[activeClub]?.presentPersonIds || [];
+    setBulkAttendance(Array.from(new Set([...currentIds, guest.id])));
+    addNotification(`נוסף כאורח לאימון: ${guest.name}`, 'SUCCESS');
+    return guest;
+  }, [activeClub, user, people, sessions, setPeople, setBulkAttendance, addNotification]);
+
+  const saveConfig = useCallback(async (nextConfig: ClubWhatsAppConfig) => {
+    await saveClubWhatsAppConfig(nextConfig);
+    addNotification('הגדרות וואטסאפ של החוג נשמרו', 'SUCCESS');
+  }, [addNotification]);
+
+  const setPollColor = useCallback(async (pollId: string, colorId: string) => {
+    if (!activeClub) return;
+    await saveClubWhatsAppConfig({ ...clubConfig, clubId: activeClub, pollColors: { ...(clubConfig.pollColors || {}), [pollId]: colorId } });
+  }, [activeClub, clubConfig]);
 
   return {
-    polls,
-    relevantPolls,
-    activePoll,
-    selectedPollId,
-    setSelectedPollId,
-    summary,
-    clubConfig,
-    clubPeople,
-    mappings,
-    availableGroups,
-    voteAlerts,
+    polls: relevantPolls, allPollsCount: polls.length, activePoll, selectedPollId, setSelectedPollId, summary,
+    clubConfig, clubPeople, effectiveClubPeople, mappings: clubMappings, syncCandidates, availableGroups, voteAlerts,
     dismissAlert: useCallback((id: string) => setVoteAlerts((p) => p.filter((a) => a.id !== id)), [setVoteAlerts]),
     clearAlerts: useCallback(() => setVoteAlerts([]), [setVoteAlerts]),
-    isLoading,
-    error,
-    retry,
-    applyPollAttendance,
-    linkVoterToPerson,
-    unlinkVoter,
-    addGuestFromVoter,
-    saveConfig,
-    setPollColor,
+    isLoading, error, retry, applyPollAttendance, linkVoterToPerson, confirmSyncCandidate,
+    importRosterMembers, unlinkVoter, addGuestFromVoter, saveConfig, setPollColor, linkClubGroup, updateMemberRole,
   };
 };
