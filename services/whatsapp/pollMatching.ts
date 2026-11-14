@@ -32,9 +32,13 @@ export const mappingBelongsToClub = (
   if (pollVoterIds.has(m.voterId)) return true;
   if (!linkedGroups.length) return true;
   const groups = m.groups || [];
-  return groups.some((g) =>
-    linkedGroups.some((lg) => g.toLowerCase().includes(lg.trim().toLowerCase()))
-  );
+  return groups.some((g) => {
+    const gNorm = g.trim().toLowerCase();
+    return linkedGroups.some((lg) => {
+      const lgNorm = lg.trim().toLowerCase();
+      return gNorm === lgNorm || gNorm.includes(lgNorm) || lgNorm.includes(gNorm);
+    });
+  });
 };
 
 export const findAutoSyncCandidates = (

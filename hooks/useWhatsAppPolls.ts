@@ -4,6 +4,7 @@ import { Person, Role } from '../types';
 import { ClubWhatsAppConfig, MatchCandidate, ResolvedVoter, WhatsAppMemberMapping } from '../types/whatsapp';
 import { resolvePollSummary } from '../services/whatsapp/pollResolver';
 import { findAutoSyncCandidates, getMappingUidForClub, mappingBelongsToClub } from '../services/whatsapp/pollMatching';
+import { mergeClubRosterWithWhatsApp } from '../services/whatsapp/rosterMerge';
 import {
   autoLinkPhoneMatches, createClubGuestFromVoter, importWhatsAppRosterToClub,
   saveClubWhatsAppConfig, saveWhatsAppMemberMapping, unlinkWhatsAppMember, updateClubPersonRole,
@@ -38,26 +39,23 @@ export const useWhatsAppPolls = () => {
     return mappings.filter((m) => mappingBelongsToClub(m, activeClub, clubConfig.linkedGroups, pollVoters));
   }, [mappings, activeClub, clubConfig.linkedGroups, votes]);
 
+  const baseUnifiedPeople = useMemo(
+    () => mergeClubRosterWithWhatsApp({ clubId: activeClub, clubPeople, mappings: clubMappings, summary: null }),
+    [activeClub, clubPeople, clubMappings]
+  );
+
   const summary = useMemo(() => {
     if (!activePoll) return null;
     return resolvePollSummary({
-      poll: activePoll, votes, mappings: clubMappings, people: clubPeople, profilePhotos,
+      poll: activePoll, votes, mappings: clubMappings, people: baseUnifiedPeople, profilePhotos,
       config: clubConfig, recentlyChangedVoterIds: recentChangedVoters,
     });
-  }, [activePoll, votes, clubMappings, clubPeople, profilePhotos, clubConfig, recentChangedVoters]);
+  }, [activePoll, votes, clubMappings, baseUnifiedPeople, profilePhotos, clubConfig, recentChangedVoters]);
 
-  const effectiveClubPeople = useMemo(() => {
-    if (!summary) return clubPeople;
-    return clubPeople.map((person) => {
-      const status = summary.personStatusMap[person.id];
-      if (!status || status.intent !== 'ATTENDING') return person;
-      return {
-        ...person,
-        isSkipper: Boolean(person.isSkipper || status.detectedIsSkipper),
-        tags: Array.from(new Set([...(person.tags || []), ...(status.detectedTags || [])])),
-      };
-    });
-  }, [clubPeople, summary]);
+  const effectiveClubPeople = useMemo(
+    () => mergeClubRosterWithWhatsApp({ clubId: activeClub, clubPeople, mappings: clubMappings, summary }),
+    [activeClub, clubPeople, clubMappings, summary]
+  );
 
   const syncCandidates = useMemo(
     () => findAutoSyncCandidates(clubMappings, clubPeople, activeClub || undefined),
@@ -95,7 +93,11 @@ export const useWhatsAppPolls = () => {
   const availableGroups = useMemo(() => {
     const set = new Set<string>();
     polls.forEach((p) => { if (p.group) set.add(p.group); });
-    mappings.forEach((m) => (m.groups || []).forEach((g) => set.add(g)));
+    mappings.forEach((m) => {
+      const groups = (m.groups || []).filter(Boolean);
+      const named = groups.filter((g) => !g.endsWith('@g.us'));
+      (named.length > 0 ? named : groups).forEach((g) => set.add(g));
+    });
     return Array.from(set);
   }, [polls, mappings]);
 
@@ -108,8 +110,9 @@ export const useWhatsAppPolls = () => {
 
   const updateMemberRole = useCallback(async (person: Person, nextRole: Role, nextIsSkipper?: boolean) => {
     if (!activeClub) return;
-    const updated = await updateClubPersonRole(activeClub, person, nextRole, nextIsSkipper);
-    setPeople(people.map((p) => (p.id === updated.id && p.clubId === activeClub ? updated : p)));
+    const updated = await updateClubPersonRole(activeClub, { ...person, isWhatsAppGroupOnly: false }, nextRole, nextIsSkipper);
+    const exists = people.some((p) => p.id === updated.id && p.clubId === activeClub);
+    setPeople(exists ? people.map((p) => (p.id === updated.id && p.clubId === activeClub ? updated : p)) : [...people, updated]);
     addNotification(`עודכן תפקיד עבור ${person.name}`, 'SUCCESS');
   }, [activeClub, people, setPeople, addNotification]);
 

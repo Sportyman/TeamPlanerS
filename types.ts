@@ -188,6 +188,9 @@ export interface Person {
   notes?: string;
   photoURL?: string;
   isSkipper?: boolean;
+  attendanceCount?: number;
+  lastAttendedAt?: string;
+  isWhatsAppGroupOnly?: boolean;
   preferredBoatType?: string; 
   genderConstraint?: GenderConstraint;
   mustPairWith?: string[];   

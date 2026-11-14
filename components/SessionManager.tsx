@@ -10,6 +10,7 @@ import { InventorySelector } from './session/InventorySelector';
 import { LoadingScreen } from './layout/LoadingScreen';
 import { useWhatsAppPolls } from '../hooks/useWhatsAppPolls';
 import { calculateSessionBoatRecommendation } from '../services/boatAllocationLogic';
+import { recordClubAttendance } from '../services/syncService';
 
 export const SessionManager: React.FC = () => {
   const {
@@ -71,6 +72,13 @@ export const SessionManager: React.FC = () => {
   const step = (stepParam ? Number(stepParam) : (currentSession.teams.length > 0 ? 3 : 1)) as 1 | 2 | 3;
   const handleStepChange = (newStep: number) => setSearchParams({ step: String(newStep) });
 
+  const handleAdvanceToEquipment = () => {
+    if (activeClub && presentPeople.length > 0) {
+      recordClubAttendance(activeClub, presentPeople).catch(() => {});
+    }
+    handleStepChange(2);
+  };
+
   const startPairing = () => {
     updateInventory(localInventory);
     runPairing(allClubPeople.length > 0 ? allClubPeople : undefined);
@@ -115,7 +123,7 @@ export const SessionManager: React.FC = () => {
       {step === 1 && (
         <AttendanceList
           people={clubPeople} presentIds={currentSession.presentPersonIds}
-          onToggle={toggleAttendance} onBulkSelect={setBulkAttendance} onNext={() => handleStepChange(2)}
+          onToggle={toggleAttendance} onBulkSelect={setBulkAttendance} onNext={handleAdvanceToEquipment}
         />
       )}
       {step === 2 && (

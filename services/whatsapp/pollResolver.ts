@@ -15,6 +15,7 @@ import {
   extractPhoneFromVoterId,
   namesMatch,
   normalizePhone,
+  sanitizeDocId,
 } from './pollFormatting';
 import { getMappingUidForClub } from './pollMatching';
 
@@ -65,11 +66,12 @@ export const resolvePollSummary = (params: {
     const clubUid = mapping ? getMappingUidForClub(mapping, config.clubId) : undefined;
     const manualPerson = clubUid ? peopleById.get(clubUid) : undefined;
     const phonePerson = normPhone ? peopleByPhone.get(normPhone) : undefined;
+    const virtualWaPerson = peopleById.get(`wa_${sanitizeDocId(vote.voter).slice(0, 48)}`);
     const namePerson = !manualPerson && !phonePerson && (vote.pushName || mapping?.pushName)
       ? people.find((p) => namesMatch(vote.pushName || mapping?.pushName, p.name))
       : undefined;
 
-    const person = manualPerson || phonePerson;
+    const person = manualPerson || phonePerson || virtualWaPerson;
     const matchSource: ResolvedVoter['matchSource'] = manualPerson
       ? 'MANUAL_MAP'
       : phonePerson

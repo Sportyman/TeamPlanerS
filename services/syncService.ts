@@ -1,5 +1,5 @@
 import { db } from '../firebase';
-import { doc, getDoc, getDocFromServer, getDocs, getDocsFromServer, setDoc, collection, query, where, onSnapshot, Unsubscribe, addDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocFromServer, getDocs, getDocsFromServer, setDoc, collection, query, where, onSnapshot, Unsubscribe, addDoc, increment } from 'firebase/firestore';
 import { useAppStore } from '../store';
 import { Person, ClubID, MembershipStatus, UserProfile, Role, AccessLevel, Gender } from '../types';
 
@@ -40,6 +40,8 @@ const hydratePeopleFromMemberships = async (memberships: any[]): Promise<Person[
             gender: profile?.gender || ms.gender || Gender.MALE,
             role: ms.role || Role.MEMBER, rank: ms.rank || 3,
             isSkipper: Boolean(profile?.isSkipper || ms.isSkipper),
+            attendanceCount: typeof ms.attendanceCount === 'number' ? ms.attendanceCount : 0,
+            lastAttendedAt: ms.lastAttendedAt || undefined,
             phone: profile?.primaryPhone || ms.phone || '',
             notes: profile?.medicalNotes || ms.notes || '',
             tags: Array.isArray(ms.tags) ? ms.tags : [],
@@ -115,6 +117,7 @@ export const addPersonToClubCloud = async (clubId: ClubID, person: Person) => {
             status: MembershipStatus.ACTIVE, lastUpdate: new Date().toISOString(),
         };
         if (person.photoURL) payload.photoURL = person.photoURL;
+        if (typeof person.attendanceCount === 'number') payload.attendanceCount = person.attendanceCount;
         if (person.preferredBoatType) payload.preferredBoatType = person.preferredBoatType;
         if (person.genderConstraint) payload.genderConstraint = person.genderConstraint;
         await setDoc(docRef, payload, { merge: true });
@@ -122,6 +125,37 @@ export const addPersonToClubCloud = async (clubId: ClubID, person: Person) => {
     } catch (error) {
         addLog(`Failed to sync person to club cloud: ${error}`, 'ERROR');
         throw error;
+    }
+};
+
+export const recordClubAttendance = async (clubId: ClubID, attendedPeople: Person[]) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const nowIso = new Date().toISOString();
+    const toRecord = attendedPeople.filter((p) => p.lastAttendedAt?.slice(0, 10) !== today);
+    if (toRecord.length === 0) return;
+
+    const store = useAppStore.getState();
+    const updatedMap = new Map<string, Person>();
+    await Promise.all(toRecord.map(async (p) => {
+        try {
+            const payload: Record<string, any> = {
+                uid: p.id, clubId, displayName: p.name, gender: p.gender || Gender.MALE,
+                role: p.role, rank: p.rank ?? 3, isSkipper: Boolean(p.isSkipper),
+                phone: p.phone || '', status: MembershipStatus.ACTIVE,
+                attendanceCount: increment(1), lastAttendedAt: nowIso, lastUpdate: nowIso,
+            };
+            if (p.photoURL) payload.photoURL = p.photoURL;
+            await setDoc(doc(db, 'memberships', `${clubId}_${p.id}`), payload, { merge: true });
+            updatedMap.set(p.id, { ...p, isWhatsAppGroupOnly: false, attendanceCount: (p.attendanceCount || 0) + 1, lastAttendedAt: nowIso });
+        } catch (err) {
+            addLog(`Attendance count update skipped for ${p.name}: ${err}`, 'WARN');
+        }
+    }));
+    if (updatedMap.size > 0) {
+        const currentClubIds = new Set(store.people.map((p) => `${p.clubId}:${p.id}`));
+        const nextPeople = store.people.map((p) => (p.clubId === clubId && updatedMap.has(p.id) ? updatedMap.get(p.id)! : p));
+        updatedMap.forEach((p) => { if (!currentClubIds.has(`${clubId}:${p.id}`)) nextPeople.push(p); });
+        store.setPeople(nextPeople);
     }
 };
 
