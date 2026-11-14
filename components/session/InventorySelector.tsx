@@ -94,6 +94,7 @@ export const InventorySelector: React.FC<InventorySelectorProps> = ({
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <select value={p.role} onChange={(e) => onUpdateParticipantRole(p, e.target.value as Role)} className="border border-slate-200 rounded-lg px-2 py-1 bg-white font-semibold">
+                    <option value={Role.UNASSIGNED}>לא הוגדר *</option>
                     <option value={Role.MEMBER}>{getRoleLabel(Role.MEMBER, p.gender)}</option>
                     <option value={Role.VOLUNTEER}>{getRoleLabel(Role.VOLUNTEER, p.gender)}</option>
                     <option value={Role.INSTRUCTOR}>{getRoleLabel(Role.INSTRUCTOR, p.gender)}</option>

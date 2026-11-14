@@ -10,6 +10,7 @@ import { InventoryEditor } from './dashboard/InventoryEditor';
 import { MembershipRequests } from './dashboard/MembershipRequests';
 import { WhatsAppDashboardView } from './whatsapp/WhatsAppDashboardView';
 import { approveMembership, saveUserProfile } from '../services/profileService';
+import { getDefaultBoatDefs, saveClubBoatDefinitions } from '../services/clubEquipmentService';
 import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -28,7 +29,8 @@ export const Dashboard: React.FC = () => {
   if (!activeClub) return null;
   const currentClubLabel = clubs.find(c => c.id === activeClub)?.label || '';
   const clubPeople = people.filter(p => p.clubId === activeClub);
-  const settings = clubSettings[activeClub] || { boatDefinitions: [] };
+  const rawSettings = clubSettings[activeClub];
+  const boatDefs = rawSettings?.boatDefinitions?.length ? rawSettings.boatDefinitions : getDefaultBoatDefs(activeClub, currentClubLabel);
 
   const handleApprove = async (m: any) => {
       try {
@@ -61,12 +63,23 @@ export const Dashboard: React.FC = () => {
   if (view === 'INVITES') return <div className="max-w-4xl mx-auto py-6"><button onClick={() => navigate('/app/manage')} className="flex items-center gap-2 text-slate-500 mb-6"><ArrowRight size={20} /> חזרה</button><InviteManager /></div>;
   if (view === 'WHATSAPP') return <WhatsAppDashboardView />;
   if (view === 'MEMBERSHIPS') return <MembershipRequests clubId={activeClub} onApprove={handleApprove} onBack={() => navigate('/app/manage')} />;
-  if (view === 'INVENTORY') return <InventoryEditor clubId={activeClub} definitions={settings.boatDefinitions} onSave={() => navigate('/app')} onCancel={() => navigate('/app/manage')} />;
+  if (view === 'INVENTORY') return (
+    <InventoryEditor
+      clubId={activeClub}
+      definitions={boatDefs}
+      onSave={async (defs) => {
+        await saveClubBoatDefinitions(activeClub, defs);
+        addNotification('הגדרות הציוד נשמרו בהצלחה', 'SUCCESS');
+        navigate('/app');
+      }}
+      onCancel={() => navigate('/app/manage')}
+    />
+  );
   if (view === 'PEOPLE') return (
     <PeopleManagementView
       activeClub={activeClub}
       people={clubPeople}
-      boatDefinitions={settings.boatDefinitions}
+      boatDefinitions={boatDefs}
       onBack={() => navigate('/app/manage')}
       onDelete={handleRemovePerson}
       onNotify={addNotification}

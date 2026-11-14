@@ -1,8 +1,14 @@
 
 import { StateCreator } from 'zustand';
-import { AppState, EMPTY_SESSION } from '../store';
+import { AppState, EMPTY_SESSION, createInventoryFromDefs } from '../store';
 import { Club, ClubID, Person, ClubSettings, SyncStatus, BoatDefinition, UserPermission } from '../../types';
 import { DEFAULT_CLUBS, KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from '../../mockData';
+
+const defaultBoatsForClub = (clubId: string, label = ''): BoatDefinition[] => {
+  const combined = `${clubId} ${label}`.toLowerCase();
+  if (clubId === 'SAILING' || combined.includes('שייט') || combined.includes('sailing')) return SAILING_DEFINITIONS;
+  return KAYAK_DEFINITIONS;
+};
 
 export interface GlobalSlice {
   clubs: Club[];
@@ -14,6 +20,7 @@ export interface GlobalSlice {
   _hasHydrated: boolean; 
 
   setActiveClub: (clubId: ClubID) => void;
+  setClubBoatDefinitions: (clubId: ClubID, defs: BoatDefinition[]) => void;
   setPeople: (people: Person[]) => void;
   setSyncStatus: (status: SyncStatus) => void;
   setGlobalConfig: (config: { superAdmins: string[], protectedAdmins?: string[], permissions?: UserPermission[] }) => void;
@@ -37,7 +44,23 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
   isInitialLoading: false,
   _hasHydrated: false,
 
-  setActiveClub: (clubId) => set({ activeClub: clubId }),
+  setActiveClub: (clubId) => set((state) => {
+    const hasDefs = (state.clubSettings[clubId]?.boatDefinitions?.length || 0) > 0;
+    if (hasDefs) return { activeClub: clubId };
+    const clubLabel = state.clubs.find((c) => c.id === clubId)?.label || '';
+    const defs = defaultBoatsForClub(clubId, clubLabel);
+    return {
+      activeClub: clubId,
+      clubSettings: { ...state.clubSettings, [clubId]: { boatDefinitions: defs } },
+      sessions: {
+        ...state.sessions,
+        [clubId]: state.sessions[clubId] || { ...EMPTY_SESSION, inventory: createInventoryFromDefs(defs) },
+      },
+    };
+  }),
+  setClubBoatDefinitions: (clubId, defs) => set((state) => ({
+    clubSettings: { ...state.clubSettings, [clubId]: { boatDefinitions: defs } },
+  })),
   setPeople: (people) => set({ people }),
   setSyncStatus: (status) => set({ syncStatus: status }),
   setInitialLoading: (isLoading) => set({ isInitialLoading: isLoading }),
@@ -52,10 +75,11 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
 
   addClub: (label) => set(state => {
     const newId = 'CLUB-' + Date.now();
+    const defs = defaultBoatsForClub(newId, label);
     return {
         clubs: [...state.clubs, { id: newId, label }],
-        clubSettings: { ...state.clubSettings, [newId]: { boatDefinitions: [] } },
-        sessions: { ...state.sessions, [newId]: { ...EMPTY_SESSION } }
+        clubSettings: { ...state.clubSettings, [newId]: { boatDefinitions: defs } },
+        sessions: { ...state.sessions, [newId]: { ...EMPTY_SESSION, inventory: createInventoryFromDefs(defs) } }
     };
   }),
 

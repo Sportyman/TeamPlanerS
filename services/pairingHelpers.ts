@@ -22,7 +22,7 @@ export const personRequiresDouble = (p: Person): boolean => {
   if (personRequiresPrivate(p)) return false;
   if (p.preferredBoatType === DefaultBoatTypes.DOUBLE) return true;
   if (personPrefersSingle(p)) return false;
-  return p.role === Role.MEMBER || p.role === Role.GUEST;
+  return p.role === Role.MEMBER || p.role === Role.GUEST || p.role === Role.UNASSIGNED;
 };
 
 export const buildClusters = (people: Person[]): PairingCluster[] => {

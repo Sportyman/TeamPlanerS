@@ -57,7 +57,7 @@ export const PeopleManagementView: React.FC<PeopleManagementViewProps> = ({
 
   const handleImportAll = async () => {
     if (unlinkedMappings.length === 0) return;
-    await importRosterMembers(unlinkedMappings.map((m) => ({ mapping: m, role: Role.MEMBER })));
+    await importRosterMembers(unlinkedMappings.map((m) => ({ mapping: m, role: Role.UNASSIGNED })));
   };
 
   return (

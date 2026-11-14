@@ -1,14 +1,20 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../store';
-import { ClubID, Team, Role, Gender, BoatType, DefaultBoatTypes, Person } from '../../types';
+import { BoatDefinition, BoatType, ClubID, DefaultBoatTypes, Gender, Person, Role, Team } from '../../types';
 import { generateSmartPairings } from '../../services/pairingLogic';
+import { KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from '../../mockData';
+
+const fallbackDefsFor = (clubId: ClubID, settings?: { boatDefinitions?: BoatDefinition[] }): BoatDefinition[] => {
+  if (settings?.boatDefinitions && settings.boatDefinitions.length > 0) return settings.boatDefinitions;
+  return clubId === 'SAILING' ? SAILING_DEFINITIONS : KAYAK_DEFINITIONS;
+};
 
 export interface PairingSlice {
   pairingDirty: boolean;
   histories: Record<ClubID, Team[][]>;
   futures: Record<ClubID, Team[][]>;
 
-  runPairing: (peopleOverride?: Person[]) => void;
+  runPairing: (peopleOverride?: Person[], defsOverride?: BoatDefinition[]) => void;
   resetSession: () => void;
   addManualTeam: () => void;
   removeTeam: (teamId: string) => void;
@@ -28,13 +34,14 @@ export const createPairingSlice: StateCreator<AppState, [], [], PairingSlice> = 
   histories: {},
   futures: {},
 
-  runPairing: (peopleOverride) => {
+  runPairing: (peopleOverride, defsOverride) => {
     const { people, activeClub, sessions, clubSettings } = get();
     if (!activeClub) return;
     const cur = sessions[activeClub];
     const sourcePeople = peopleOverride || people;
     const present = sourcePeople.filter((p) => p.clubId === activeClub && cur.presentPersonIds.includes(p.id));
-    const teams = generateSmartPairings(present, cur.inventory, clubSettings[activeClub].boatDefinitions);
+    const defs = defsOverride && defsOverride.length > 0 ? defsOverride : fallbackDefsFor(activeClub, clubSettings[activeClub]);
+    const teams = generateSmartPairings(present, cur.inventory, defs);
     set((s) => ({
       histories: { ...s.histories, [activeClub]: [] },
       futures: { ...s.futures, [activeClub]: [] },
@@ -47,7 +54,7 @@ export const createPairingSlice: StateCreator<AppState, [], [], PairingSlice> = 
     const { activeClub, clubSettings } = get();
     if (!activeClub) return;
     const inv: Record<string, number> = {};
-    clubSettings[activeClub].boatDefinitions.forEach((d) => { inv[d.id] = d.defaultCount; });
+    fallbackDefsFor(activeClub, clubSettings[activeClub]).forEach((d) => { inv[d.id] = d.defaultCount; });
     set((s) => ({
       histories: { ...s.histories, [activeClub]: [] },
       futures: { ...s.futures, [activeClub]: [] },
@@ -60,7 +67,7 @@ export const createPairingSlice: StateCreator<AppState, [], [], PairingSlice> = 
     const { activeClub, sessions, clubSettings } = get();
     if (!activeClub) return;
     const cur = sessions[activeClub];
-    const defaultBoatId = clubSettings[activeClub].boatDefinitions[0]?.id || DefaultBoatTypes.DOUBLE;
+    const defaultBoatId = fallbackDefsFor(activeClub, clubSettings[activeClub])[0]?.id || DefaultBoatTypes.DOUBLE;
     const newTeam: Team = { id: Date.now().toString(), members: [], boatType: defaultBoatId, boatCount: 1 };
     set((s) => ({
       histories: { ...s.histories, [activeClub]: [...(s.histories[activeClub] || []), cur.teams] },

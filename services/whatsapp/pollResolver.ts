@@ -79,8 +79,8 @@ export const resolvePollSummary = (params: {
       : 'UNMAPPED';
 
     const classification = classifySelectedOptions(vote.selectedOptions, rules);
-    // Preserve existing club role by default when person exists; pollRole remains visible for 1-click switch
-    const effectiveRole = person?.role || classification.detectedRole || Role.GUEST;
+    const knownRole = person && person.role !== Role.UNASSIGNED ? person.role : undefined;
+    const effectiveRole = knownRole || classification.detectedRole || person?.role || Role.UNASSIGNED;
     const displayName = person?.name || vote.pushName || mapping?.pushName || rawPhone || vote.voter.split('@')[0];
     const profilePicUrl = vote.profilePicUrl || mapping?.profilePicUrl || (person ? profilePhotos[person.id] : undefined);
     const updatedRecently = recentlyChangedVoterIds.has(vote.voter);
@@ -90,7 +90,7 @@ export const resolvePollSummary = (params: {
       if (effectiveRole === Role.VOLUNTEER) counts.volunteers++;
       else if (effectiveRole === Role.INSTRUCTOR) counts.instructors++;
       else if (effectiveRole === Role.GUEST) counts.guests++;
-      else counts.members++;
+      else if (effectiveRole === Role.MEMBER) counts.members++;
 
       if (classification.detectedIsSkipper || person?.isSkipper) counts.skippers++;
       if (person) attendingSet.add(person.id);

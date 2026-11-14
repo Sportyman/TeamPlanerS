@@ -22,6 +22,7 @@ export const PeopleTable: React.FC<PeopleTableProps> = ({ people, onEdit, onDele
       case Role.INSTRUCTOR: return 'text-cyan-800';
       case Role.VOLUNTEER: return 'text-orange-700';
       case Role.MEMBER: return 'text-sky-700';
+      case Role.UNASSIGNED: return 'text-amber-700';
       default: return 'text-slate-600';
     }
   };
@@ -46,6 +47,7 @@ export const PeopleTable: React.FC<PeopleTableProps> = ({ people, onEdit, onDele
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="font-bold text-slate-900 truncate">{person.name}</span>
+                      {person.role === Role.UNASSIGNED && <span className="text-amber-600 font-black" title="נדרשת השלמת תפקיד">*</span>}
                       {person.isSkipper && <ShipWheel size={14} className="text-blue-700 shrink-0" />}
                     </div>
                     <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap tabular-nums">

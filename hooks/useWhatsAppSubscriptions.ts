@@ -11,6 +11,7 @@ import { DEFAULT_KEYWORD_RULES } from '../config/whatsappDefaults';
 import { deduplicateLatestVotes } from '../services/whatsapp/pollResolver';
 import { detectVoteChanges } from '../services/whatsapp/pollMatching';
 import {
+  fetchRecentPollVotesForClub,
   subscribeToClubWhatsAppConfig,
   subscribeToPollsEvents,
   subscribeToPollVotes,
@@ -26,6 +27,7 @@ interface UseWhatsAppSubscriptionsParams {
 export const useWhatsAppSubscriptions = ({ userId, activeClub, onNotify }: UseWhatsAppSubscriptionsParams) => {
   const [polls, setPolls] = useState<PollEvent[]>([]);
   const [votes, setVotes] = useState<PollVote[]>([]);
+  const [historicalVotes, setHistoricalVotes] = useState<PollVote[]>([]);
   const [mappings, setMappings] = useState<WhatsAppMemberMapping[]>([]);
   const [clubConfig, setClubConfig] = useState<ClubWhatsAppConfig>({
     clubId: activeClub || '', linkedGroups: [], keywordRules: DEFAULT_KEYWORD_RULES, pollColors: {},
@@ -43,6 +45,7 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, onNotify }: UseWh
 
   useEffect(() => {
     setSelectedPollId('');
+    setHistoricalVotes([]);
     setVoteAlerts([]);
     setRecentChangedVoters(new Set());
   }, [activeClub]);
@@ -78,6 +81,15 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, onNotify }: UseWh
       clubConfig.linkedGroups.some((g) => p.group.toLowerCase().includes(g.trim().toLowerCase()))
     );
   }, [polls, clubConfig.linkedGroups]);
+
+  useEffect(() => {
+    if (!userId || relevantPolls.length === 0) { setHistoricalVotes([]); return; }
+    let cancelled = false;
+    fetchRecentPollVotesForClub(relevantPolls.map((p) => p.pollId)).then((allVotes) => {
+      if (!cancelled) setHistoricalVotes(allVotes);
+    });
+    return () => { cancelled = true; };
+  }, [userId, relevantPolls, retryKey]);
 
   useEffect(() => {
     if (relevantPolls.length === 0) {
@@ -132,7 +144,7 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, onNotify }: UseWh
   const setResolvedVotersRef = useCallback((voters: ResolvedVoter[]) => { resolvedVotersRef.current = voters; }, []);
 
   return {
-    polls, relevantPolls, votes, mappings, clubConfig, selectedPollId, setSelectedPollId,
+    polls, relevantPolls, votes, historicalVotes, mappings, clubConfig, selectedPollId, setSelectedPollId,
     voteAlerts, setVoteAlerts, recentChangedVoters, isLoading, error,
     retry: () => setRetryKey((k) => k + 1), setResolvedVotersRef,
   };

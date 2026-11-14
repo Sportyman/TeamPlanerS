@@ -11,6 +11,7 @@ import { LoadingScreen } from './layout/LoadingScreen';
 import { useWhatsAppPolls } from '../hooks/useWhatsAppPolls';
 import { calculateSessionBoatRecommendation } from '../services/boatAllocationLogic';
 import { recordClubAttendance } from '../services/syncService';
+import { getDefaultBoatDefs } from '../services/clubEquipmentService';
 
 export const SessionManager: React.FC = () => {
   const {
@@ -26,7 +27,13 @@ export const SessionManager: React.FC = () => {
   const [localInventory, setLocalInventory] = useState<BoatInventory>(currentSession?.inventory || {});
   const [hasManualInventoryEdit, setHasManualInventoryEdit] = useState(false);
 
-  const settings = activeClub ? (clubSettings[activeClub] || { boatDefinitions: [] }) : { boatDefinitions: [] };
+  const currentClubLabel = activeClub ? (clubs.find((c) => c.id === activeClub)?.label || '') : '';
+  const storedDefs = activeClub ? clubSettings[activeClub]?.boatDefinitions : undefined;
+  const boatDefinitions = useMemo(
+    () => (storedDefs && storedDefs.length > 0 ? storedDefs : activeClub ? getDefaultBoatDefs(activeClub, currentClubLabel) : []),
+    [storedDefs, activeClub, currentClubLabel]
+  );
+
   const allClubPeople = useMemo(
     () => (effectiveClubPeople.length > 0 ? effectiveClubPeople : people.filter((p) => p.clubId === activeClub)),
     [effectiveClubPeople, people, activeClub]
@@ -47,10 +54,10 @@ export const SessionManager: React.FC = () => {
   }, [presentSignature, activeClub]);
 
   useEffect(() => {
-    if (!currentSession || hasManualInventoryEdit || presentPeople.length === 0 || settings.boatDefinitions.length === 0) return;
-    const rec = calculateSessionBoatRecommendation(presentPeople, settings.boatDefinitions, currentSession.inventory);
+    if (!currentSession || hasManualInventoryEdit || presentPeople.length === 0 || boatDefinitions.length === 0) return;
+    const rec = calculateSessionBoatRecommendation(presentPeople, boatDefinitions, currentSession.inventory);
     setLocalInventory(rec.recommendedInventory);
-  }, [presentPeople, settings.boatDefinitions, currentSession, hasManualInventoryEdit]);
+  }, [presentPeople, boatDefinitions, currentSession, hasManualInventoryEdit]);
 
   if (_hasHydrated && !isInitialLoading && !activeClub) return <Navigate to="/" replace />;
   if (!activeClub) return <LoadingScreen message="מזהה חוג..." />;
@@ -81,7 +88,7 @@ export const SessionManager: React.FC = () => {
 
   const startPairing = () => {
     updateInventory(localInventory);
-    runPairing(allClubPeople.length > 0 ? allClubPeople : undefined);
+    runPairing(allClubPeople.length > 0 ? allClubPeople : undefined, boatDefinitions);
     handleStepChange(3);
   };
 
@@ -128,8 +135,8 @@ export const SessionManager: React.FC = () => {
       )}
       {step === 2 && (
         <InventorySelector
-          clubLabel={clubs.find((c) => c.id === activeClub)?.label || ''}
-          boatDefinitions={settings.boatDefinitions}
+          clubLabel={currentClubLabel}
+          boatDefinitions={boatDefinitions}
           localInventory={localInventory}
           allClubPeople={allClubPeople}
           presentPeople={presentPeople}

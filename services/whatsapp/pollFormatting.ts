@@ -84,6 +84,7 @@ const ROLE_PRIORITY: Record<Role, number> = {
   [Role.VOLUNTEER]: 3,
   [Role.MEMBER]: 2,
   [Role.GUEST]: 1,
+  [Role.UNASSIGNED]: 0,
 };
 
 export const classifyOption = (

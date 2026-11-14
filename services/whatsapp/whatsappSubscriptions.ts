@@ -1,27 +1,9 @@
 import { db } from '../../firebase';
-import {
-  collection,
-  doc,
-  limit,
-  onSnapshot,
-  query,
-  Unsubscribe,
-  where,
-} from 'firebase/firestore';
+import { collection, doc, getDocs, limit, onSnapshot, query, Unsubscribe, where } from 'firebase/firestore';
 import { ClubID } from '../../types';
-import {
-  ClubWhatsAppConfig,
-  PollEvent,
-  PollVote,
-  WhatsAppMemberMapping,
-} from '../../types/whatsapp';
+import { ClubWhatsAppConfig, PollEvent, PollVote, WhatsAppMemberMapping } from '../../types/whatsapp';
 import { DEFAULT_KEYWORD_RULES } from '../../config/whatsappDefaults';
-import {
-  extractOptionLabels,
-  formatHebrewPollDate,
-  getPollColorToken,
-  toTimestampMs,
-} from './pollFormatting';
+import { extractOptionLabels, formatHebrewPollDate, getPollColorToken, toTimestampMs } from './pollFormatting';
 import { handleFirestoreError, OperationType } from './firestoreError';
 import { addLog } from '../syncService';
 
@@ -176,4 +158,27 @@ export const subscribeToClubWhatsAppConfig = (
       onData(defaultConfig);
     }
   );
+};
+
+export const fetchRecentPollVotesForClub = async (pollIds: string[]): Promise<PollVote[]> => {
+  const uniqueIds = Array.from(new Set(pollIds.filter(Boolean))).slice(0, 10);
+  if (uniqueIds.length === 0) return [];
+  try {
+    const snap = await getDocs(query(collection(db, 'poll_votes'), where('pollId', 'in', uniqueIds)));
+    return snap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        pollId: String(data.pollId || ''),
+        voter: String(data.voter || ''),
+        pushName: data.pushName || data.voterName || undefined,
+        profilePicUrl: data.profilePicUrl || undefined,
+        phone: data.phone || undefined,
+        selectedOptions: extractOptionLabels(data.selectedOptions),
+        timestampMs: toTimestampMs(data.timestamp),
+      };
+    });
+  } catch {
+    return [];
+  }
 };

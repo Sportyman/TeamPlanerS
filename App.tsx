@@ -18,19 +18,26 @@ import { MainLayout } from './components/layout/MainLayout';
 import { LoadingScreen } from './components/layout/LoadingScreen';
 import { AccessLevel } from './types';
 import { fetchGlobalConfig, addLog, subscribeToClubData } from './services/syncService';
+import { subscribeToClubBoatDefinitions } from './services/clubEquipmentService';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
 const AppContent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, activeClub, isInitialLoading } = useAppStore();
+  const { user, activeClub, clubs, isInitialLoading } = useAppStore();
   
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
+    let unsubData: (() => void) | undefined;
+    let unsubBoats: (() => void) | undefined;
     if (user && activeClub && !user.isDev) {
-        unsubscribe = subscribeToClubData(activeClub);
+        const clubLabel = clubs.find((c) => c.id === activeClub)?.label || '';
+        unsubData = subscribeToClubData(activeClub);
+        unsubBoats = subscribeToClubBoatDefinitions(activeClub, clubLabel);
     }
-    return () => { if (unsubscribe) unsubscribe(); };
-  }, [user, activeClub]);
+    return () => {
+        if (unsubData) unsubData();
+        if (unsubBoats) unsubBoats();
+    };
+  }, [user, activeClub, clubs]);
 
   if (activeClub && isInitialLoading) {
       return <MainLayout><LoadingScreen message="מסנכרן נתוני מועדון..." /></MainLayout>;

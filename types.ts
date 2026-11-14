@@ -4,6 +4,7 @@ export enum Role {
   VOLUNTEER = 'VOLUNTEER',
   MEMBER = 'MEMBER',
   GUEST = 'GUEST',
+  UNASSIGNED = 'UNASSIGNED',
 }
 
 export enum AccessLevel {
@@ -89,8 +90,9 @@ export const getRoleLabel = (role: Role, gender: Gender): string => {
         [Role.VOLUNTEER]: { [Gender.MALE]: 'מתנדב', [Gender.FEMALE]: 'מתנדבת' },
         [Role.MEMBER]: { [Gender.MALE]: 'חבר', [Gender.FEMALE]: 'חברה' },
         [Role.GUEST]: { [Gender.MALE]: 'אורח', [Gender.FEMALE]: 'אורחת' },
+        [Role.UNASSIGNED]: { [Gender.MALE]: 'לא הוגדר תפקיד', [Gender.FEMALE]: 'לא הוגדר תפקיד' },
     };
-    return labels[role][gender] || labels[role][Gender.MALE];
+    return labels[role]?.[gender] || labels[Role.UNASSIGNED][Gender.MALE];
 };
 
 export type GenderPrefType = 'NONE' | 'MALE' | 'FEMALE';

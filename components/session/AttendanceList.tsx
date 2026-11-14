@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { Person, Role, getRoleLabel } from '../../types';
-import { CheckSquare, Square, Shield, ArrowDownAZ, ArrowUpNarrowWide, CheckCircle2, Circle, ShipWheel, ArrowLeft, UserPlus, TrendingUp, Search } from 'lucide-react';
+import { Person, Role } from '../../types';
+import { CheckSquare, Square, Shield, ArrowDownAZ, ArrowUpNarrowWide, ArrowLeft, UserPlus, TrendingUp, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { PersonEditorModal } from '../dashboard/PersonEditorModal';
 import { useAppStore } from '../../store';
 import { addPersonToClubCloud } from '../../services/syncService';
 import { useWhatsAppPolls } from '../../hooks/useWhatsAppPolls';
 import { sortAttendancePeople } from '../../services/whatsapp/rosterMerge';
 import { SessionPollBar } from '../whatsapp/SessionPollBar';
-import { WhatsAppAvatar } from '../whatsapp/WhatsAppAvatar';
+import { AttendancePersonCard } from './AttendancePersonCard';
 
 type SortType = 'ATTENDANCE' | 'ROLE' | 'NAME' | 'RANK';
 
@@ -25,6 +25,7 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
   const { clubSettings, activeClub } = useAppStore();
   const [sortBy, setSortBy] = useState<SortType>('ATTENDANCE');
   const [search, setSearch] = useState('');
+  const [showUnchecked, setShowUnchecked] = useState(false);
   const [isAddingQuickly, setIsAddingQuickly] = useState(false);
 
   const {
@@ -34,32 +35,42 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
     confirmSyncCandidate, importRosterMembers, updateMemberRole,
   } = useWhatsAppPolls();
 
-  const displayPeople = useMemo(() => {
-    if (effectiveClubPeople.length > 0) return effectiveClubPeople;
-    return people;
-  }, [people, effectiveClubPeople]);
+  const displayPeople = useMemo(
+    () => (effectiveClubPeople.length > 0 ? effectiveClubPeople : people),
+    [people, effectiveClubPeople]
+  );
 
-  const sortedPeople = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const filtered = q
-      ? displayPeople.filter((p) => p.name.toLowerCase().includes(q) || (p.phone || '').includes(q))
-      : displayPeople;
-    const copy = [...filtered];
+  const sortList = (list: Person[]) => {
+    const copy = [...list];
     switch (sortBy) {
       case 'NAME':
         return copy.sort((a, b) => a.name.localeCompare(b.name, 'he'));
       case 'RANK':
         return copy.sort((a, b) => (b.rank - a.rank) || a.name.localeCompare(b.name, 'he'));
-      case 'ROLE':
-        return copy.sort((a, b) => {
-          const roleOrder = { [Role.INSTRUCTOR]: -1, [Role.VOLUNTEER]: 0, [Role.MEMBER]: 1, [Role.GUEST]: 2 };
-          if (roleOrder[a.role] !== roleOrder[b.role]) return roleOrder[a.role] - roleOrder[b.role];
-          return a.name.localeCompare(b.name, 'he');
-        });
+      case 'ROLE': {
+        const order: Record<Role, number> = {
+          [Role.INSTRUCTOR]: 0, [Role.VOLUNTEER]: 1, [Role.MEMBER]: 2, [Role.GUEST]: 3, [Role.UNASSIGNED]: 4,
+        };
+        return copy.sort((a, b) => (order[a.role] - order[b.role]) || a.name.localeCompare(b.name, 'he'));
+      }
       default:
         return sortAttendancePeople(copy);
     }
-  }, [displayPeople, search, sortBy]);
+  };
+
+  const { checkedPeople, uncheckedPeople } = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const filtered = q
+      ? displayPeople.filter((p) => p.name.toLowerCase().includes(q) || (p.phone || '').includes(q))
+      : displayPeople;
+    const presentSet = new Set(presentIds);
+    return {
+      checkedPeople: sortList(filtered.filter((p) => presentSet.has(p.id))),
+      uncheckedPeople: sortList(filtered.filter((p) => !presentSet.has(p.id))),
+    };
+  }, [displayPeople, search, presentIds, sortBy]);
+
+  const isUncheckedVisible = showUnchecked || checkedPeople.length === 0 || search.trim().length > 0;
 
   const stats = {
     vols: displayPeople.filter((p) => presentIds.includes(p.id) && (p.role === Role.VOLUNTEER || p.role === Role.INSTRUCTOR)).length,
@@ -67,20 +78,9 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
     skippers: displayPeople.filter((p) => presentIds.includes(p.id) && p.isSkipper).length,
   };
 
-  const getCardStyle = (role: Role, isPresent: boolean) => {
-    const base = 'flex items-center justify-between gap-3 p-3.5 rounded-2xl border text-right transition-all duration-200 select-none shadow-sm group';
-    if (!isPresent) return `${base} border-slate-200 bg-white text-slate-600 hover:border-slate-300 opacity-85 hover:opacity-100`;
-    switch (role) {
-      case Role.INSTRUCTOR: return `${base} border-cyan-500 bg-cyan-50 text-cyan-900 ring-2 ring-cyan-500/20`;
-      case Role.VOLUNTEER: return `${base} border-orange-500 bg-orange-50 text-orange-900 ring-2 ring-orange-500/20`;
-      case Role.MEMBER: return `${base} border-sky-500 bg-sky-50 text-sky-900 ring-2 ring-sky-500/20`;
-      default: return `${base} border-emerald-500 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20`;
-    }
-  };
-
   const boatDefs = activeClub ? (clubSettings[activeClub]?.boatDefinitions || []) : [];
 
-  const handleQuickSave = async (p: Person) => {
+  const handleQuickSaveNew = async (p: Person) => {
     if (activeClub) {
       await addPersonToClubCloud(activeClub, p);
       setIsAddingQuickly(false);
@@ -88,7 +88,7 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
   };
 
   return (
-    <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-6">
+    <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-5">
       <SessionPollBar
         activeClub={activeClub || ''} polls={polls} activePoll={activePoll} summary={summary} people={displayPeople}
         presentIds={presentIds} linkedGroups={clubConfig.linkedGroups} availableGroups={availableGroups}
@@ -99,8 +99,8 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
         onUpdatePersonRole={updateMemberRole} onDismissAlert={dismissAlert} onClearAlerts={clearAlerts} onRetry={retryPolls}
       />
 
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-5">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4">
           <div>
             <div className="flex items-center gap-3 flex-wrap">
               <h2 className="text-3xl font-black text-slate-800 tracking-tight">מי הגיע היום?</h2>
@@ -138,48 +138,53 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-        {sortedPeople.map((person) => {
-          const isPresent = presentIds.includes(person.id);
-          const pollStatus = summary?.personStatusMap[person.id];
-          return (
-            <button key={person.id} onClick={() => onToggle(person.id)} className={getCardStyle(person.role, isPresent)}>
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <WhatsAppAvatar name={person.name} src={person.photoURL} sizeClass="w-11 h-11 text-sm" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-black text-base leading-tight truncate">{person.name}</span>
-                    {person.isSkipper && <ShipWheel size={15} className={isPresent ? 'text-brand-600 shrink-0' : 'text-slate-400 shrink-0'} />}
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-1 text-[11px] flex-wrap text-slate-600 tabular-nums">
-                    <span className="font-bold">{getRoleLabel(person.role, person.gender)}</span>
-                    {(person.attendanceCount || 0) > 0 && <span>· {person.attendanceCount} אימונים</span>}
-                    {person.isWhatsAppGroupOnly && <span>· קבוצת וואטסאפ</span>}
-                    {pollStatus && (
-                      <span className={`font-bold ${pollStatus.intent === 'ATTENDING' ? 'text-emerald-700' : pollStatus.intent === 'DECLINING' ? 'text-red-700' : 'text-amber-700'}`}>
-                        · {pollStatus.intent === 'ATTENDING' ? 'אישר בסקר' : pollStatus.intent === 'DECLINING' ? 'לא מגיע' : 'אולי'}
-                        {pollStatus.updatedRecently ? ' (שונה)' : ''}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="shrink-0">
-                {isPresent ? <CheckCircle2 className="text-brand-600" size={28} /> : <Circle className="text-slate-300" size={28} />}
-              </div>
-            </button>
-          );
-        })}
-      </div>
+      {checkedPeople.length > 0 && (
+        <div className="space-y-2.5">
+          <div className="text-xs font-bold text-slate-500 tabular-nums">מסומנים להיום ({checkedPeople.length})</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {checkedPeople.map((person) => (
+              <AttendancePersonCard
+                key={person.id} person={person} isPresent pollStatus={summary?.personStatusMap[person.id]}
+                onToggle={onToggle} onQuickSave={updateMemberRole}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
-      <div className="mt-8 flex justify-end">
+      {uncheckedPeople.length > 0 && (
+        <div className="space-y-3">
+          {checkedPeople.length > 0 && (
+            <button type="button" onClick={() => setShowUnchecked((v) => !v)} className="w-full flex items-center gap-3 py-1 text-xs font-bold text-slate-500 hover:text-slate-800 group">
+              <div className="h-px bg-slate-200 flex-1 group-hover:bg-slate-300" />
+              <span className="flex items-center gap-1 whitespace-nowrap tabular-nums">
+                {isUncheckedVisible ? `הסתר משתתפים נוספים (${uncheckedPeople.length})` : `הצג עוד משתתפים (${uncheckedPeople.length})`}
+                {isUncheckedVisible ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </span>
+              <div className="h-px bg-slate-200 flex-1 group-hover:bg-slate-300" />
+            </button>
+          )}
+          {isUncheckedVisible && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {uncheckedPeople.map((person) => (
+                <AttendancePersonCard
+                  key={person.id} person={person} isPresent={false} pollStatus={summary?.personStatusMap[person.id]}
+                  onToggle={onToggle} onQuickSave={updateMemberRole}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="mt-6 flex justify-end">
         <button onClick={onNext} disabled={presentIds.length === 0} className="w-full md:w-auto bg-brand-600 disabled:opacity-50 hover:bg-brand-500 text-white px-10 py-4 rounded-2xl font-black text-xl shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95">
           הבא: ציוד <ArrowLeft size={24} />
         </button>
       </div>
 
       {isAddingQuickly && (
-        <PersonEditorModal allPeople={displayPeople} boatDefinitions={boatDefs} onClose={() => setIsAddingQuickly(false)} onSave={handleQuickSave} />
+        <PersonEditorModal allPeople={displayPeople} boatDefinitions={boatDefs} onClose={() => setIsAddingQuickly(false)} onSave={handleQuickSaveNew} />
       )}
     </div>
   );

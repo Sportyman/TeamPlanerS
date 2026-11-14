@@ -53,7 +53,9 @@ export const calculateSessionBoatRecommendation = (
   // Kayaking-style allocation: DOUBLE (vol + member) + SINGLE buddy pods (never 1 solo!)
   if (doubleBoat && multiBoats.every((b) => b.capacity <= 2)) {
     const clusterDoubles = multiClusters.reduce((sum, c) => sum + Math.ceil(c.size / 2), 0);
-    const membersNeedingDouble = mustDoubleSingles.filter((p) => p.role === Role.MEMBER || p.role === Role.GUEST);
+    const membersNeedingDouble = mustDoubleSingles.filter(
+      (p) => p.role === Role.MEMBER || p.role === Role.GUEST || p.role === Role.UNASSIGNED
+    );
     const pairedWithVolDoubles = Math.min(membersNeedingDouble.length, volunteerSingles.length);
     const unpairedMustDouble = Math.max(0, membersNeedingDouble.length - volunteerSingles.length);
     const remainingVols = Math.max(0, volunteerSingles.length - pairedWithVolDoubles);
@@ -63,15 +65,17 @@ export const calculateSessionBoatRecommendation = (
     let neededDoubles = clusterDoubles + pairedWithVolDoubles + Math.ceil(unpairedMustDouble / 2) + extraVolDoublePairs;
     let neededSingles = Math.max(0, remainingVols - extraVolDoublePairs * 2) + independentPassengers.length;
 
-    // Never send 1 solo single kayak out on the water
+    // Never send 1 solo boat alone; if only 1 single exists, try converting 1 double into 2 singles (trio) or accompany a double kayak
     const totalSinglesWithPrivate = neededSingles + privatePaddlers.length;
     if (singleBoat && totalSinglesWithPrivate === 1) {
       const canConvertDoubleToTrio = neededDoubles > clusterDoubles && membersNeedingDouble.some((m) => (m.rank || 0) >= 3);
       if (canConvertDoubleToTrio) {
         neededDoubles -= 1;
-        neededSingles += 2; // 1 + 2 = 3 (שלישייה)
+        neededSingles += 2;
+      } else if (neededDoubles === 0) {
+        warnings.push('נותר חותר יחיד בלבד — חובה לצרף לבן זוג או קבוצה (אין יציאה לבד למים).');
       } else {
-        warnings.push('מספר משתתפים אי-זוגי: נותר חותר 1 ליחיד — חובה לצרף לשלישייה או לבן זוג נוסף (אין יציאה לבד).');
+        warnings.push('מומלץ שהחותר בקיאק היחיד יצטרף צמוד לקיאק הזוגי כשני כלי שיט יחד.');
       }
     }
 
