@@ -10,6 +10,7 @@ import {
 } from '../../types/whatsapp';
 import {
   classifySelectedOptions,
+  cleanWhatsAppPhone,
   extractPhoneFromVoterId,
   namesMatch,
   normalizePhone,
@@ -29,7 +30,8 @@ export const mappingBelongsToClub = (
   pollVoterIds: Set<string>
 ): boolean => {
   if (getMappingUidForClub(m, clubId)) return true;
-  if (pollVoterIds.has(m.voterId)) return true;
+  const aliases = m.aliasVoterIds || [m.voterId];
+  if (aliases.some((id) => pollVoterIds.has(id))) return true;
   if (!linkedGroups.length) return true;
   const groups = m.groups || [];
   return groups.some((g) => {
@@ -57,7 +59,7 @@ export const findAutoSyncCandidates = (
   mappings.forEach((m) => {
     const linkedUid = getMappingUidForClub(m, clubId);
     if (linkedUid && people.some((p) => p.id === linkedUid)) return;
-    const norm = normalizePhone(m.phone || extractPhoneFromVoterId(m.voterId));
+    const norm = cleanWhatsAppPhone(m.phone, m.voterId);
     if (norm) {
       const matches = peopleByPhone.get(norm) || [];
       if (matches.length === 1) {
@@ -81,10 +83,27 @@ export const detectVoteChanges = (
   nextVotes: PollVote[],
   resolvedVoters: ResolvedVoter[],
   rules: KeywordRule[],
-  pollId: string
+  pollId: string,
+  mappings: WhatsAppMemberMapping[] = [],
+  people: Person[] = [],
+  clubId?: ClubID
 ): VoteChangeAlert[] => {
   const latestNext = deduplicateLatestVotes(nextVotes);
   const voterLookup = new Map(resolvedVoters.map((v) => [v.voterId, v]));
+  const mappingByVoter = new Map<string, WhatsAppMemberMapping>();
+  const mappingByPhone = new Map<string, WhatsAppMemberMapping>();
+  mappings.forEach((m) => {
+    (m.aliasVoterIds || [m.voterId]).forEach((id) => mappingByVoter.set(id, m));
+    const norm = cleanWhatsAppPhone(m.phone, m.voterId);
+    if (norm) mappingByPhone.set(norm, m);
+  });
+  const peopleById = new Map(people.map((p) => [p.id, p]));
+  const peopleByPhone = new Map<string, Person>();
+  people.forEach((p) => {
+    const norm = normalizePhone(p.phone);
+    if (norm) peopleByPhone.set(norm, p);
+  });
+
   const alerts: VoteChangeAlert[] = [];
 
   latestNext.forEach((next) => {
@@ -95,6 +114,11 @@ export const detectVoteChanges = (
     if (!prev && next.selectedOptions.length === 0) return;
 
     const resolved = voterLookup.get(next.voter);
+    const cleanPhone = cleanWhatsAppPhone(next.phone, next.voter) || extractPhoneFromVoterId(next.voter);
+    const mapping = resolved?.mapping || mappingByVoter.get(next.voter) || (cleanPhone ? mappingByPhone.get(cleanPhone) : undefined);
+    const linkedUid = mapping ? getMappingUidForClub(mapping, clubId) : undefined;
+    const person = resolved?.person || (linkedUid ? peopleById.get(linkedUid) : undefined) || (cleanPhone ? peopleByPhone.get(cleanPhone) : undefined);
+
     const prevClass = prev
       ? classifySelectedOptions(prev.selectedOptions, rules)
       : { intent: 'UNVOTED' as PollIntent };
@@ -104,9 +128,9 @@ export const detectVoteChanges = (
       id: `${pollId}_${next.voter}_${next.timestampMs || Date.now()}`,
       pollId,
       voterId: next.voter,
-      displayName: resolved?.displayName || next.pushName || next.voter.split('@')[0],
-      profilePicUrl: resolved?.profilePicUrl || next.profilePicUrl,
-      personId: resolved?.person?.id,
+      displayName: resolved?.displayName || person?.name || next.pushName || mapping?.pushName || cleanPhone || next.voter.split('@')[0],
+      profilePicUrl: resolved?.profilePicUrl || next.profilePicUrl || mapping?.profilePicUrl || person?.photoURL,
+      personId: person?.id,
       previousOptions: prev?.selectedOptions || [],
       newOptions: next.selectedOptions,
       previousIntent: prevClass.intent,

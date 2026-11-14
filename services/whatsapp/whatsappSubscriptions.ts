@@ -68,7 +68,8 @@ export const subscribeToPollVotes = (
           profilePicUrl: data.profilePicUrl || undefined,
           phone: data.phone || undefined,
           selectedOptions: extractOptionLabels(data.selectedOptions),
-          timestampMs: toTimestampMs(data.timestamp),
+          timestampMs: toTimestampMs(data.interractedAt) || toTimestampMs(data.timestamp),
+          interractedAtMs: toTimestampMs(data.interractedAt) || undefined,
         };
       });
       onData(parsed);
@@ -175,7 +176,8 @@ export const fetchRecentPollVotesForClub = async (pollIds: string[]): Promise<Po
         profilePicUrl: data.profilePicUrl || undefined,
         phone: data.phone || undefined,
         selectedOptions: extractOptionLabels(data.selectedOptions),
-        timestampMs: toTimestampMs(data.timestamp),
+        timestampMs: toTimestampMs(data.interractedAt) || toTimestampMs(data.timestamp),
+        interractedAtMs: toTimestampMs(data.interractedAt) || undefined,
       };
     });
   } catch {

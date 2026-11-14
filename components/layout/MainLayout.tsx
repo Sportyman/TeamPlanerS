@@ -29,7 +29,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
   const location = useLocation();
   const initialLoadRef = useRef(true);
 
-  useEffect(() => { setIsMenuOpen(false); }, [location]);
+  useEffect(() => { setIsMenuOpen(false); setIsNotifOpen(false); }, [location]);
 
   useEffect(() => {
     if (user && user.isAdmin && activeClub) {
@@ -95,23 +95,29 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative flex justify-between h-16 items-center">
             <div className="flex items-center gap-2">
-              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors"><Menu size={28} /></button>
+              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors" aria-label="תפריט"><Menu size={28} /></button>
               <div className="relative">
-                <button onClick={() => { setIsNotifOpen(!isNotifOpen); if (!isNotifOpen) clearUnread(); }} className="p-2 text-slate-400 hover:text-brand-600 transition-colors relative">
+                <button onClick={() => { setIsNotifOpen(!isNotifOpen); if (!isNotifOpen) clearUnread(); }} className="p-2 text-slate-400 hover:text-brand-600 transition-colors relative" aria-label="התראות">
                   <Bell size={24} />
                   {unreadCount > 0 && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white shadow-sm animate-bounce" />}
                 </button>
                 {isNotifOpen && (
-                  <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 z-[70]">
-                    <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center"><span className="text-xs font-black text-slate-400 uppercase tracking-widest">התראות</span><button onClick={() => setIsNotifOpen(false)}><X size={14} className="text-slate-300" /></button></div>
-                    <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
-                      {notifications.length === 0 ? <div className="p-8 text-center text-slate-400 text-xs">אין התראות חדשות</div> : notifications.map((n) => (
-                        <div key={n.id} className="p-4 hover:bg-slate-50 transition-colors"><p className="text-sm font-bold text-slate-700 leading-tight">{n.message}</p><div className="flex items-center gap-1 mt-1 text-[10px] text-slate-400 font-medium"><Clock size={10} /> {new Date(n.timestamp).toLocaleTimeString('he-IL')}</div></div>
-                      ))}
+                  <>
+                    <div className="fixed inset-0 z-[65]" onClick={() => setIsNotifOpen(false)} aria-hidden="true" />
+                    <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 z-[70]">
+                      <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center"><span className="text-xs font-black text-slate-400 uppercase tracking-widest">התראות</span><button onClick={() => setIsNotifOpen(false)} aria-label="סגור התראות"><X size={14} className="text-slate-300" /></button></div>
+                      <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
+                        {notifications.length === 0 ? <div className="p-8 text-center text-slate-400 text-xs">אין התראות חדשות</div> : notifications.map((n) => (
+                          <div key={n.id} className="p-4 hover:bg-slate-50 transition-colors"><p className="text-sm font-bold text-slate-700 leading-tight">{n.message}</p><div className="flex items-center gap-1 mt-1 text-[10px] text-slate-400 font-medium"><Clock size={10} /> {new Date(n.timestamp).toLocaleTimeString('he-IL')}</div></div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
+              <button onClick={() => navigate('/')} className="p-2 text-slate-400 hover:text-brand-600 transition-colors" title="דף הבית" aria-label="דף הבית">
+                <Home size={22} />
+              </button>
             </div>
 
             <button

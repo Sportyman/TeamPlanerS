@@ -1,3 +1,3 @@
-export const APP_VERSION = '6.3.8';
+export const APP_VERSION = '6.3.9';
 export const LAST_COMMIT_MESSAGE =
-  'feat(attendance,equipment): put checked attendees first with expandable divider, add inline role/tag quick edit, add UNASSIGNED (*) with cross-poll role inference, and fix equipment persistence & defaults';
+  'fix(whatsapp,ui): rename non-attending divider, add outside-click close & Home button in navbar, fix deleted/declining poll attendance sync, dedupe @lid/@c.us members, and resolve live vote alert names/avatars';

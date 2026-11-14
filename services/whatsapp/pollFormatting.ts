@@ -40,6 +40,17 @@ export const extractPhoneFromVoterId = (voterId: string): string | undefined => 
   return normalized.length >= 9 ? normalized : undefined;
 };
 
+export const cleanWhatsAppPhone = (phone?: string, voterId?: string): string | undefined => {
+  if (phone) {
+    const digits = phone.replace(/\D/g, '');
+    const lidUser = voterId?.endsWith('@lid') ? voterId.split('@')[0] : '';
+    if (digits && digits !== lidUser && digits.length >= 9 && digits.length <= 13) {
+      return normalizePhone(digits);
+    }
+  }
+  return voterId ? extractPhoneFromVoterId(voterId) : undefined;
+};
+
 export const sanitizeDocId = (rawId: string): string =>
   rawId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 120);
 

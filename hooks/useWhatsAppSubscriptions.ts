@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ClubID, Person } from '../types';
 import {
   ClubWhatsAppConfig,
   PollEvent,
@@ -10,6 +11,7 @@ import {
 import { DEFAULT_KEYWORD_RULES } from '../config/whatsappDefaults';
 import { deduplicateLatestVotes } from '../services/whatsapp/pollResolver';
 import { detectVoteChanges } from '../services/whatsapp/pollMatching';
+import { enrichVoteAlertsWithContacts, isNumericFallbackName } from '../services/whatsapp/mappingDedup';
 import {
   fetchRecentPollVotesForClub,
   subscribeToClubWhatsAppConfig,
@@ -20,11 +22,12 @@ import {
 
 interface UseWhatsAppSubscriptionsParams {
   userId?: string;
-  activeClub: string | null;
+  activeClub: ClubID | null;
+  people: Person[];
   onNotify: (msg: string, type?: 'INFO' | 'SUCCESS' | 'WARN') => void;
 }
 
-export const useWhatsAppSubscriptions = ({ userId, activeClub, onNotify }: UseWhatsAppSubscriptionsParams) => {
+export const useWhatsAppSubscriptions = ({ userId, activeClub, people, onNotify }: UseWhatsAppSubscriptionsParams) => {
   const [polls, setPolls] = useState<PollEvent[]>([]);
   const [votes, setVotes] = useState<PollVote[]>([]);
   const [historicalVotes, setHistoricalVotes] = useState<PollVote[]>([]);
@@ -33,6 +36,7 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, onNotify }: UseWh
     clubId: activeClub || '', linkedGroups: [], keywordRules: DEFAULT_KEYWORD_RULES, pollColors: {},
   });
   const [selectedPollId, setSelectedPollId] = useState<string>('');
+  const [votesLoadedPollId, setVotesLoadedPollId] = useState<string | null>(null);
   const [voteAlerts, setVoteAlerts] = useState<VoteChangeAlert[]>([]);
   const [recentChangedVoters, setRecentChangedVoters] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -42,9 +46,15 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, onNotify }: UseWh
   const baselineVotesRef = useRef<Map<string, PollVote>>(new Map());
   const initializedPollRef = useRef<string | null>(null);
   const resolvedVotersRef = useRef<ResolvedVoter[]>([]);
+  const mappingsRef = useRef<WhatsAppMemberMapping[]>([]);
+  const peopleRef = useRef<Person[]>(people);
+
+  mappingsRef.current = mappings;
+  peopleRef.current = people;
 
   useEffect(() => {
     setSelectedPollId('');
+    setVotesLoadedPollId(null);
     setHistoricalVotes([]);
     setVoteAlerts([]);
     setRecentChangedVoters(new Set());
@@ -105,14 +115,16 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, onNotify }: UseWh
   }, [relevantPolls, clubConfig.activePollId, selectedPollId]);
 
   useEffect(() => {
-    if (!userId || !selectedPollId) { setVotes([]); return; }
+    if (!userId || !selectedPollId) { setVotes([]); setVotesLoadedPollId(null); return; }
     initializedPollRef.current = null;
     baselineVotesRef.current = new Map();
+    setVotesLoadedPollId(null);
 
     const unsubVotes = subscribeToPollVotes(
       selectedPollId,
       (nextVotes) => {
         const latestList = deduplicateLatestVotes(nextVotes);
+        setVotesLoadedPollId(selectedPollId);
         if (initializedPollRef.current !== selectedPollId) {
           baselineVotesRef.current = new Map(latestList.map((v) => [v.voter, v]));
           initializedPollRef.current = selectedPollId;
@@ -120,7 +132,10 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, onNotify }: UseWh
           return;
         }
         const rules = clubConfig.keywordRules?.length ? clubConfig.keywordRules : DEFAULT_KEYWORD_RULES;
-        const changes = detectVoteChanges(baselineVotesRef.current, nextVotes, resolvedVotersRef.current, rules, selectedPollId);
+        const changes = detectVoteChanges(
+          baselineVotesRef.current, nextVotes, resolvedVotersRef.current, rules, selectedPollId,
+          mappingsRef.current, peopleRef.current, activeClub || undefined
+        );
         if (changes.length > 0) {
           setVoteAlerts((prev) => [...changes, ...prev].slice(0, 25));
           setRecentChangedVoters((prev) => {
@@ -129,8 +144,18 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, onNotify }: UseWh
             return nextSet;
           });
           changes.forEach((c) => {
-            const newText = c.newOptions.length ? c.newOptions.join(', ') : 'ביטל הצבעה';
-            onNotify(`עדכון בסקר: ${c.displayName} בחר/ה "${newText}"`, 'WARN');
+            const emitToast = (resolvedAlert: VoteChangeAlert) => {
+              const newText = resolvedAlert.newOptions.length ? resolvedAlert.newOptions.join(', ') : 'ביטל הצבעה';
+              onNotify(`עדכון בסקר: ${resolvedAlert.displayName} בחר/ה "${newText}"`, 'WARN');
+            };
+            if (isNumericFallbackName(c.displayName)) {
+              setTimeout(() => {
+                const enriched = enrichVoteAlertsWithContacts([c], mappingsRef.current, peopleRef.current)[0] || c;
+                emitToast(enriched);
+              }, 700);
+            } else {
+              emitToast(c);
+            }
           });
         }
         baselineVotesRef.current = new Map(latestList.map((v) => [v.voter, v]));
@@ -139,13 +164,13 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, onNotify }: UseWh
       (err) => setError(err.message)
     );
     return () => unsubVotes();
-  }, [userId, selectedPollId, clubConfig.keywordRules, onNotify, retryKey]);
+  }, [userId, activeClub, selectedPollId, clubConfig.keywordRules, onNotify, retryKey]);
 
   const setResolvedVotersRef = useCallback((voters: ResolvedVoter[]) => { resolvedVotersRef.current = voters; }, []);
 
   return {
-    polls, relevantPolls, votes, historicalVotes, mappings, clubConfig, selectedPollId, setSelectedPollId,
-    voteAlerts, setVoteAlerts, recentChangedVoters, isLoading, error,
+    polls, relevantPolls, votes, votesLoadedPollId, historicalVotes, mappings, clubConfig, selectedPollId,
+    setSelectedPollId, voteAlerts, setVoteAlerts, recentChangedVoters, isLoading, error,
     retry: () => setRetryKey((k) => k + 1), setResolvedVotersRef,
   };
 };

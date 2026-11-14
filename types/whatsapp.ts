@@ -39,11 +39,13 @@ export interface PollVote {
   phone?: string;
   selectedOptions: string[];
   timestampMs: number;
+  interractedAtMs?: number;
 }
 
 export interface WhatsAppMemberMapping {
   id: string;
   voterId: string;
+  aliasVoterIds?: string[];
   pushName?: string;
   profilePicUrl?: string;
   phone?: string;

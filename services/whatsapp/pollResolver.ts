@@ -12,7 +12,7 @@ import {
 import { DEFAULT_KEYWORD_RULES } from '../../config/whatsappDefaults';
 import {
   classifySelectedOptions,
-  extractPhoneFromVoterId,
+  cleanWhatsAppPhone,
   namesMatch,
   normalizePhone,
   sanitizeDocId,
@@ -39,10 +39,24 @@ export const resolvePollSummary = (params: {
 }): ResolvedPollSummary => {
   const { poll, votes, mappings, people, profilePhotos, config, recentlyChangedVoterIds } = params;
   const rules = config.keywordRules?.length ? config.keywordRules : DEFAULT_KEYWORD_RULES;
-  const latestVotes = deduplicateLatestVotes(votes);
 
   const mappingByVoter = new Map<string, WhatsAppMemberMapping>();
-  mappings.forEach((m) => mappingByVoter.set(m.voterId, m));
+  const mappingByPhone = new Map<string, WhatsAppMemberMapping>();
+  mappings.forEach((m) => {
+    (m.aliasVoterIds || [m.voterId]).forEach((id) => mappingByVoter.set(id, m));
+    const p = cleanWhatsAppPhone(m.phone, m.voterId);
+    if (p && !mappingByPhone.has(p)) mappingByPhone.set(p, m);
+  });
+
+  // Deduplicate latest votes by canonical mapping voterId when aliases exist
+  const rawLatest = deduplicateLatestVotes(votes);
+  const canonicalVoteMap = new Map<string, PollVote>();
+  rawLatest.forEach((v) => {
+    const key = mappingByVoter.get(v.voter)?.voterId || v.voter;
+    const prev = canonicalVoteMap.get(key);
+    if (!prev || v.timestampMs >= prev.timestampMs) canonicalVoteMap.set(key, v);
+  });
+  const latestVotes = Array.from(canonicalVoteMap.values());
 
   const peopleById = new Map<string, Person>();
   const peopleByPhone = new Map<string, Person>();
@@ -60,13 +74,17 @@ export const resolvePollSummary = (params: {
   const attendingSet = new Set<string>();
 
   const resolvedVoters: ResolvedVoter[] = latestVotes.map((vote) => {
-    const mapping = mappingByVoter.get(vote.voter);
-    const rawPhone = vote.phone || mapping?.phone || extractPhoneFromVoterId(vote.voter);
+    const rawPhoneFromVote = cleanWhatsAppPhone(vote.phone, vote.voter);
+    const mapping = mappingByVoter.get(vote.voter) || (rawPhoneFromVote ? mappingByPhone.get(rawPhoneFromVote) : undefined);
+    const rawPhone = rawPhoneFromVote || cleanWhatsAppPhone(mapping?.phone, mapping?.voterId);
     const normPhone = normalizePhone(rawPhone);
     const clubUid = mapping ? getMappingUidForClub(mapping, config.clubId) : undefined;
     const manualPerson = clubUid ? peopleById.get(clubUid) : undefined;
     const phonePerson = normPhone ? peopleByPhone.get(normPhone) : undefined;
-    const virtualWaPerson = peopleById.get(`wa_${sanitizeDocId(vote.voter).slice(0, 48)}`);
+    const aliasIds = mapping?.aliasVoterIds || [vote.voter];
+    const virtualWaPerson = aliasIds
+      .map((id) => peopleById.get(`wa_${sanitizeDocId(id).slice(0, 48)}`))
+      .find(Boolean);
     const namePerson = !manualPerson && !phonePerson && (vote.pushName || mapping?.pushName)
       ? people.find((p) => namesMatch(vote.pushName || mapping?.pushName, p.name))
       : undefined;

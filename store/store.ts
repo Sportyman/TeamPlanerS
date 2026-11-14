@@ -32,7 +32,18 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'etgarim-storage',
-      version: 47.0, 
+      version: 48.0,
+      migrate: (persistedState: unknown, version: number) => {
+        const state = persistedState as Partial<AppState> | null;
+        if (state && version < 48 && state.sessions) {
+          const cleanedSessions: typeof state.sessions = {};
+          Object.entries(state.sessions).forEach(([clubId, sess]) => {
+            cleanedSessions[clubId] = { ...sess, presentPersonIds: [], teams: [] };
+          });
+          return { ...state, sessions: cleanedSessions };
+        }
+        return state;
+      },
       onRehydrateStorage: () => (state) => {
           if (state) {
               state.setHasHydrated(true);

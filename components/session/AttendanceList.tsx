@@ -158,7 +158,7 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
             <button type="button" onClick={() => setShowUnchecked((v) => !v)} className="w-full flex items-center gap-3 py-1 text-xs font-bold text-slate-500 hover:text-slate-800 group">
               <div className="h-px bg-slate-200 flex-1 group-hover:bg-slate-300" />
               <span className="flex items-center gap-1 whitespace-nowrap tabular-nums">
-                {isUncheckedVisible ? `הסתר משתתפים נוספים (${uncheckedPeople.length})` : `הצג עוד משתתפים (${uncheckedPeople.length})`}
+                {isUncheckedVisible ? `הסתר משתתפים שלא אישרו הגעה (${uncheckedPeople.length})` : `משתתפים שלא אישרו הגעה (${uncheckedPeople.length})`}
                 {isUncheckedVisible ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               </span>
               <div className="h-px bg-slate-200 flex-1 group-hover:bg-slate-300" />
