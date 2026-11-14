@@ -105,3 +105,31 @@ export const classifySelectedOptions = (
   const results = selectedOptions.map((opt) => classifyOption(opt, rules));
   return results.find((r) => r.intent === 'ATTENDING') || results.find((r) => r.intent === 'MAYBE') || results[0];
 };
+
+export const extractOptionLabels = (raw: unknown): string[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (typeof item === 'string') return item.trim();
+      if (typeof item === 'object' && item !== null) {
+        const obj = item as { name?: unknown; title?: unknown; optionName?: unknown; label?: unknown };
+        const candidate = obj.name ?? obj.title ?? obj.optionName ?? obj.label;
+        return typeof candidate === 'string' ? candidate.trim() : '';
+      }
+      return String(item || '').trim();
+    })
+    .filter(Boolean);
+};
+
+export const formatFirestoreErrorMessage = (raw: string): string => {
+  try {
+    const parsed = JSON.parse(raw) as { error?: string; path?: string };
+    if (parsed?.error) {
+      return parsed.path ? `${parsed.path}: ${parsed.error}` : parsed.error;
+    }
+  } catch {
+    // plain string
+  }
+  return raw;
+};
+

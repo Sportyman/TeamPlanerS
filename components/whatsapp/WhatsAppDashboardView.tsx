@@ -8,6 +8,7 @@ import { VoteAlertsBanner } from './VoteAlertsBanner';
 import { PollSummaryTab } from './PollSummaryTab';
 import { VoterMappingTab } from './VoterMappingTab';
 import { WhatsAppSettingsTab } from './WhatsAppSettingsTab';
+import { formatFirestoreErrorMessage } from '../../services/whatsapp/pollFormatting';
 import { ArrowRight, Calendar, Download, RefreshCw } from 'lucide-react';
 
 type TabId = 'SUMMARY' | 'MAPPING' | 'SETTINGS';
@@ -52,8 +53,11 @@ export const WhatsAppDashboardView: React.FC = () => {
       </div>
 
       {error && (
-        <div className="border border-red-200 bg-red-50 rounded-xl p-4 flex items-center justify-between gap-4 text-sm text-red-900">
-          <span>שגיאה בטעינת נתוני הסקרים מ-Firestore.</span>
+        <div className="border border-red-200 bg-red-50 rounded-xl p-4 flex items-center justify-between gap-4 text-sm text-red-900 flex-wrap">
+          <div className="min-w-0">
+            <div className="font-bold">שגיאה בטעינת נתוני הסקרים מ-Firestore.</div>
+            <div className="text-xs text-red-700 font-mono mt-0.5 break-all" dir="ltr">{formatFirestoreErrorMessage(error)}</div>
+          </div>
           <button type="button" onClick={retry} className="px-3 py-1.5 rounded-lg bg-white border border-red-200 text-xs font-bold flex items-center gap-1">
             <RefreshCw size={14} /> נסה שוב
           </button>

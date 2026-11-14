@@ -1,3 +1,3 @@
-export const APP_VERSION = '6.3.2';
+export const APP_VERSION = '6.3.3';
 export const LAST_COMMIT_MESSAGE =
-  'feat(whatsapp): integrate live poll sync, role-aware attendance loading, avatar/LID mapping, vote-change alerts, and poll color/date badges';
+  'fix(whatsapp): store club whatsapp config on clubs collection to match existing Firestore rules and parse object-shaped poll options';

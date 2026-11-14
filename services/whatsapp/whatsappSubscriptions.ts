@@ -16,8 +16,14 @@ import {
   WhatsAppMemberMapping,
 } from '../../types/whatsapp';
 import { DEFAULT_KEYWORD_RULES } from '../../config/whatsappDefaults';
-import { formatHebrewPollDate, getPollColorToken, toTimestampMs } from './pollFormatting';
+import {
+  extractOptionLabels,
+  formatHebrewPollDate,
+  getPollColorToken,
+  toTimestampMs,
+} from './pollFormatting';
 import { handleFirestoreError, OperationType } from './firestoreError';
+import { addLog } from '../syncService';
 
 export const subscribeToPollsEvents = (
   pollColors: Record<string, string> | undefined,
@@ -38,9 +44,9 @@ export const subscribeToPollsEvents = (
           return {
             id: d.id,
             pollId,
-            group: String(data.group || 'קבוצה כללית'),
+            group: String(data.groupName || data.group || 'קבוצה כללית'),
             question: String(data.question || 'סקר ללא כותרת'),
-            options: Array.isArray(data.options) ? data.options.map(String) : [],
+            options: extractOptionLabels(data.options),
             createdAtMs,
             displayDate,
             displayTime,
@@ -79,7 +85,7 @@ export const subscribeToPollVotes = (
           pushName: data.pushName || data.voterName || undefined,
           profilePicUrl: data.profilePicUrl || undefined,
           phone: data.phone || undefined,
-          selectedOptions: Array.isArray(data.selectedOptions) ? data.selectedOptions.map(String) : [],
+          selectedOptions: extractOptionLabels(data.selectedOptions),
           timestampMs: toTimestampMs(data.timestamp),
         };
       });
@@ -133,40 +139,39 @@ export const subscribeToWhatsAppMembers = (
 export const subscribeToClubWhatsAppConfig = (
   clubId: ClubID,
   onData: (config: ClubWhatsAppConfig) => void,
-  onError: (err: Error) => void
+  _onError: (err: Error) => void
 ): Unsubscribe => {
-  const path = `whatsapp_club_configs/${clubId}`;
+  const defaultConfig: ClubWhatsAppConfig = {
+    clubId,
+    linkedGroups: [],
+    keywordRules: DEFAULT_KEYWORD_RULES,
+    pollColors: {},
+  };
+
   return onSnapshot(
-    doc(db, 'whatsapp_club_configs', clubId),
+    doc(db, 'clubs', clubId),
     (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
+      const data = snap.exists() ? snap.data() : null;
+      const cfg = data?.whatsappConfig;
+      if (cfg && typeof cfg === 'object') {
         onData({
           clubId,
-          linkedGroups: Array.isArray(data.linkedGroups) ? data.linkedGroups : [],
+          linkedGroups: Array.isArray(cfg.linkedGroups) ? cfg.linkedGroups : [],
           keywordRules:
-            Array.isArray(data.keywordRules) && data.keywordRules.length > 0
-              ? data.keywordRules
+            Array.isArray(cfg.keywordRules) && cfg.keywordRules.length > 0
+              ? cfg.keywordRules
               : DEFAULT_KEYWORD_RULES,
-          pollColors: data.pollColors || {},
-          activePollId: data.activePollId || undefined,
-          updatedAt: data.updatedAt || undefined,
+          pollColors: cfg.pollColors || {},
+          activePollId: cfg.activePollId || undefined,
+          updatedAt: cfg.updatedAt || undefined,
         });
       } else {
-        onData({
-          clubId,
-          linkedGroups: [],
-          keywordRules: DEFAULT_KEYWORD_RULES,
-          pollColors: {},
-        });
+        onData(defaultConfig);
       }
     },
     (error) => {
-      try {
-        handleFirestoreError(error, OperationType.GET, path);
-      } catch (wrapped) {
-        onError(wrapped as Error);
-      }
+      addLog(`Club WhatsApp config fallback (${clubId}): ${error.message}`, 'WARN');
+      onData(defaultConfig);
     }
   );
 };

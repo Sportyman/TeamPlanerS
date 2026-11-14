@@ -5,6 +5,7 @@ import { PollEvent, ResolvedPollSummary, VoteChangeAlert } from '../../types/wha
 import { PollSelectorDropdown } from './PollSelectorDropdown';
 import { VoteAlertsBanner } from './VoteAlertsBanner';
 import { VoterLinkModal } from './VoterLinkModal';
+import { formatFirestoreErrorMessage } from '../../services/whatsapp/pollFormatting';
 import { AlertCircle, Download, MessageSquare, RefreshCw, Settings2, UserCheck } from 'lucide-react';
 
 interface SessionPollBarProps {
@@ -44,10 +45,13 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
 
   if (error) {
     return (
-      <div className="border border-red-200 bg-red-50/60 rounded-2xl p-4 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2.5 text-sm text-red-900">
-          <AlertCircle size={18} className="text-red-600 shrink-0" />
-          <span>לא ניתן לטעון סקרי וואטסאפ כרגע. בדוק את הרשאות Firestore או החיבור.</span>
+      <div className="border border-red-200 bg-red-50/60 rounded-2xl p-4 flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-start gap-2.5 text-sm text-red-900 min-w-0">
+          <AlertCircle size={18} className="text-red-600 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <div className="font-bold">לא ניתן לטעון סקרי וואטסאפ כרגע. בדוק את הרשאות Firestore או החיבור.</div>
+            <div className="text-xs text-red-700 font-mono mt-0.5 break-all" dir="ltr">{formatFirestoreErrorMessage(error)}</div>
+          </div>
         </div>
         <button type="button" onClick={onRetry} className="px-3 py-2 rounded-lg bg-white border border-red-200 text-xs font-bold text-red-800 hover:bg-red-100 flex items-center gap-1.5 whitespace-nowrap">
           <RefreshCw size={14} /> <span>נסה שוב</span>

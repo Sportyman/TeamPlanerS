@@ -48,17 +48,25 @@ export const unlinkWhatsAppMember = async (voterId: string): Promise<void> => {
 };
 
 export const saveClubWhatsAppConfig = async (config: ClubWhatsAppConfig): Promise<void> => {
-  const path = `whatsapp_club_configs/${config.clubId}`;
+  const path = `clubs/${config.clubId}`;
+  const cleanRules = config.keywordRules.slice(0, 80).map((r) =>
+    r.role
+      ? { id: r.id, keyword: r.keyword, intent: r.intent, role: r.role }
+      : { id: r.id, keyword: r.keyword, intent: r.intent }
+  );
+
   try {
     await setDoc(
-      doc(db, 'whatsapp_club_configs', config.clubId),
+      doc(db, 'clubs', config.clubId),
       {
-        clubId: config.clubId,
-        linkedGroups: config.linkedGroups.slice(0, 30),
-        keywordRules: config.keywordRules.slice(0, 80),
-        pollColors: config.pollColors || {},
-        activePollId: config.activePollId || null,
-        updatedAt: new Date().toISOString(),
+        whatsappConfig: {
+          clubId: config.clubId,
+          linkedGroups: config.linkedGroups.slice(0, 30),
+          keywordRules: cleanRules,
+          pollColors: config.pollColors || {},
+          activePollId: config.activePollId || null,
+          updatedAt: new Date().toISOString(),
+        },
       },
       { merge: true }
     );
