@@ -6,6 +6,7 @@ import { resolvePollSummary } from '../services/whatsapp/pollResolver';
 import { findAutoSyncCandidates, getMappingUidForClub, mappingBelongsToClub } from '../services/whatsapp/pollMatching';
 import { mergeClubRosterWithWhatsApp } from '../services/whatsapp/rosterMerge';
 import { deduplicateWhatsAppMappings, enrichVoteAlertsWithContacts } from '../services/whatsapp/mappingDedup';
+import { collectAvailableGroups, runClubDuplicateCleanup } from '../services/whatsapp/clubDedupSync';
 import { clearDeletedPollAttendance, reconcileInitialPollAttendance } from '../services/whatsapp/pollAttendanceSync';
 import {
   autoLinkPhoneMatches, createClubGuestFromVoter, importWhatsAppRosterToClub,
@@ -102,16 +103,15 @@ export const useWhatsAppPolls = () => {
     }).catch(() => {});
   }, [activeClub, user, syncCandidates, addNotification]);
 
-  const availableGroups = useMemo(() => {
-    const set = new Set<string>();
-    polls.forEach((p) => { if (p.group) set.add(p.group); });
-    mappings.forEach((m) => {
-      const groups = (m.groups || []).filter(Boolean);
-      const named = groups.filter((g) => !g.endsWith('@g.us'));
-      (named.length > 0 ? named : groups).forEach((g) => set.add(g));
-    });
-    return Array.from(set);
-  }, [polls, mappings]);
+  useEffect(() => {
+    if (!activeClub || !user || user.isDev || clubPeople.length < 2) return;
+    runClubDuplicateCleanup({
+      clubId: activeClub, clubPeople, allPeople: useAppStore.getState().people,
+      mappings: clubMappings, attemptedSet: attemptedAutoLinkRef.current, updatedBy: user.email || user.uid,
+    }).then((next) => { if (next) setPeople(next); }).catch(() => {});
+  }, [activeClub, user, clubPeople, clubMappings, setPeople]);
+
+  const availableGroups = useMemo(() => collectAvailableGroups(polls, mappings), [polls, mappings]);
 
   const linkClubGroup = useCallback(async (groupName: string) => {
     if (!activeClub || !groupName.trim()) return;

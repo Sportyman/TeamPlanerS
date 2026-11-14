@@ -2,7 +2,8 @@ import { db } from '../../firebase';
 import { deleteField, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { ClubID, Gender, Person, Role } from '../../types';
 import { ClubWhatsAppConfig, MatchCandidate, WhatsAppMemberMapping } from '../../types/whatsapp';
-import { extractPhoneFromVoterId, sanitizeDocId } from './pollFormatting';
+import { sanitizeDocId } from './pollFormatting';
+import { getMappingCanonicalPhone } from './mappingDedup';
 import { handleFirestoreError, OperationType } from './firestoreError';
 import { addPersonToClubCloud, addLog } from '../syncService';
 
@@ -129,33 +130,22 @@ export const importWhatsAppRosterToClub = async (
   const created: Person[] = [];
   for (const item of entries) {
     const { mapping, role, isSkipper } = item;
-    const phone = mapping.phone || extractPhoneFromVoterId(mapping.voterId) || '';
+    const phone = getMappingCanonicalPhone(mapping) || '';
     const name = (mapping.pushName || phone || mapping.voterId.split('@')[0]).trim();
     const personId = `wa_${sanitizeDocId(mapping.voterId).slice(0, 48)}`;
     const person: Person = {
-      id: personId,
-      clubId,
-      name,
-      gender: Gender.MALE,
-      role,
+      id: personId, clubId, name, gender: Gender.MALE, role,
       rank: role === Role.INSTRUCTOR ? 5 : role === Role.VOLUNTEER ? 4 : 2,
       isSkipper: Boolean(isSkipper || role === Role.INSTRUCTOR),
-      phone,
-      photoURL: mapping.profilePicUrl,
-      notes: 'יובא מקבוצת וואטסאפ',
-      tags: ['וואטסאפ'],
+      phone, photoURL: mapping.profilePicUrl, notes: 'יובא מקבוצת וואטסאפ', tags: ['וואטסאפ'],
     };
     await addPersonToClubCloud(clubId, person);
-    await saveWhatsAppMemberMapping({
-      voterId: mapping.voterId,
-      pushName: name,
-      profilePicUrl: mapping.profilePicUrl,
-      phone,
-      uid: person.id,
-      clubId,
-      matchedBy: 'BOT_SYNC',
-      updatedBy,
-    });
+    for (const aliasId of mapping.aliasVoterIds || [mapping.voterId]) {
+      await saveWhatsAppMemberMapping({
+        voterId: aliasId, pushName: name, profilePicUrl: mapping.profilePicUrl,
+        phone, uid: person.id, clubId, matchedBy: 'BOT_SYNC', updatedBy,
+      });
+    }
     created.push(person);
   }
   return created;

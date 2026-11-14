@@ -46,9 +46,11 @@ export const PeopleManagementView: React.FC<PeopleManagementViewProps> = ({
   }, [effectiveClubPeople, people, search]);
 
   const unlinkedMappings = useMemo(() => {
-    const linkedIds = new Set(people.map((p) => p.id));
-    return mappings.filter((m) => !linkedIds.has(`wa_${m.voterId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 48)}`));
-  }, [mappings, people]);
+    const virtualIds = new Set(effectiveClubPeople.filter((p) => p.isWhatsAppGroupOnly).map((p) => p.id));
+    return mappings.filter((m) =>
+      (m.aliasVoterIds || [m.voterId]).some((id) => virtualIds.has(`wa_${id.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 48)}`))
+    );
+  }, [mappings, effectiveClubPeople]);
 
   const handlePromote = async (person: Person) => {
     await addPersonToClubCloud(activeClub, { ...person, isWhatsAppGroupOnly: false });

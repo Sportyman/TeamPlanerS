@@ -18,6 +18,8 @@ import {
   sanitizeDocId,
 } from './pollFormatting';
 import { getMappingUidForClub } from './pollMatching';
+import { getPersonCanonicalPhone, getPicKey } from './personDedup';
+import { getMappingCanonicalPhone } from './mappingDedup';
 
 export const deduplicateLatestVotes = (votes: PollVote[]): PollVote[] => {
   const map = new Map<string, PollVote>();
@@ -44,11 +46,10 @@ export const resolvePollSummary = (params: {
   const mappingByPhone = new Map<string, WhatsAppMemberMapping>();
   mappings.forEach((m) => {
     (m.aliasVoterIds || [m.voterId]).forEach((id) => mappingByVoter.set(id, m));
-    const p = cleanWhatsAppPhone(m.phone, m.voterId);
+    const p = getMappingCanonicalPhone(m);
     if (p && !mappingByPhone.has(p)) mappingByPhone.set(p, m);
   });
 
-  // Deduplicate latest votes by canonical mapping voterId when aliases exist
   const rawLatest = deduplicateLatestVotes(votes);
   const canonicalVoteMap = new Map<string, PollVote>();
   rawLatest.forEach((v) => {
@@ -60,10 +61,13 @@ export const resolvePollSummary = (params: {
 
   const peopleById = new Map<string, Person>();
   const peopleByPhone = new Map<string, Person>();
+  const peopleByPic = new Map<string, Person>();
   people.forEach((p) => {
     peopleById.set(p.id, p);
-    const norm = normalizePhone(p.phone);
-    if (norm) peopleByPhone.set(norm, p);
+    const norm = getPersonCanonicalPhone(p);
+    if (norm && !peopleByPhone.has(norm)) peopleByPhone.set(norm, p);
+    const pic = getPicKey(p.photoURL);
+    if (pic && !peopleByPic.has(pic)) peopleByPic.set(pic, p);
   });
 
   const counts: ResolvedPollCounts = {
@@ -76,11 +80,13 @@ export const resolvePollSummary = (params: {
   const resolvedVoters: ResolvedVoter[] = latestVotes.map((vote) => {
     const rawPhoneFromVote = cleanWhatsAppPhone(vote.phone, vote.voter);
     const mapping = mappingByVoter.get(vote.voter) || (rawPhoneFromVote ? mappingByPhone.get(rawPhoneFromVote) : undefined);
-    const rawPhone = rawPhoneFromVote || cleanWhatsAppPhone(mapping?.phone, mapping?.voterId);
+    const rawPhone = rawPhoneFromVote || (mapping ? getMappingCanonicalPhone(mapping) : undefined);
     const normPhone = normalizePhone(rawPhone);
     const clubUid = mapping ? getMappingUidForClub(mapping, config.clubId) : undefined;
     const manualPerson = clubUid ? peopleById.get(clubUid) : undefined;
     const phonePerson = normPhone ? peopleByPhone.get(normPhone) : undefined;
+    const picKey = getPicKey(vote.profilePicUrl || mapping?.profilePicUrl);
+    const picPerson = picKey ? peopleByPic.get(picKey) : undefined;
     const aliasIds = mapping?.aliasVoterIds || [vote.voter];
     const virtualWaPerson = aliasIds
       .map((id) => peopleById.get(`wa_${sanitizeDocId(id).slice(0, 48)}`))
@@ -89,7 +95,7 @@ export const resolvePollSummary = (params: {
       ? people.find((p) => namesMatch(vote.pushName || mapping?.pushName, p.name))
       : undefined;
 
-    const person = manualPerson || phonePerson || virtualWaPerson;
+    const person = manualPerson || phonePerson || picPerson || virtualWaPerson;
     const matchSource: ResolvedVoter['matchSource'] = manualPerson
       ? 'MANUAL_MAP'
       : phonePerson

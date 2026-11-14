@@ -1,8 +1,10 @@
 import { ClubID, Gender, Person, Role } from '../../types';
 import { KeywordRule, PollOptionClassification, PollVote, ResolvedPollSummary, WhatsAppMemberMapping } from '../../types/whatsapp';
 import { DEFAULT_KEYWORD_RULES } from '../../config/whatsappDefaults';
-import { classifySelectedOptions, cleanWhatsAppPhone, normalizeName, normalizePhone, sanitizeDocId } from './pollFormatting';
+import { classifySelectedOptions, cleanWhatsAppPhone, normalizeName, sanitizeDocId } from './pollFormatting';
 import { getMappingUidForClub } from './pollMatching';
+import { deduplicateClubPeople, getPersonCanonicalPhone, getPicKey } from './personDedup';
+import { getMappingCanonicalPhone } from './mappingDedup';
 
 const buildHistoricalClassifications = (
   votes: PollVote[],
@@ -30,26 +32,36 @@ export const mergeClubRosterWithWhatsApp = (params: {
   keywordRules?: KeywordRule[];
 }): Person[] => {
   const { clubId, clubPeople, mappings, summary, historicalVotes = [], keywordRules = [] } = params;
-  if (!clubId) return clubPeople;
+  const { people: uniqueClubPeople, aliasToKeepId } = deduplicateClubPeople(clubPeople);
+  if (!clubId) return uniqueClubPeople;
 
   const historicalClass = buildHistoricalClassifications(historicalVotes, keywordRules);
   const mappingByLinkedUid = new Map<string, WhatsAppMemberMapping>();
   const mappingByPhone = new Map<string, WhatsAppMemberMapping>();
+  const mappingByPic = new Map<string, WhatsAppMemberMapping>();
 
   mappings.forEach((m) => {
     const linkedUid = getMappingUidForClub(m, clubId);
-    if (linkedUid && !mappingByLinkedUid.has(linkedUid)) mappingByLinkedUid.set(linkedUid, m);
-    const norm = cleanWhatsAppPhone(m.phone, m.voterId);
+    const resolvedUid = linkedUid ? (aliasToKeepId.get(linkedUid) || linkedUid) : undefined;
+    if (resolvedUid && !mappingByLinkedUid.has(resolvedUid)) mappingByLinkedUid.set(resolvedUid, m);
+    const norm = getMappingCanonicalPhone(m);
     if (norm && !mappingByPhone.has(norm)) mappingByPhone.set(norm, m);
+    const pic = getPicKey(m.profilePicUrl);
+    if (pic && !mappingByPic.has(pic)) mappingByPic.set(pic, m);
   });
 
-  const existingIds = new Set(clubPeople.map((p) => p.id));
-  const existingPhones = new Set(clubPeople.map((p) => normalizePhone(p.phone)).filter(Boolean));
-  const existingNames = new Set(clubPeople.map((p) => normalizeName(p.name)).filter((n) => n.length >= 3));
+  const existingIds = new Set(uniqueClubPeople.map((p) => p.id));
+  aliasToKeepId.forEach((_, rawId) => existingIds.add(rawId));
+  const existingPhones = new Set(uniqueClubPeople.map((p) => getPersonCanonicalPhone(p)).filter(Boolean) as string[]);
+  const existingNames = new Set(uniqueClubPeople.map((p) => normalizeName(p.name)).filter((n) => n.length >= 3));
+  const existingPics = new Set(uniqueClubPeople.map((p) => getPicKey(p.photoURL)).filter(Boolean));
 
-  const enrichedPeople: Person[] = clubPeople.map((person) => {
-    const normPhone = normalizePhone(person.phone);
-    const matchedMapping = mappingByLinkedUid.get(person.id) || (normPhone ? mappingByPhone.get(normPhone) : undefined);
+  const enrichedPeople: Person[] = uniqueClubPeople.map((person) => {
+    const normPhone = getPersonCanonicalPhone(person);
+    const picKey = getPicKey(person.photoURL);
+    const matchedMapping = mappingByLinkedUid.get(person.id)
+      || (normPhone ? mappingByPhone.get(normPhone) : undefined)
+      || (picKey ? mappingByPic.get(picKey) : undefined);
     const status = summary?.personStatusMap[person.id];
     const aliases = matchedMapping?.aliasVoterIds || (matchedMapping ? [matchedMapping.voterId] : []);
     const hist = aliases.map((id) => historicalClass.get(id)).find(Boolean);
@@ -58,6 +70,7 @@ export const mergeClubRosterWithWhatsApp = (params: {
 
     return {
       ...person,
+      phone: normPhone || cleanWhatsAppPhone(person.phone) || person.phone,
       role: inferredRole,
       photoURL: resolvedPhoto,
       isSkipper: Boolean(person.isSkipper || (status?.intent === 'ATTENDING' && status.detectedIsSkipper) || (person.role === Role.UNASSIGNED && hist?.detectedIsSkipper)),
@@ -71,30 +84,32 @@ export const mergeClubRosterWithWhatsApp = (params: {
   mappings.forEach((m) => {
     const linkedUid = getMappingUidForClub(m, clubId);
     if (linkedUid && existingIds.has(linkedUid)) return;
-    const rawPhone = cleanWhatsAppPhone(m.phone, m.voterId) || '';
-    const normPhone = normalizePhone(rawPhone);
+    const normPhone = getMappingCanonicalPhone(m) || '';
     if (normPhone && existingPhones.has(normPhone)) return;
     const aliases = m.aliasVoterIds || [m.voterId];
     if (aliases.some((id) => existingIds.has(`wa_${sanitizeDocId(id).slice(0, 48)}`))) return;
-    const deterministicId = `wa_${sanitizeDocId(m.voterId).slice(0, 48)}`;
+    const picKey = getPicKey(m.profilePicUrl);
+    if (picKey && existingPics.has(picKey) && !normPhone) return;
     const normPush = normalizeName(m.pushName);
-    if (normPush.length >= 3 && existingNames.has(normPush)) return;
+    if (normPush.length >= 3 && existingNames.has(normPush) && !normPhone) return;
 
+    const deterministicId = `wa_${sanitizeDocId(m.voterId).slice(0, 48)}`;
     existingIds.add(deterministicId);
     aliases.forEach((id) => existingIds.add(`wa_${sanitizeDocId(id).slice(0, 48)}`));
     if (normPhone) existingPhones.add(normPhone);
+    if (picKey) existingPics.add(picKey);
     if (normPush.length >= 3) existingNames.add(normPush);
 
     const vote = aliases.map((id) => voteByVoterId.get(id)).find(Boolean);
     const hist = aliases.map((id) => historicalClass.get(id)).find(Boolean);
-    const displayName = (m.pushName || vote?.displayName || rawPhone || m.voterId.split('@')[0]).trim();
+    const displayName = (m.pushName || vote?.displayName || normPhone || m.voterId.split('@')[0]).trim();
     const detectedRole = vote?.pollRole || hist?.detectedRole || Role.UNASSIGNED;
 
     virtualMembers.push({
       id: deterministicId, clubId, name: displayName, gender: Gender.MALE, role: detectedRole,
       rank: detectedRole === Role.INSTRUCTOR ? 5 : detectedRole === Role.VOLUNTEER ? 4 : 3,
       isSkipper: Boolean(vote?.detectedIsSkipper || hist?.detectedIsSkipper),
-      phone: rawPhone, photoURL: m.profilePicUrl || vote?.profilePicUrl, attendanceCount: 0,
+      phone: normPhone, photoURL: m.profilePicUrl || vote?.profilePicUrl, attendanceCount: 0,
       tags: Array.from(new Set(['קבוצת וואטסאפ', ...(vote?.detectedTags || hist?.detectedTags || [])])),
       isWhatsAppGroupOnly: true,
     });
