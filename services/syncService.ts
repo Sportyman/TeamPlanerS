@@ -60,6 +60,7 @@ export const subscribeToClubData = (clubId: ClubID): Unsubscribe => {
                 isSkipper: profile?.isSkipper || ms.isSkipper || false,
                 phone: profile?.primaryPhone || '',
                 notes: profile?.medicalNotes || '',
+                photoURL: profile?.photoURL || undefined,
                 mustPairWith: ms.mustPairWith || [],
                 preferPairWith: ms.preferPairWith || [],
                 cannotPairWith: ms.cannotPairWith || []

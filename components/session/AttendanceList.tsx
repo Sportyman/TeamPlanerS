@@ -5,6 +5,8 @@ import { CheckSquare, Square, Shield, ArrowDownAZ, ArrowUpNarrowWide, CheckCircl
 import { PersonEditorModal } from '../dashboard/PersonEditorModal';
 import { useAppStore } from '../../store';
 import { addPersonToClubCloud } from '../../services/syncService';
+import { useWhatsAppPolls } from '../../hooks/useWhatsAppPolls';
+import { SessionPollBar } from '../whatsapp/SessionPollBar';
 
 type SortType = 'ROLE' | 'NAME' | 'RANK';
 
@@ -22,6 +24,22 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
   const { clubSettings, activeClub } = useAppStore();
   const [sortBy, setSortBy] = useState<SortType>('ROLE');
   const [isAddingQuickly, setIsAddingQuickly] = useState(false);
+
+  const {
+    polls,
+    activePoll,
+    setSelectedPollId,
+    summary,
+    voteAlerts,
+    dismissAlert,
+    clearAlerts,
+    isLoading: isPollLoading,
+    error: pollError,
+    retry: retryPolls,
+    applyPollAttendance,
+    linkVoterToPerson,
+    addGuestFromVoter,
+  } = useWhatsAppPolls();
 
   const getSortedPeople = () => {
     const sorted = [...people];
@@ -62,8 +80,27 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
   };
 
   return (
-    <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200">
-      <div className="flex flex-col gap-6 mb-8">
+    <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-6">
+      <SessionPollBar
+        polls={polls}
+        activePoll={activePoll}
+        summary={summary}
+        people={people}
+        presentIds={presentIds}
+        voteAlerts={voteAlerts}
+        isLoading={isPollLoading}
+        error={pollError}
+        onSelectPoll={setSelectedPollId}
+        onApplyAttendance={applyPollAttendance}
+        onTogglePerson={onToggle}
+        onLinkVoter={linkVoterToPerson}
+        onAddGuest={addGuestFromVoter}
+        onDismissAlert={dismissAlert}
+        onClearAlerts={clearAlerts}
+        onRetry={retryPolls}
+      />
+
+      <div className="flex flex-col gap-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-6">
            <div>
              <div className="flex items-center gap-3">
@@ -76,9 +113,9 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
                 </button>
              </div>
              <div className="flex flex-wrap gap-2 mt-2">
-                <span className="text-orange-700 bg-orange-50 px-3 py-1 rounded-full border border-orange-200 text-xs font-bold uppercase">מתנדבים: {stats.vols}</span>
-                <span className="text-sky-700 bg-sky-50 px-3 py-1 rounded-full border border-sky-200 text-xs font-bold uppercase">חברים: {stats.mems}</span>
-                <span className="text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200 text-xs font-bold uppercase">סה"כ: {presentIds.length}</span>
+                <span className="text-orange-700 bg-orange-50 px-3 py-1 rounded-full border border-orange-200 text-xs font-bold uppercase tabular-nums">מתנדבים: {stats.vols}</span>
+                <span className="text-sky-700 bg-sky-50 px-3 py-1 rounded-full border border-sky-200 text-xs font-bold uppercase tabular-nums">חברים: {stats.mems}</span>
+                <span className="text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200 text-xs font-bold uppercase tabular-nums">סה"כ: {presentIds.length}</span>
             </div>
            </div>
             <div className="flex gap-2 shrink-0">
@@ -98,21 +135,28 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {getSortedPeople().map(person => {
           const isPresent = presentIds.includes(person.id);
+          const pollStatus = summary?.personStatusMap[person.id];
           return (
             <button key={person.id} onClick={() => onToggle(person.id)} className={getCardStyle(person.role, isPresent)}>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                    <span className="font-black text-xl leading-none">{person.name}</span>
+                    <span className="font-black text-xl leading-none truncate">{person.name}</span>
                     {person.isSkipper && <ShipWheel size={16} className={isPresent ? "text-brand-600" : "text-slate-300"} />}
                 </div>
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${isPresent ? 'bg-white/50 border border-current/20' : 'bg-slate-200'}`}>
                     {getRoleLabel(person.role, person.gender)}
                   </span>
                   {person.phone && <span className="text-[10px] opacity-60 font-mono" dir="ltr">{person.phone}</span>}
+                  {pollStatus && (
+                    <span className={`text-[10px] font-bold ${pollStatus.intent === 'ATTENDING' ? 'text-emerald-700' : pollStatus.intent === 'DECLINING' ? 'text-red-700' : 'text-amber-700'}`}>
+                      · {pollStatus.intent === 'ATTENDING' ? 'אישר בסקר' : pollStatus.intent === 'DECLINING' ? 'לא מגיע בסקר' : 'אולי בסקר'}
+                      {pollStatus.updatedRecently ? ' (שונה)' : ''}
+                    </span>
+                  )}
                 </div>
               </div>
-              <div className="mr-4">
+              <div className="mr-4 shrink-0">
                 {isPresent ? <CheckCircle2 className="text-brand-600" size={32} /> : <Circle className="text-slate-200" size={32} />}
               </div>
             </button>

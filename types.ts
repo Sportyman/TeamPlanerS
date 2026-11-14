@@ -1,4 +1,4 @@
-
+import { APP_VERSION as CONFIG_APP_VERSION } from './config/version';
 export enum Role {
   INSTRUCTOR = 'INSTRUCTOR',
   VOLUNTEER = 'VOLUNTEER',
@@ -151,7 +151,7 @@ export interface UserPermission {
   accessLevel: AccessLevel;
 }
 
-export const APP_VERSION = '6.2.3'; 
+export const APP_VERSION = CONFIG_APP_VERSION;
 
 export const TEAM_COLORS = [
   'bg-blue-50 border-blue-200',      
@@ -186,6 +186,7 @@ export interface Person {
   role: Role;
   rank: number;
   notes?: string;
+  photoURL?: string;
   isSkipper?: boolean;
   preferredBoatType?: string; 
   genderConstraint?: GenderConstraint;

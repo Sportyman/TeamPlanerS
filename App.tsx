@@ -4,6 +4,7 @@ import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { useAppStore } from './store';
 import { Dashboard } from './components/Dashboard';
 import { SessionManager } from './components/SessionManager';
+import { WhatsAppDashboardView } from './components/whatsapp/WhatsAppDashboardView';
 import { Login } from './components/Login';
 import { LandingPage } from './components/LandingPage';
 import { SuperAdminDashboard } from './components/SuperAdminDashboard';
@@ -84,6 +85,7 @@ const App: React.FC = () => {
         <Route path="/profile-setup" element={<AuthGuard requireProfile={false} requiredLevel={AccessLevel.NONE}><ProfileSetup /></AuthGuard>} />
         <Route path="/super-admin" element={<AuthGuard requiredLevel={AccessLevel.SUPER_ADMIN}><AppContent><SuperAdminDashboard /></AppContent></AuthGuard>} />
         <Route path="/app" element={<AuthGuard requiredLevel={AccessLevel.STAFF}><AppContent><SessionManager /></AppContent></AuthGuard>} />
+        <Route path="/app/whatsapp" element={<AuthGuard requiredLevel={AccessLevel.STAFF}><AppContent><WhatsAppDashboardView /></AppContent></AuthGuard>} />
         <Route path="/app/manage" element={<AuthGuard requiredLevel={AccessLevel.CLUB_ADMIN}><AppContent><Dashboard /></AppContent></AuthGuard>} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
