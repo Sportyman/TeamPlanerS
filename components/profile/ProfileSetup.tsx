@@ -27,12 +27,27 @@ export const ProfileSetup: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (userProfile) {
+      setFirstName(userProfile.firstName || '');
+      setLastName(userProfile.lastName || '');
+      setContactEmail(userProfile.contactEmail || user?.email || '');
+      setGender(userProfile.gender || Gender.MALE);
+      setBirthDate(userProfile.birthDate || '');
+      setPrimaryPhone(userProfile.primaryPhone || '');
+      setMedicalNotes(userProfile.medicalNotes || '');
+      setIsSkipper(Boolean(userProfile.isSkipper));
+      if (userProfile.firstName && userProfile.lastName && !pendingInvite && searchParams.get('edit') !== 'true') {
+        navigate(isSuperAdmin || memberships.some(m => m.status === 'ACTIVE') ? '/app' : '/', { replace: true });
+      }
+    }
+  }, [userProfile, pendingInvite, searchParams, isSuperAdmin, memberships, navigate, user]);
+
   // Persistence: If refresh happens, restore invite from URL token
   useEffect(() => {
     const restoreInvite = async () => {
         const inviteToken = searchParams.get('invite');
         if (inviteToken && !pendingInvite) {
-            console.log("Restoring pending invite from URL token...");
             const invite = await validateInviteToken(inviteToken);
             if (invite) setPendingInvite(invite);
         }

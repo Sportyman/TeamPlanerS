@@ -51,18 +51,20 @@ const App: React.FC = () => {
     addLog("System starting v6.0.0 (Reactive)", 'INFO');
     
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-        const state = useAppStore.getState();
         if (firebaseUser) {
+            await fetchGlobalConfig();
+            const state = useAppStore.getState();
             const email = firebaseUser.email?.toLowerCase().trim() || '';
             const isSuperAdmin = state.superAdmins.some(a => a.toLowerCase() === email) || 
                                state.protectedAdmins.some(a => a.toLowerCase() === email);
             
             useAppStore.setState({ 
-                user: { uid: firebaseUser.uid, email, isAdmin: isSuperAdmin, photoURL: firebaseUser.photoURL || undefined, isDev: false } 
+                user: { uid: firebaseUser.uid, email, isAdmin: isSuperAdmin, photoURL: firebaseUser.photoURL || undefined, isDev: false },
+                isLoadingResources: true
             });
             await loadUserResources(firebaseUser.uid);
         } else {
-            useAppStore.setState({ user: null, userProfile: null, memberships: [] });
+            useAppStore.setState({ user: null, userProfile: null, memberships: [], isLoadingResources: false });
         }
         setAuthInitialized(true);
     });

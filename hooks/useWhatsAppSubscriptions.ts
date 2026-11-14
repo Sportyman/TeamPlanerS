@@ -48,6 +48,12 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, onNotify }: UseWh
   }, [activeClub]);
 
   useEffect(() => {
+    const handleSyncRefresh = () => setRetryKey((k) => k + 1);
+    window.addEventListener('teamplaner:sync-refresh', handleSyncRefresh);
+    return () => window.removeEventListener('teamplaner:sync-refresh', handleSyncRefresh);
+  }, []);
+
+  useEffect(() => {
     if (!userId || !activeClub) { setIsLoading(false); return; }
     setIsLoading(true);
     setError(null);

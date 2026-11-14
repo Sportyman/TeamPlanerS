@@ -26,8 +26,9 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
 
   const {
     polls, activePoll, setSelectedPollId, summary, clubConfig, availableGroups, effectiveClubPeople,
-    voteAlerts, dismissAlert, clearAlerts, isLoading: isPollLoading, error: pollError, retry: retryPolls,
-    applyPollAttendance, linkVoterToPerson, addGuestFromVoter, linkClubGroup,
+    mappings, syncCandidates, voteAlerts, dismissAlert, clearAlerts, isLoading: isPollLoading, error: pollError,
+    retry: retryPolls, applyPollAttendance, linkVoterToPerson, addGuestFromVoter, linkClubGroup,
+    confirmSyncCandidate, importRosterMembers, updateMemberRole,
   } = useWhatsAppPolls();
 
   const displayPeople = useMemo(() => {
@@ -77,12 +78,13 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
   return (
     <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-6">
       <SessionPollBar
-        polls={polls} activePoll={activePoll} summary={summary} people={displayPeople}
+        activeClub={activeClub || ''} polls={polls} activePoll={activePoll} summary={summary} people={displayPeople}
         presentIds={presentIds} linkedGroups={clubConfig.linkedGroups} availableGroups={availableGroups}
-        voteAlerts={voteAlerts} isLoading={isPollLoading} error={pollError}
-        onSelectPoll={setSelectedPollId} onLinkGroup={linkClubGroup} onApplyAttendance={applyPollAttendance}
-        onTogglePerson={onToggle} onLinkVoter={linkVoterToPerson} onAddGuest={addGuestFromVoter}
-        onDismissAlert={dismissAlert} onClearAlerts={clearAlerts} onRetry={retryPolls}
+        mappings={mappings} syncCandidates={syncCandidates} voteAlerts={voteAlerts}
+        isLoading={isPollLoading} error={pollError} onSelectPoll={setSelectedPollId} onLinkGroup={linkClubGroup}
+        onApplyAttendance={applyPollAttendance} onTogglePerson={onToggle} onLinkVoter={linkVoterToPerson}
+        onAddGuest={addGuestFromVoter} onConfirmCandidate={confirmSyncCandidate} onImportRoster={importRosterMembers}
+        onUpdatePersonRole={updateMemberRole} onDismissAlert={dismissAlert} onClearAlerts={clearAlerts} onRetry={retryPolls}
       />
 
       <div className="flex flex-col gap-6">

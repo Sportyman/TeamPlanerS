@@ -1,9 +1,9 @@
-
 import { StateCreator } from 'zustand';
 import { AppState } from '../store';
 import { auth, googleProvider } from '../../firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { getUserProfile, getUserMemberships } from '../../services/profileService';
+import { fetchGlobalConfig } from '../../services/syncService';
 import { UserProfile, ClubMembership, UserPermission, ClubID, Gender, MembershipStatus, AccessLevel } from '../../types';
 
 export interface AuthSlice {
@@ -14,6 +14,7 @@ export interface AuthSlice {
   protectedAdmins: string[];
   permissions: UserPermission[];
   authInitialized: boolean;
+  isLoadingResources: boolean;
   authError: string | null;
 
   loginWithGoogle: () => Promise<boolean>;
@@ -38,102 +39,75 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
   protectedAdmins: [],
   permissions: [],
   authInitialized: false,
+  isLoadingResources: false,
   authError: null,
 
   loginWithGoogle: async () => {
-    set({ authError: null });
+    set({ authError: null, isLoadingResources: true });
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const email = result.user.email?.toLowerCase().trim() || '';
       const uid = result.user.uid;
+      await fetchGlobalConfig();
       const { superAdmins, protectedAdmins } = get();
+      const isSuperAdmin = superAdmins.some(a => a.toLowerCase() === email) || protectedAdmins.some(a => a.toLowerCase() === email);
 
-      const isSuperAdmin = superAdmins.some(a => a.toLowerCase() === email) || 
-                         protectedAdmins.some(a => a.toLowerCase() === email);
-
-      set({ user: { uid, email, isAdmin: isSuperAdmin, photoURL: result.user.photoURL || undefined, isDev: false } });
+      set({ user: { uid, email, isAdmin: isSuperAdmin, photoURL: result.user.photoURL || undefined, isDev: false }, isLoadingResources: true });
       await get().loadUserResources(uid);
-      
-      // Post-load check: if profile is empty, pre-fill from Google info
-      const currentState = get();
-      if (!currentState.userProfile && result.user.displayName) {
-          const parts = result.user.displayName.split(' ');
-          const firstName = parts[0] || '';
-          const lastName = parts.slice(1).join(' ') || '';
-          
-          const skeletonProfile: Partial<UserProfile> = {
-              firstName,
-              lastName,
-              email: result.user.email || '',
-              contactEmail: result.user.email || ''
-          };
-          // We don't save it yet, ProfileSetup will handle it with its local state
-      }
-      
       return true;
     } catch (error) {
       console.error("Login error:", error);
-      set({ authError: 'התחברות בוטלה או נכשלה.' });
+      set({ authError: 'התחברות בוטלה או נכשלה.', isLoadingResources: false });
       return false;
     }
   },
 
   loginDev: (email, isAdmin) => {
-    set({ authError: null });
+    set({ authError: null, isLoadingResources: false });
     const uid = 'dev-user-' + Date.now();
     const devEmail = email || 'dev@example.com';
     const { activeClub } = get();
-    
-    const mockProfile: UserProfile = {
-      uid,
-      firstName: 'מפתח',
-      lastName: 'מערכת',
-      email: devEmail,
-      contactEmail: devEmail,
-      gender: Gender.MALE,
-      birthDate: '1990-01-01',
-      primaryPhone: '050-000-0000',
-      emergencyContacts: [],
-      medicalNotes: 'חשבון פיתוח - כניסה מהירה',
-      certifications: [],
-      isSkipper: true,
-      joinedSystemDate: new Date().toISOString()
-    };
 
+    const mockProfile: UserProfile = {
+      uid, firstName: 'מפתח', lastName: 'מערכת', email: devEmail, contactEmail: devEmail,
+      gender: Gender.MALE, birthDate: '1990-01-01', primaryPhone: '050-000-0000',
+      emergencyContacts: [], medicalNotes: 'חשבון פיתוח - כניסה מהירה',
+      certifications: [], isSkipper: true, joinedSystemDate: new Date().toISOString(),
+    };
     const mockMemberships: ClubMembership[] = activeClub ? [{
-        uid,
-        clubId: activeClub,
-        role: isAdmin ? 'INSTRUCTOR' : 'VOLUNTEER' as any,
-        status: MembershipStatus.ACTIVE,
-        joinedClubDate: new Date().toISOString(),
-        rank: 5
+      uid, clubId: activeClub, role: (isAdmin ? 'INSTRUCTOR' : 'VOLUNTEER') as any,
+      status: MembershipStatus.ACTIVE, joinedClubDate: new Date().toISOString(), rank: 5,
     }] : [];
 
-    set({ 
-      user: { uid, email: devEmail, isAdmin, photoURL: undefined, isDev: true }, 
-      userProfile: mockProfile,
-      memberships: mockMemberships,
-      authInitialized: true 
-    });
-    
+    set({ user: { uid, email: devEmail, isAdmin, isDev: true }, userProfile: mockProfile, memberships: mockMemberships, authInitialized: true });
     return true;
   },
 
   logout: async () => {
-    try { await signOut(auth); } catch(e) {}
-    set({ user: null, userProfile: null, memberships: [], activeClub: null });
+    try { await signOut(auth); } catch {}
+    set({ user: null, userProfile: null, memberships: [], activeClub: null, isLoadingResources: false });
   },
 
   setUserProfile: (profile) => set({ userProfile: profile }),
 
   loadUserResources: async (uid) => {
     if (uid.startsWith('dev-user-')) return;
+    set({ isLoadingResources: true });
     try {
-      const profile = await getUserProfile(uid);
-      const memberships = await getUserMemberships(uid);
-      set({ userProfile: profile, memberships });
+      await fetchGlobalConfig();
+      const [profile, memberships] = await Promise.all([getUserProfile(uid), getUserMemberships(uid)]);
+      const { user, superAdmins, protectedAdmins } = get();
+      const email = user?.email?.toLowerCase() || '';
+      const isSuperAdmin = superAdmins.some(a => a.toLowerCase() === email) || protectedAdmins.some(a => a.toLowerCase() === email);
+      set({
+        userProfile: profile,
+        memberships,
+        user: user ? { ...user, isAdmin: isSuperAdmin } : user,
+        isLoadingResources: false,
+      });
     } catch (e) {
       console.error("Resource loading failed", e);
+      set({ isLoadingResources: false });
     }
   },
 
@@ -156,35 +130,18 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
   removeSuperAdmin: (email) => set(state => {
     const normalized = email.toLowerCase().trim();
-    if (state.protectedAdmins.includes(normalized)) {
-      alert('Root account cannot be removed.');
-      return state;
-    }
+    if (state.protectedAdmins.includes(normalized)) return state;
     return { superAdmins: state.superAdmins.filter(a => a.toLowerCase() !== normalized) };
   }),
 
   addPermission: (email, clubId, level) => set(state => {
     const normalizedEmail = email.toLowerCase().trim();
-    // Remove any existing permission for this specific email + club combination
-    const filteredPermissions = state.permissions.filter(p => 
-      !(p.email.toLowerCase() === normalizedEmail && p.clubId === clubId)
-    );
-    
-    const newPermission: UserPermission = {
-      email: normalizedEmail,
-      clubId,
-      accessLevel: level
-    };
-    
-    return { permissions: [...filteredPermissions, newPermission] };
+    const filtered = state.permissions.filter(p => !(p.email.toLowerCase() === normalizedEmail && p.clubId === clubId));
+    return { permissions: [...filtered, { email: normalizedEmail, clubId, accessLevel: level }] };
   }),
 
   removePermission: (email, clubId) => set(state => {
     const normalizedEmail = email.toLowerCase().trim();
-    return {
-      permissions: state.permissions.filter(p => 
-        !(p.email.toLowerCase() === normalizedEmail && p.clubId === clubId)
-      )
-    };
+    return { permissions: state.permissions.filter(p => !(p.email.toLowerCase() === normalizedEmail && p.clubId === clubId)) };
   }),
 });

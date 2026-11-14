@@ -1,7 +1,6 @@
-
 import { db } from '../firebase';
-import { doc, getDoc, getDocFromServer, setDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
-import { UserProfile, ClubMembership, ClubID, MembershipStatus, AccessLevel, Role } from '../types';
+import { doc, getDoc, getDocFromServer, setDoc, collection, query, where, getDocs, getDocsFromServer, updateDoc } from 'firebase/firestore';
+import { UserProfile, ClubMembership, MembershipStatus } from '../types';
 import { sendNotificationToClub } from './syncService';
 
 export const getMembershipId = (clubId: string, uid: string) => `${clubId}_${uid}`;
@@ -9,7 +8,7 @@ export const getMembershipId = (clubId: string, uid: string) => `${clubId}_${uid
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
     try {
         const docRef = doc(db, 'profiles', uid);
-        const docSnap = await getDoc(docRef);
+        const docSnap = await getDocFromServer(docRef).catch(() => getDoc(docRef));
         return docSnap.exists() ? (docSnap.data() as UserProfile) : null;
     } catch (error) {
         console.error("Error fetching profile:", error);
@@ -30,8 +29,8 @@ export const saveUserProfile = async (profile: UserProfile): Promise<void> => {
 export const getUserMemberships = async (uid: string): Promise<ClubMembership[]> => {
     try {
         const q = query(collection(db, 'memberships'), where('uid', '==', uid));
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => doc.data() as ClubMembership);
+        const querySnapshot = await getDocsFromServer(q).catch(() => getDocs(q));
+        return querySnapshot.docs.map(d => d.data() as ClubMembership);
     } catch (error) {
         console.error("Error fetching memberships:", error);
         return [];
@@ -52,15 +51,11 @@ export const joinClub = async (membership: ClubMembership): Promise<void> => {
 export const approveMembership = async (membershipId: string, updates: Partial<ClubMembership> = {}): Promise<void> => {
     try {
         const docRef = doc(db, 'memberships', membershipId);
-        
-        // 1. Perform the update
         await updateDoc(docRef, {
             ...updates,
             status: MembershipStatus.ACTIVE,
             approvedAt: new Date().toISOString()
         });
-
-        // 2. Trigger notification after approval using getDocFromServer to satisfy TS
         const snap = await getDocFromServer(docRef);
         if (snap.exists()) {
             const data = snap.data();

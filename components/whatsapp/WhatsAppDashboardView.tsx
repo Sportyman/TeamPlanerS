@@ -11,11 +11,13 @@ import { WhatsAppSettingsTab } from './WhatsAppSettingsTab';
 import { formatFirestoreErrorMessage } from '../../services/whatsapp/pollFormatting';
 import { ArrowRight, Calendar, Download, RefreshCw } from 'lucide-react';
 
+import { forceFullSync } from '../../services/syncService';
+
 type TabId = 'SUMMARY' | 'MAPPING' | 'SETTINGS';
 
 export const WhatsAppDashboardView: React.FC = () => {
   const navigate = useNavigate();
-  const { activeClub, sessions, toggleAttendance } = useAppStore();
+  const { user, activeClub, sessions, toggleAttendance } = useAppStore();
   const { isClubAdmin } = usePermissions();
   const [activeTab, setActiveTab] = useState<TabId>('SUMMARY');
 
@@ -40,6 +42,10 @@ export const WhatsAppDashboardView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <button type="button" onClick={() => { forceFullSync(user?.uid, activeClub); retry(); }} className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 whitespace-nowrap min-h-[44px]">
+            <RefreshCw size={14} />
+            <span>רענן וסנכרן</span>
+          </button>
           {summary && summary.attendingPersonIds.length > 0 && (
             <button type="button" onClick={() => { applyPollAttendance('MERGE'); navigate('/app?step=1'); }} className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-2 whitespace-nowrap min-h-[44px]">
               <Download size={15} />
