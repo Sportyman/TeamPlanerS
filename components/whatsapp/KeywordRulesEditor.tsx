@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Role } from '../../types';
 import { KeywordRule } from '../../types/whatsapp';
 import { DEFAULT_KEYWORD_RULES } from '../../config/whatsappDefaults';
-import { Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { KeywordGuideModal } from './KeywordGuideModal';
+import { HelpCircle, Plus, RotateCcw, Trash2 } from 'lucide-react';
 
 interface KeywordRulesEditorProps {
   rules: KeywordRule[];
@@ -15,6 +16,7 @@ export const KeywordRulesEditor: React.FC<KeywordRulesEditorProps> = ({ rules, o
   const [newRole, setNewRole] = useState('');
   const [newIsSkipper, setNewIsSkipper] = useState(false);
   const [newTags, setNewTags] = useState('');
+  const [showGuide, setShowGuide] = useState(false);
 
   const addRule = () => {
     const kw = newKeyword.trim();
@@ -48,14 +50,24 @@ export const KeywordRulesEditor: React.FC<KeywordRulesEditorProps> = ({ rules, o
             זיהוי אוטומטי מאפשרויות הסקר (מתנדב, חבר, מדריך, מפקד סירה, אורח או תגיות פעילות).
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => onChange(DEFAULT_KEYWORD_RULES)}
-          className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 flex items-center gap-1"
-        >
-          <RotateCcw size={13} />
-          <span>שחזר ברירת מחדל</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setShowGuide(true)}
+            className="px-3 py-1.5 rounded-lg border border-brand-200 bg-brand-50 text-xs font-bold text-brand-800 hover:bg-brand-100 flex items-center gap-1"
+          >
+            <HelpCircle size={14} />
+            <span>איך זה עובד? הסבר ודוגמה</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange(DEFAULT_KEYWORD_RULES)}
+            className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 flex items-center gap-1"
+          >
+            <RotateCcw size={13} />
+            <span>שחזר ברירת מחדל</span>
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2 items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
@@ -63,7 +75,7 @@ export const KeywordRulesEditor: React.FC<KeywordRulesEditorProps> = ({ rules, o
           type="text"
           value={newKeyword}
           onChange={(e) => setNewKeyword(e.target.value)}
-          placeholder="ביטוי בסקר (למשל: מפקד סירה)"
+          placeholder="ביטוי בסקר (למשל: מתנדב מגיע)"
           className="flex-1 min-w-[160px] px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg"
         />
         <select
@@ -154,6 +166,7 @@ export const KeywordRulesEditor: React.FC<KeywordRulesEditorProps> = ({ rules, o
           </div>
         ))}
       </div>
+      {showGuide && <KeywordGuideModal onClose={() => setShowGuide(false)} />}
     </div>
   );
 };

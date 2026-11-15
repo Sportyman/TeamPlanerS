@@ -5,6 +5,7 @@ import { MatchCandidate, PollEvent, ResolvedPollSummary, WhatsAppMemberMapping }
 import { PollSelectorDropdown } from './PollSelectorDropdown';
 import { VoterLinkModal } from './VoterLinkModal';
 import { WhatsAppRosterModal } from './WhatsAppRosterModal';
+import { GroupLinkSelect } from './GroupLinkSelect';
 import { formatFirestoreErrorMessage } from '../../services/whatsapp/pollFormatting';
 import { AlertCircle, Download, MessageSquare, RefreshCw, Settings2, UserCheck, Users } from 'lucide-react';
 
@@ -79,14 +80,12 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
             <Settings2 size={13} /> <span>הגדרות וואטסאפ</span>
           </Link>
         </div>
-        {availableGroups.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {availableGroups.map((g) => (
-              <button key={g} type="button" onClick={() => onLinkGroup(g)} className="px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-xs font-bold text-amber-900 hover:bg-amber-100">
-                + שייך לחוג: {g}
-              </button>
-            ))}
-          </div>
+        {availableGroups.length > 0 ? (
+          <GroupLinkSelect groups={availableGroups} onLink={onLinkGroup} />
+        ) : (
+          <p className="text-xs text-amber-800">
+            לא נמצאו עדיין קבוצות זמינות מהבוט. הפעל את הבוט ולחץ על ״סנכרן נתונים״ למעלה.
+          </p>
         )}
       </div>
     );

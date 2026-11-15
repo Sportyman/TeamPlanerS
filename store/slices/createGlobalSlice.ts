@@ -24,7 +24,9 @@ export interface GlobalSlice {
   setPeople: (people: Person[]) => void;
   setSyncStatus: (status: SyncStatus) => void;
   setGlobalConfig: (config: { superAdmins: string[], protectedAdmins?: string[], permissions?: UserPermission[] }) => void;
-  addClub: (label: string) => void;
+  addClub: (label: string) => string;
+  updateClub: (id: string, label: string) => void;
+  mergeCloudClubs: (cloudClubs: Club[], deletedIds?: string[]) => void;
   removeClub: (id: string) => void;
   setCloudData: (data: any) => void;
   hardReset: () => void;
@@ -73,13 +75,31 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
       syncStatus: 'SYNCED'
   }),
 
-  addClub: (label) => set(state => {
+  addClub: (label) => {
     const newId = 'CLUB-' + Date.now();
-    const defs = defaultBoatsForClub(newId, label);
-    return {
+    set((state) => {
+      const defs = defaultBoatsForClub(newId, label);
+      return {
         clubs: [...state.clubs, { id: newId, label }],
         clubSettings: { ...state.clubSettings, [newId]: { boatDefinitions: defs } },
-        sessions: { ...state.sessions, [newId]: { ...EMPTY_SESSION, inventory: createInventoryFromDefs(defs) } }
+        sessions: { ...state.sessions, [newId]: { ...EMPTY_SESSION, inventory: createInventoryFromDefs(defs) } },
+      };
+    });
+    return newId;
+  },
+
+  updateClub: (id, label) => set((state) => ({
+    clubs: state.clubs.map((c) => (c.id === id ? { ...c, label: label.trim() } : c)),
+  })),
+
+  mergeCloudClubs: (cloudClubs, deletedIds = []) => set((state) => {
+    const deletedSet = new Set(deletedIds);
+    const map = new Map<string, Club>();
+    state.clubs.filter((c) => !deletedSet.has(c.id)).forEach((c) => map.set(c.id, c));
+    cloudClubs.forEach((c) => { if (!deletedSet.has(c.id)) map.set(c.id, c); });
+    return {
+      clubs: Array.from(map.values()),
+      activeClub: state.activeClub && deletedSet.has(state.activeClub) ? null : state.activeClub,
     };
   }),
 

@@ -82,7 +82,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           <NavLink to="/app" icon={<Calendar size={20} />} text="ניהול אימון" className="p-4" />
-          <NavLink to="/app/whatsapp" icon={<MessageSquare size={20} />} text="סקרי וואטסאפ" className="p-4" />
+          <NavLink to="/app/whatsapp" icon={<MessageSquare size={20} />} text="ניהול וואטסאפ" className="p-4" />
           {isClubAdmin && <><NavLink to="/app/manage" icon={<LayoutGrid size={20} />} text="ניהול חוג" className="p-4" /><NavLink to="/app/manage?view=INVITES" icon={<Sparkles size={20} />} text="לינקים וצירוף" className="p-4" /></>}
           {isSuperAdmin && <><div className="h-px bg-slate-100 my-4" /><NavLink to="/super-admin" icon={<Shield size={20} />} text="ניהול מערכת" className="p-4" /></>}
         </div>

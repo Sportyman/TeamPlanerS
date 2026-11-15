@@ -8,6 +8,7 @@ import { VoteAlertsBanner } from './VoteAlertsBanner';
 import { PollSummaryTab } from './PollSummaryTab';
 import { VoterMappingTab } from './VoterMappingTab';
 import { WhatsAppSettingsTab } from './WhatsAppSettingsTab';
+import { GroupLinkSelect } from './GroupLinkSelect';
 import { formatFirestoreErrorMessage } from '../../services/whatsapp/pollFormatting';
 import { ArrowRight, Calendar, Download, RefreshCw } from 'lucide-react';
 
@@ -38,7 +39,7 @@ export const WhatsAppDashboardView: React.FC = () => {
             <ArrowRight size={15} />
             <span>{isClubAdmin ? 'חזרה לניהול החוג' : 'חזרה לאימון'}</span>
           </button>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">סקרי וואטסאפ ומיפוי משתתפים</h1>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">ניהול וואטסאפ ומיפוי משתתפים</h1>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -118,11 +119,7 @@ export const WhatsAppDashboardView: React.FC = () => {
                   : 'עדיין לא נקלטו סקרים מקבוצת הוואטסאפ של חוג זה.'}
               </div>
               {clubConfig.linkedGroups.length === 0 && availableGroups.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-2">
-                  {availableGroups.map((g) => (
-                    <button key={g} type="button" onClick={() => linkClubGroup(g)} className="px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-bold hover:bg-brand-700">+ שייך קבוצה: {g}</button>
-                  ))}
-                </div>
+                <GroupLinkSelect groups={availableGroups} onLink={linkClubGroup} centered />
               )}
             </div>
           )}

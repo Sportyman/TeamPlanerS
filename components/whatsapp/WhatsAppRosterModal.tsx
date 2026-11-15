@@ -3,6 +3,7 @@ import { ClubID, Person, Role, getRoleLabel } from '../../types';
 import { MatchCandidate, WhatsAppMemberMapping } from '../../types/whatsapp';
 import { getMappingUidForClub } from '../../services/whatsapp/pollMatching';
 import { WhatsAppAvatar } from './WhatsAppAvatar';
+import { isRawWhatsAppJid } from '../../services/whatsapp/clubDedupSync';
 import { Check, Info, UserPlus, Users, X } from 'lucide-react';
 
 interface WhatsAppRosterModalProps {
@@ -29,7 +30,7 @@ export const WhatsAppRosterModal: React.FC<WhatsAppRosterModalProps> = ({
   const [busy, setBusy] = useState(false);
 
   const availableGroups = useMemo(() => {
-    const all = Array.from(new Set(mappings.flatMap((m) => m.groups || []).filter(Boolean)));
+    const all = Array.from(new Set(mappings.flatMap((m) => m.groups || []).filter((g) => Boolean(g) && !isRawWhatsAppJid(g))));
     if (!linkedGroups.length) return all;
     return all.filter((g) => linkedGroups.some((lg) => g.toLowerCase().includes(lg.trim().toLowerCase())));
   }, [mappings, linkedGroups]);

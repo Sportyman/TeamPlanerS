@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { ClubWhatsAppConfig, KeywordRule } from '../../types/whatsapp';
 import { DEFAULT_KEYWORD_RULES } from '../../config/whatsappDefaults';
 import { KeywordRulesEditor } from './KeywordRulesEditor';
-import { Plus, Save } from 'lucide-react';
+import { isRawWhatsAppJid } from '../../services/whatsapp/clubDedupSync';
+import { Plus, Save, X } from 'lucide-react';
 
 interface WhatsAppSettingsTabProps {
   config: ClubWhatsAppConfig;
@@ -47,7 +48,8 @@ export const WhatsAppSettingsTab: React.FC<WhatsAppSettingsTabProps> = ({
     }
   };
 
-  const allGroups = Array.from(new Set([...availableGroups, ...linkedGroups]));
+  const cleanAvailable = availableGroups.filter((g) => !isRawWhatsAppJid(g));
+  const allGroups = Array.from(new Set([...cleanAvailable, ...linkedGroups]));
 
   return (
     <div className="space-y-6">
@@ -55,13 +57,13 @@ export const WhatsAppSettingsTab: React.FC<WhatsAppSettingsTabProps> = ({
         <div>
           <h3 className="text-base font-bold text-slate-900">קבוצות וואטסאפ מקושרות לחוג</h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            סמן אילו קבוצות וואטסאפ שייכות לחוג זה כדי שהסקר הרלוונטי ייבחר אוטומטית לפני האימון.
+            סמן אילו קבוצות וואטסאפ שייכות לחוג זה כדי שהסקר הרלוונטי ייבחר אוטומטית לפני האימון. (לחץ על קבוצה מסומנת להסרה)
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
           {allGroups.length === 0 ? (
-            <span className="text-xs text-slate-500">טרם זוהו קבוצות מ-polls_events. ניתן להוסיף שם קבוצה ידנית מטה.</span>
+            <span className="text-xs text-slate-500">טרם זוהו קבוצות תקינות מהבוט. ניתן להוסיף שם קבוצה ידנית מטה.</span>
           ) : (
             allGroups.map((group) => {
               const active = linkedGroups.includes(group);
@@ -70,13 +72,14 @@ export const WhatsAppSettingsTab: React.FC<WhatsAppSettingsTabProps> = ({
                   key={group}
                   type="button"
                   onClick={() => toggleGroup(group)}
-                  className={`px-3 py-2 rounded-xl border text-xs font-bold transition-colors ${
+                  className={`px-3 py-2 rounded-xl border text-xs font-bold transition-colors flex items-center gap-1.5 ${
                     active
                       ? 'border-brand-600 bg-brand-50 text-brand-800'
                       : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                   }`}
                 >
-                  {group}
+                  <span>{group}</span>
+                  {active && <X size={13} className="text-brand-700" />}
                 </button>
               );
             })

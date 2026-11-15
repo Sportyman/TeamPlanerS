@@ -2,6 +2,7 @@ import { db } from '../firebase';
 import { doc, getDoc, getDocFromServer, getDocs, getDocsFromServer, setDoc, collection, query, where, onSnapshot, Unsubscribe, addDoc, increment } from 'firebase/firestore';
 import { useAppStore } from '../store';
 import { Person, ClubID, MembershipStatus, UserProfile, Role, AccessLevel, Gender } from '../types';
+import { fetchCloudClubsCatalog, isLegacyMockId } from './auth/superAdminService';
 
 const systemLogs: { time: string; msg: string; type: 'INFO' | 'WARN' | 'ERROR' | 'SYNC' }[] = [];
 
@@ -20,7 +21,8 @@ export const downloadSystemLogs = () => {
 };
 
 const hydratePeopleFromMemberships = async (memberships: any[]): Promise<Person[]> => {
-    return Promise.all(memberships.map(async (ms: any) => {
+    const realMemberships = memberships.filter((ms: any) => !isLegacyMockId(String(ms.uid || '')));
+    return Promise.all(realMemberships.map(async (ms: any) => {
         let profile: UserProfile | null = null;
         try {
             const profileRef = doc(db, 'profiles', ms.uid);
@@ -80,9 +82,7 @@ export const forceFullSync = async (uid?: string, clubId?: ClubID | null): Promi
     store.setSyncStatus('SYNCING');
     try {
         await fetchGlobalConfig();
-        if (uid && !uid.startsWith('dev-user-')) {
-            await store.loadUserResources(uid);
-        }
+        if (uid && !uid.startsWith('dev-user-')) await store.loadUserResources(uid);
         let syncedCount = 0;
         if (clubId) {
             const q = query(collection(db, 'memberships'), where('clubId', '==', clubId), where('status', '==', MembershipStatus.ACTIVE));
@@ -170,13 +170,11 @@ export const ensureAdminMembership = async (clubId: ClubID, user: { uid: string;
                 status: MembershipStatus.ACTIVE, joinedClubDate: new Date().toISOString(), rank: 5, lastUpdate: new Date().toISOString(),
             });
         }
-    } catch (error) {
-        addLog(`Error ensuring admin membership: ${error}`, 'ERROR');
-    }
+    } catch (error) { addLog(`Error ensuring admin membership: ${error}`, 'ERROR'); }
 };
 
 export const fetchGlobalConfig = async () => {
-    const { setGlobalConfig } = useAppStore.getState();
+    const { setGlobalConfig, mergeCloudClubs } = useAppStore.getState();
     try {
         const docRef = doc(db, 'config', 'global');
         const docSnap = await getDocFromServer(docRef).catch(() => getDoc(docRef));
@@ -184,6 +182,8 @@ export const fetchGlobalConfig = async () => {
             const data = docSnap.data();
             setGlobalConfig({ superAdmins: data.superAdmins || [], protectedAdmins: data.protectedAdmins || [], permissions: data.permissions || [] });
         }
+        const catalog = await fetchCloudClubsCatalog().catch(() => null);
+        if (catalog) mergeCloudClubs(catalog.clubs, catalog.deletedIds);
     } catch (error) {
         addLog(`Global config fetch error: ${error}`, 'ERROR');
     }

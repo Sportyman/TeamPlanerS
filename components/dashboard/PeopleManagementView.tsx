@@ -6,6 +6,7 @@ import { sortAttendancePeople } from '../../services/whatsapp/rosterMerge';
 import { addPersonToClubCloud } from '../../services/syncService';
 import { PeopleTable } from './PeopleTable';
 import { PersonEditorModal } from './PersonEditorModal';
+import { GroupLinkSelect } from '../whatsapp/GroupLinkSelect';
 
 interface PeopleManagementViewProps {
   activeClub: ClubID;
@@ -94,13 +95,7 @@ export const PeopleManagementView: React.FC<PeopleManagementViewProps> = ({
             <span>כדי להציג כאן את כל חברי קבוצת הוואטסאפ של החוג, יש לשייך קבוצה:</span>
           </div>
           {availableGroups.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {availableGroups.map((g) => (
-                <button key={g} type="button" onClick={() => linkClubGroup(g)} className="px-3 py-1.5 rounded-xl bg-white border border-amber-300 text-xs font-bold text-amber-900 hover:bg-amber-100">
-                  + שייך לחוג: {g}
-                </button>
-              ))}
-            </div>
+            <GroupLinkSelect groups={availableGroups} onLink={linkClubGroup} />
           ) : (
             <p className="text-xs text-amber-800">הבוט עדיין לא סנכרן קבוצות — הפעל את הבוט ולחץ על "סנכרן נתונים" למעלה.</p>
           )}

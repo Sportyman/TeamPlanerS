@@ -6,18 +6,26 @@ import { addPersonToClubCloud, addLog } from '../syncService';
 import { deduplicateClubPeople } from './personDedup';
 import { saveWhatsAppMemberMapping } from './whatsappMutations';
 
+export const isRawWhatsAppJid = (value: string): boolean => {
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+  if (/@(g\.us|c\.us|lid|broadcast|newsletter)$/i.test(trimmed)) return true;
+  if (/^\d{10,}$/.test(trimmed)) return true;
+  return false;
+};
+
 export const collectAvailableGroups = (
   polls: PollEvent[],
   mappings: WhatsAppMemberMapping[]
 ): string[] => {
   const set = new Set<string>();
-  polls.forEach((p) => { if (p.group) set.add(p.group); });
+  polls.forEach((p) => { if (p.group && !isRawWhatsAppJid(p.group)) set.add(p.group.trim()); });
   mappings.forEach((m) => {
-    const groups = (m.groups || []).filter(Boolean);
-    const named = groups.filter((g) => !g.endsWith('@g.us'));
-    (named.length > 0 ? named : groups).forEach((g) => set.add(g));
+    (m.groups || [])
+      .filter((g) => Boolean(g) && !isRawWhatsAppJid(g))
+      .forEach((g) => set.add(g.trim()));
   });
-  return Array.from(set);
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'he'));
 };
 
 export const runClubDuplicateCleanup = async (params: {

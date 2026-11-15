@@ -1,3 +1,3 @@
-export const APP_VERSION = '6.3.12';
+export const APP_VERSION = '6.3.13';
 export const LAST_COMMIT_MESSAGE =
-  'fix(vite): configure server port 3000, host 0.0.0.0, allowedHosts, and HMR toggle for Cloud Run preview';
+  'feat(admin,whatsapp): club editing, group dropdown select, JID filter, keyword guide modal, and mock user purge';

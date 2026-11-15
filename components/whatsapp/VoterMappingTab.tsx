@@ -4,6 +4,7 @@ import { MatchCandidate, ResolvedVoter, WhatsAppMemberMapping } from '../../type
 import { getMappingUidForClub } from '../../services/whatsapp/pollMatching';
 import { WhatsAppAvatar } from './WhatsAppAvatar';
 import { WhatsAppRosterModal } from './WhatsAppRosterModal';
+import { GroupLinkSelect } from './GroupLinkSelect';
 import { Check, Link2, Search, Unlink, UserPlus, Users } from 'lucide-react';
 
 interface VoterMappingTabProps {
@@ -57,13 +58,7 @@ export const VoterMappingTab: React.FC<VoterMappingTabProps> = ({
       {linkedGroups.length === 0 && (
         <div className="border border-amber-200 bg-amber-50 rounded-xl p-3 flex items-center justify-between gap-3 flex-wrap text-xs">
           <span className="font-bold text-amber-900">יש לשייך קבוצת וואטסאפ לחוג זה כדי להציג רק את חברי החוג (גם אם הם חברים במספר חוגים).</span>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {availableGroups.map((g) => (
-              <button key={g} type="button" onClick={() => onLinkGroup(g)} className="px-2.5 py-1 rounded-lg bg-white border border-amber-300 font-bold text-amber-900 hover:bg-amber-100">
-                + שייך: {g}
-              </button>
-            ))}
-          </div>
+          <GroupLinkSelect groups={availableGroups} onLink={onLinkGroup} />
         </div>
       )}
 
