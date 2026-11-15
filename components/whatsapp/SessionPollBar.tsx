@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ClubID, Person, Role } from '../../types';
-import { MatchCandidate, PollEvent, ResolvedPollSummary, VoteChangeAlert, WhatsAppMemberMapping } from '../../types/whatsapp';
+import { MatchCandidate, PollEvent, ResolvedPollSummary, WhatsAppMemberMapping } from '../../types/whatsapp';
 import { PollSelectorDropdown } from './PollSelectorDropdown';
-import { VoteAlertsBanner } from './VoteAlertsBanner';
 import { VoterLinkModal } from './VoterLinkModal';
 import { WhatsAppRosterModal } from './WhatsAppRosterModal';
 import { formatFirestoreErrorMessage } from '../../services/whatsapp/pollFormatting';
@@ -20,28 +19,24 @@ interface SessionPollBarProps {
   availableGroups: string[];
   mappings: WhatsAppMemberMapping[];
   syncCandidates: MatchCandidate[];
-  voteAlerts: VoteChangeAlert[];
   isLoading: boolean;
   error: string | null;
   onSelectPoll: (pollId: string) => void;
   onLinkGroup: (groupName: string) => Promise<void>;
   onApplyAttendance: (mode: 'REPLACE' | 'MERGE') => void;
-  onTogglePerson: (personId: string) => void;
   onLinkVoter: (voter: any, personId: string) => Promise<void>;
   onAddGuest: (voter: any, persistToClub: boolean) => Promise<any>;
   onConfirmCandidate: (c: MatchCandidate, role?: Role) => Promise<void>;
   onImportRoster: (entries: Array<{ mapping: WhatsAppMemberMapping; role: Role; isSkipper?: boolean }>) => Promise<number>;
   onUpdatePersonRole: (person: Person, role: Role, isSkipper?: boolean) => Promise<void>;
-  onDismissAlert: (id: string) => void;
-  onClearAlerts: () => void;
   onRetry: () => void;
 }
 
 export const SessionPollBar: React.FC<SessionPollBarProps> = ({
   activeClub, polls, activePoll, summary, people, presentIds, linkedGroups, availableGroups,
-  mappings, syncCandidates, voteAlerts, isLoading, error,
-  onSelectPoll, onLinkGroup, onApplyAttendance, onTogglePerson, onLinkVoter, onAddGuest,
-  onConfirmCandidate, onImportRoster, onUpdatePersonRole, onDismissAlert, onClearAlerts, onRetry,
+  mappings, syncCandidates, isLoading, error,
+  onSelectPoll, onLinkGroup, onApplyAttendance, onLinkVoter, onAddGuest,
+  onConfirmCandidate, onImportRoster, onUpdatePersonRole, onRetry,
 }) => {
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showRosterModal, setShowRosterModal] = useState(false);
@@ -174,8 +169,6 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
         <span aria-hidden="true">·</span><span className="text-red-700">לא מגיעים: {counts.declining}</span>
         {counts.unmappedAttending > 0 && (<><span aria-hidden="true">·</span><span className="font-semibold text-amber-800">ממתינים לזיהוי: {counts.unmappedAttending}</span></>)}
       </div>
-
-      <VoteAlertsBanner alerts={voteAlerts} presentIds={presentIds} onTogglePerson={onTogglePerson} onDismiss={onDismissAlert} onClearAll={onClearAlerts} />
 
       {showLinkModal && (
         <VoterLinkModal voters={summary.voters} people={people} onLink={onLinkVoter} onAddGuest={async (v, persist) => { await onAddGuest(v, persist); }} onClose={() => setShowLinkModal(false)} />

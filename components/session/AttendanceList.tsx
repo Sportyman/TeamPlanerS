@@ -7,6 +7,7 @@ import { addPersonToClubCloud } from '../../services/syncService';
 import { useWhatsAppPolls } from '../../hooks/useWhatsAppPolls';
 import { sortAttendancePeople } from '../../services/whatsapp/rosterMerge';
 import { SessionPollBar } from '../whatsapp/SessionPollBar';
+import { VoteAlertsBanner } from '../whatsapp/VoteAlertsBanner';
 import { AttendancePersonCard } from './AttendancePersonCard';
 
 type SortType = 'ATTENDANCE' | 'ROLE' | 'NAME' | 'RANK';
@@ -92,11 +93,10 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
       <SessionPollBar
         activeClub={activeClub || ''} polls={polls} activePoll={activePoll} summary={summary} people={displayPeople}
         presentIds={presentIds} linkedGroups={clubConfig.linkedGroups} availableGroups={availableGroups}
-        mappings={mappings} syncCandidates={syncCandidates} voteAlerts={voteAlerts}
-        isLoading={isPollLoading} error={pollError} onSelectPoll={setSelectedPollId} onLinkGroup={linkClubGroup}
-        onApplyAttendance={applyPollAttendance} onTogglePerson={onToggle} onLinkVoter={linkVoterToPerson}
-        onAddGuest={addGuestFromVoter} onConfirmCandidate={confirmSyncCandidate} onImportRoster={importRosterMembers}
-        onUpdatePersonRole={updateMemberRole} onDismissAlert={dismissAlert} onClearAlerts={clearAlerts} onRetry={retryPolls}
+        mappings={mappings} syncCandidates={syncCandidates} isLoading={isPollLoading} error={pollError}
+        onSelectPoll={setSelectedPollId} onLinkGroup={linkClubGroup} onApplyAttendance={applyPollAttendance}
+        onLinkVoter={linkVoterToPerson} onAddGuest={addGuestFromVoter} onConfirmCandidate={confirmSyncCandidate}
+        onImportRoster={importRosterMembers} onUpdatePersonRole={updateMemberRole} onRetry={retryPolls}
       />
 
       <div className="flex flex-col gap-4">
@@ -124,12 +124,12 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 flex-wrap">
-            <span>מיון:</span>
-            <button onClick={() => setSortBy('ATTENDANCE')} className={`px-3 py-1.5 rounded-lg border flex items-center gap-1 transition-all ${sortBy === 'ATTENDANCE' ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 hover:bg-slate-50'}`}><TrendingUp size={12} /> תדירות וא-ב</button>
-            <button onClick={() => setSortBy('NAME')} className={`px-3 py-1.5 rounded-lg border flex items-center gap-1 transition-all ${sortBy === 'NAME' ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 hover:bg-slate-50'}`}><ArrowDownAZ size={12} /> א-ב</button>
-            <button onClick={() => setSortBy('ROLE')} className={`px-3 py-1.5 rounded-lg border flex items-center gap-1 transition-all ${sortBy === 'ROLE' ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 hover:bg-slate-50'}`}><Shield size={12} /> תפקיד</button>
-            <button onClick={() => setSortBy('RANK')} className={`px-3 py-1.5 rounded-lg border flex items-center gap-1 transition-all ${sortBy === 'RANK' ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 hover:bg-slate-50'}`}><ArrowUpNarrowWide size={12} /> דירוג</button>
+          <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500 flex-nowrap overflow-x-auto">
+            <span className="shrink-0 ml-0.5">מיון:</span>
+            <button onClick={() => setSortBy('ATTENDANCE')} title="מיון לפי תדירות הגעה וא-ב" className={`px-2 py-1.5 rounded-lg border flex items-center gap-1 whitespace-nowrap shrink-0 transition-all ${sortBy === 'ATTENDANCE' ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 hover:bg-slate-50'}`}><TrendingUp size={12} /> תדירות</button>
+            <button onClick={() => setSortBy('NAME')} className={`px-2 py-1.5 rounded-lg border flex items-center gap-1 whitespace-nowrap shrink-0 transition-all ${sortBy === 'NAME' ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 hover:bg-slate-50'}`}><ArrowDownAZ size={12} /> א-ב</button>
+            <button onClick={() => setSortBy('ROLE')} className={`px-2 py-1.5 rounded-lg border flex items-center gap-1 whitespace-nowrap shrink-0 transition-all ${sortBy === 'ROLE' ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 hover:bg-slate-50'}`}><Shield size={12} /> תפקיד</button>
+            <button onClick={() => setSortBy('RANK')} className={`px-2 py-1.5 rounded-lg border flex items-center gap-1 whitespace-nowrap shrink-0 transition-all ${sortBy === 'RANK' ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 hover:bg-slate-50'}`}><ArrowUpNarrowWide size={12} /> דירוג</button>
           </div>
           <div className="relative w-full sm:w-64">
             <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -176,6 +176,8 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
           )}
         </div>
       )}
+
+      <VoteAlertsBanner alerts={voteAlerts} presentIds={presentIds} onTogglePerson={onToggle} onDismiss={dismissAlert} onClearAll={clearAlerts} />
 
       <div className="mt-6 flex justify-end">
         <button onClick={onNext} disabled={presentIds.length === 0} className="w-full md:w-auto bg-brand-600 disabled:opacity-50 hover:bg-brand-500 text-white px-10 py-4 rounded-2xl font-black text-xl shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95">
