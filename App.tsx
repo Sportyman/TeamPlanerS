@@ -21,10 +21,6 @@ import { fetchGlobalConfig, addLog, subscribeToClubData } from './services/syncS
 import { subscribeToClubBoatDefinitions } from './services/clubEquipmentService';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { APIProvider } from '@vis.gl/react-google-maps';
-import { MapsQuotaBanner } from './components/schedule/MapsQuotaBanner';
-
-const MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
 const AppContent: React.FC<{ children: React.ReactNode; skipClubLoading?: boolean }> = ({
   children,
@@ -90,9 +86,8 @@ const App: React.FC = () => {
     return <LoadingScreen message="מתחבר למערכת..." />;
   }
 
-  const routerContent = (
+  return (
     <Router>
-      <MapsQuotaBanner />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
@@ -108,21 +103,6 @@ const App: React.FC = () => {
       </Routes>
       <DebugOverlay />
     </Router>
-  );
-
-  if (!MAPS_API_KEY) {
-    return routerContent;
-  }
-
-  return (
-    <APIProvider
-      apiKey={MAPS_API_KEY}
-      language="he"
-      region="IL"
-      libraries={['places']}
-    >
-      {routerContent}
-    </APIProvider>
   );
 };
 export default App;

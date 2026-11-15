@@ -8,7 +8,7 @@ import { LocationDropdownMenu } from './LocationDropdownMenu';
 interface LocationPickerProps {
   value: string;
   locationId?: string;
-  onChange: (locationName: string, locationId?: string) => void;
+  onChange: (locationName: string, locationId?: string, coords?: { lat?: number; lng?: number }) => void;
   allowOneOffCustom?: boolean;
   compact?: boolean;
 }
@@ -104,7 +104,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
               selectedValue={value}
               allowOneOffCustom={allowOneOffCustom}
               onSelectCatalog={(loc) => {
-                onChange(loc.name, loc.id);
+                onChange(loc.name, loc.id, loc.lat !== undefined && loc.lng !== undefined ? { lat: loc.lat, lng: loc.lng } : undefined);
                 setOneOffMode(false);
                 setMenuOpen(false);
               }}
@@ -150,7 +150,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         <NewLocationFormCard
           existingLocations={sortedLocations}
           onSaved={(saved) => {
-            onChange(saved.name, saved.id);
+            onChange(saved.name, saved.id, saved.lat !== undefined && saved.lng !== undefined ? { lat: saved.lat, lng: saved.lng } : undefined);
             setOneOffMode(false);
             setIsAddingNew(false);
           }}

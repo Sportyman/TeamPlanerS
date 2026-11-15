@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, Compass, X } from 'lucide-react';
 import { ClubLocation } from '../../types';
 import { useAppStore } from '../../store';
 import { addGlobalLocation, normalizeLocationName } from '../../services/scheduleService';
-import { GooglePlaceSearchInput } from './GooglePlaceSearchInput';
+import { PlaceSearchInput } from './PlaceSearchInput';
 
 interface NewLocationFormCardProps {
   existingLocations: ClubLocation[];
@@ -18,7 +18,7 @@ export const NewLocationFormCard: React.FC<NewLocationFormCardProps> = ({
 }) => {
   const { user, addNotification } = useAppStore();
   const [newName, setNewName] = useState('');
-  const [selectedPlaceId, setSelectedPlaceId] = useState<string | undefined>(undefined);
+  const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number } | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -29,7 +29,7 @@ export const NewLocationFormCard: React.FC<NewLocationFormCardProps> = ({
       const existedBefore = existingLocations.some(
         (l) => normalizeLocationName(l.name).toLowerCase() === trimmed.toLowerCase()
       );
-      const saved = await addGlobalLocation(trimmed, user?.email, selectedPlaceId);
+      const saved = await addGlobalLocation(trimmed, user?.email, selectedCoords);
       onSaved(saved);
       addNotification(
         existedBefore
@@ -50,7 +50,7 @@ export const NewLocationFormCard: React.FC<NewLocationFormCardProps> = ({
         <div>
           <div className="text-xs font-black text-slate-800">הוספת מיקום חדש למאגר הכללי</div>
           <div className="text-[11px] text-slate-500">
-            חפשו מקום ב-Google Maps או הקלידו שם מיקום. המיקום יישמר עבור כל החוגים למניעת כפילויות.
+            חפשו אזור או חוף לשמירת מיקום מדויק (למזג אוויר וגלים בעתיד), או הקלידו שם ידני.
           </div>
         </div>
         <button
@@ -63,20 +63,29 @@ export const NewLocationFormCard: React.FC<NewLocationFormCardProps> = ({
         </button>
       </div>
 
-      <GooglePlaceSearchInput
+      <PlaceSearchInput
         value={newName}
         onChangeText={(txt) => {
           setNewName(txt);
-          setSelectedPlaceId(undefined);
+          setSelectedCoords(undefined);
         }}
-        onSelectPlace={(name, placeId) => {
+        onSelectPlace={(name, coords) => {
           setNewName(name);
-          setSelectedPlaceId(placeId);
+          setSelectedCoords(coords);
         }}
         onSubmitEnter={handleSave}
       />
 
-      <div className="flex justify-end gap-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        {selectedCoords ? (
+          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center gap-1">
+            <Compass size={13} />
+            <span>נמצא מיקום מדויק ({selectedCoords.lat.toFixed(3)}, {selectedCoords.lng.toFixed(3)})</span>
+          </span>
+        ) : (
+          <span />
+        )}
+
         <button
           type="button"
           disabled={!newName.trim() || saving}

@@ -141,7 +141,8 @@ export type ClubID = string;
 export interface ClubLocation {
   id: string;
   name: string;
-  placeId?: string;
+  lat?: number;
+  lng?: number;
   createdAt?: string;
   createdBy?: string;
 }
@@ -152,6 +153,8 @@ export interface ClubSchedule {
   endTime?: string;
   locationId?: string;
   locationName: string;
+  lat?: number;
+  lng?: number;
 }
 
 export interface SessionOverride {

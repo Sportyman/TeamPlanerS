@@ -1,9 +1,9 @@
-import { doc, getDoc, getDocFromServer, setDoc, deleteField } from 'firebase/firestore';
+import { doc, setDoc, deleteField } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Club, ClubLocation, ClubSchedule, SessionOverride } from '../types';
-import { useAppStore } from '../store';
-import { addLog } from './syncService';
+import { Club, ClubSchedule, SessionOverride } from '../types';
 import { saveClubLabelToCloud } from './auth/superAdminService';
+
+export { normalizeLocationName, fetchGlobalLocations, addGlobalLocation } from './locationCatalogService';
 
 export const DAY_NAMES_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'] as const;
 
@@ -79,97 +79,6 @@ export const formatScheduleSummary = (schedule?: ClubSchedule): string => {
   const day = `יום ${DAY_NAMES_HE[schedule.dayOfWeek] ?? ''}`;
   const time = schedule.endTime ? `${schedule.startTime}–${schedule.endTime}` : schedule.startTime;
   return schedule.locationName ? `${day} · ${time} · ${schedule.locationName}` : `${day} · ${time}`;
-};
-
-export const normalizeLocationName = (name: string): string => name.trim().replace(/\s+/g, ' ');
-
-const SHARED_LOCATIONS_DOC = doc(db, 'clubs', 'shared_locations_catalog');
-
-const sanitizeLocationItem = (loc: ClubLocation): ClubLocation => {
-  const clean: ClubLocation = {
-    id: String(loc.id || `loc-${Date.now()}`),
-    name: normalizeLocationName(loc.name),
-  };
-  if (loc.placeId) clean.placeId = String(loc.placeId);
-  if (loc.createdAt) clean.createdAt = String(loc.createdAt);
-  if (loc.createdBy) clean.createdBy = String(loc.createdBy);
-  return clean;
-};
-
-export const fetchGlobalLocations = async (): Promise<ClubLocation[]> => {
-  try {
-    const snap = await getDocFromServer(SHARED_LOCATIONS_DOC).catch(() => getDoc(SHARED_LOCATIONS_DOC));
-    const map = new Map<string, ClubLocation>();
-    const rawItems = snap.exists() && Array.isArray(snap.data().items) ? snap.data().items : [];
-    rawItems.forEach((item: any) => {
-      if (typeof item?.name === 'string' && item.name.trim()) {
-        const name = normalizeLocationName(item.name);
-        map.set(name.toLowerCase(), sanitizeLocationItem({
-          id: String(item.id || name),
-          name,
-          placeId: item.placeId,
-          createdAt: item.createdAt,
-          createdBy: item.createdBy,
-        }));
-      }
-    });
-    useAppStore.getState().clubs.forEach((club) => {
-      const locName = club.defaultSchedule?.locationName;
-      if (locName && locName.trim()) {
-        const clean = normalizeLocationName(locName);
-        if (!map.has(clean.toLowerCase())) {
-          map.set(clean.toLowerCase(), { id: club.defaultSchedule?.locationId || clean, name: clean });
-        }
-      }
-    });
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'he'));
-  } catch (err) {
-    addLog(`Failed to fetch global locations: ${err}`, 'WARN');
-    return [];
-  }
-};
-
-export const addGlobalLocation = async (
-  rawName: string,
-  createdBy?: string,
-  placeId?: string
-): Promise<ClubLocation> => {
-  const normalized = normalizeLocationName(rawName);
-  if (!normalized) throw new Error('יש להזין שם מיקום');
-
-  const existingRemote = await fetchGlobalLocations();
-  const storeLocs = useAppStore.getState().locations;
-  const mergedMap = new Map<string, ClubLocation>();
-  [...storeLocs, ...existingRemote].forEach((loc) => {
-    const key = normalizeLocationName(loc.name).toLowerCase();
-    if (key && !mergedMap.has(key)) mergedMap.set(key, sanitizeLocationItem(loc));
-  });
-
-  const existingMatch = mergedMap.get(normalized.toLowerCase());
-  if (existingMatch) {
-    useAppStore.getState().setLocations(Array.from(mergedMap.values()));
-    return existingMatch;
-  }
-
-  const created = sanitizeLocationItem({
-    id: `loc-${Date.now()}`,
-    name: normalized,
-    placeId,
-    createdAt: new Date().toISOString(),
-    createdBy,
-  });
-  mergedMap.set(normalized.toLowerCase(), created);
-  const nextList = Array.from(mergedMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'he'));
-
-  await setDoc(SHARED_LOCATIONS_DOC, {
-    isSystemCatalog: true,
-    isDeleted: false,
-    items: nextList,
-    updatedAt: new Date().toISOString(),
-  }, { merge: true });
-
-  useAppStore.getState().setLocations(nextList);
-  return created;
 };
 
 export const saveClubScheduleToCloud = async (

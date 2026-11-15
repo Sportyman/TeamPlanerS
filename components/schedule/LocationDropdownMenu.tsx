@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Check, Edit3, MapPin, Plus, Search } from 'lucide-react';
+import { Check, Compass, Edit3, MapPin, Plus, Search } from 'lucide-react';
 import { ClubLocation } from '../../types';
 import { normalizeLocationName } from '../../services/scheduleService';
 
@@ -56,6 +56,7 @@ export const LocationDropdownMenu: React.FC<LocationDropdownMenuProps> = ({
             const isSelected =
               normalizeLocationName(selectedValue).toLowerCase() ===
               normalizeLocationName(loc.name).toLowerCase();
+            const hasCoords = typeof loc.lat === 'number' && typeof loc.lng === 'number';
             return (
               <button
                 key={loc.id || loc.name}
@@ -72,6 +73,11 @@ export const LocationDropdownMenu: React.FC<LocationDropdownMenuProps> = ({
                 <span className="flex-1 text-sm font-bold leading-relaxed whitespace-normal break-words">
                   {loc.name}
                 </span>
+                {hasCoords && (
+                  <span title="כולל נ״צ לתחזית מזג אוויר וגלים" className="text-sky-600 shrink-0 mt-1">
+                    <Compass size={13} />
+                  </span>
+                )}
                 {isSelected && <Check size={16} className="text-brand-600 shrink-0 mt-0.5" />}
               </button>
             );

@@ -55,6 +55,8 @@ export const saveClubLabelToCloud = async (
     };
     if (defaultSchedule.endTime) cleanSched.endTime = defaultSchedule.endTime;
     if (defaultSchedule.locationId) cleanSched.locationId = defaultSchedule.locationId;
+    if (typeof defaultSchedule.lat === 'number' && Number.isFinite(defaultSchedule.lat)) cleanSched.lat = defaultSchedule.lat;
+    if (typeof defaultSchedule.lng === 'number' && Number.isFinite(defaultSchedule.lng)) cleanSched.lng = defaultSchedule.lng;
     payload.defaultSchedule = cleanSched;
   }
   await setDoc(doc(db, 'clubs', clubId), payload, { merge: true });
