@@ -4,6 +4,7 @@ import { useAppStore } from '../store';
 import { Team, Role, getRoleLabel, BoatType, TEAM_COLORS, Person } from '../types';
 import { GripVertical, AlertTriangle, ArrowRightLeft, Check, Printer, Share2, Link as LinkIcon, Eye, Send, RotateCcw, RotateCw, Star, Shuffle, X, Plus, Trash2, Search, UserPlus, Lock, ShieldCheck, Heart, UserX, Shield, ShipWheel } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import { computeNextClubSession } from '../services/scheduleService';
 
 // Pairing Board Component
 export const PairingBoard: React.FC = () => {
@@ -24,7 +25,8 @@ export const PairingBoard: React.FC = () => {
     addGuestToTeam,
     assignMemberToTeam,
     removeMemberFromTeam,
-    clubSettings
+    clubSettings,
+    clubs
   } = useAppStore();
   
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -150,8 +152,15 @@ export const PairingBoard: React.FC = () => {
       }))
     }));
 
+    const activeClubObj = clubs.find((c) => c.id === activeClub);
+    const upcoming = computeNextClubSession(activeClubObj);
+    const timeStr = upcoming ? (upcoming.endTime ? `${upcoming.startTime}–${upcoming.endTime}` : upcoming.startTime) : '';
     const payload = {
-      date: new Date().toLocaleDateString('he-IL'),
+      clubName: activeClubObj?.label || '',
+      date: upcoming ? `${upcoming.dayName}, ${upcoming.displayDate}` : new Date().toLocaleDateString('he-IL'),
+      time: timeStr,
+      location: upcoming?.locationName || '',
+      note: upcoming?.note || '',
       labels: boatLabels,
       teams: cleanTeams
     };
@@ -794,8 +803,19 @@ export const PairingBoard: React.FC = () => {
 
       <div className="hidden print:block space-y-8">
         <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold">רשימת שיבוצים לאימון</h1>
-            <p className="text-lg text-slate-600 mt-2">{new Date().toLocaleDateString('he-IL')}</p>
+            {(() => {
+              const clubObj = clubs.find((c) => c.id === activeClub);
+              const upcoming = computeNextClubSession(clubObj);
+              const tStr = upcoming ? (upcoming.endTime ? `${upcoming.startTime}–${upcoming.endTime}` : upcoming.startTime) : '';
+              return (
+                <>
+                  <h1 className="text-3xl font-bold">רשימת שיבוצים לאימון{clubObj ? ` — ${clubObj.label}` : ''}</h1>
+                  <p className="text-lg text-slate-600 mt-2">
+                    {upcoming ? `${upcoming.dayName}, ${upcoming.displayDate} · ${tStr}${upcoming.locationName ? ` · ${upcoming.locationName}` : ''}` : new Date().toLocaleDateString('he-IL')}
+                  </p>
+                </>
+              );
+            })()}
         </div>
 
         <div className="grid grid-cols-1 gap-6">

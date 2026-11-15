@@ -1,7 +1,9 @@
 
 import { StateCreator } from 'zustand';
 import { AppState, EMPTY_SESSION, createInventoryFromDefs } from '../store';
-import { Club, ClubID, Person, ClubSettings, SyncStatus, BoatDefinition, UserPermission } from '../../types';
+import {
+  Club, ClubID, ClubLocation, ClubSchedule, SessionOverride, Person, ClubSettings, SyncStatus, BoatDefinition, UserPermission,
+} from '../../types';
 import { DEFAULT_CLUBS, KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from '../../mockData';
 
 const defaultBoatsForClub = (clubId: string, label = ''): BoatDefinition[] => {
@@ -12,6 +14,7 @@ const defaultBoatsForClub = (clubId: string, label = ''): BoatDefinition[] => {
 
 export interface GlobalSlice {
   clubs: Club[];
+  locations: ClubLocation[];
   activeClub: ClubID | null;
   clubSettings: Record<ClubID, ClubSettings>;
   people: Person[];
@@ -24,8 +27,11 @@ export interface GlobalSlice {
   setPeople: (people: Person[]) => void;
   setSyncStatus: (status: SyncStatus) => void;
   setGlobalConfig: (config: { superAdmins: string[], protectedAdmins?: string[], permissions?: UserPermission[] }) => void;
-  addClub: (label: string) => string;
-  updateClub: (id: string, label: string) => void;
+  setLocations: (locations: ClubLocation[]) => void;
+  addLocation: (location: ClubLocation) => void;
+  addClub: (label: string, defaultSchedule?: ClubSchedule) => string;
+  updateClub: (id: string, label: string, defaultSchedule?: ClubSchedule) => void;
+  setClubSessionOverride: (clubId: string, override: SessionOverride | null) => void;
   mergeCloudClubs: (cloudClubs: Club[], deletedIds?: string[]) => void;
   removeClub: (id: string) => void;
   setCloudData: (data: any) => void;
@@ -36,6 +42,7 @@ export interface GlobalSlice {
 
 export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (set) => ({
   clubs: DEFAULT_CLUBS,
+  locations: [],
   activeClub: null,
   clubSettings: {
     'KAYAK': { boatDefinitions: KAYAK_DEFINITIONS },
@@ -67,6 +74,12 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
   setSyncStatus: (status) => set({ syncStatus: status }),
   setInitialLoading: (isLoading) => set({ isInitialLoading: isLoading }),
   setHasHydrated: (val) => set({ _hasHydrated: val }),
+  setLocations: (locations) => set({ locations }),
+  addLocation: (location) => set((state) => {
+    const key = location.name.trim().toLowerCase();
+    if (state.locations.some((l) => l.name.trim().toLowerCase() === key)) return state;
+    return { locations: [...state.locations, location].sort((a, b) => a.name.localeCompare(b.name, 'he')) };
+  }),
   
   setGlobalConfig: (config) => set({ 
       superAdmins: config.superAdmins.map(a => a.toLowerCase().trim()),
@@ -75,12 +88,12 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
       syncStatus: 'SYNCED'
   }),
 
-  addClub: (label) => {
+  addClub: (label, defaultSchedule) => {
     const newId = 'CLUB-' + Date.now();
     set((state) => {
       const defs = defaultBoatsForClub(newId, label);
       return {
-        clubs: [...state.clubs, { id: newId, label }],
+        clubs: [...state.clubs, { id: newId, label, defaultSchedule }],
         clubSettings: { ...state.clubSettings, [newId]: { boatDefinitions: defs } },
         sessions: { ...state.sessions, [newId]: { ...EMPTY_SESSION, inventory: createInventoryFromDefs(defs) } },
       };
@@ -88,15 +101,33 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
     return newId;
   },
 
-  updateClub: (id, label) => set((state) => ({
-    clubs: state.clubs.map((c) => (c.id === id ? { ...c, label: label.trim() } : c)),
+  updateClub: (id, label, defaultSchedule) => set((state) => ({
+    clubs: state.clubs.map((c) => (c.id === id ? {
+      ...c,
+      label: label.trim(),
+      defaultSchedule: defaultSchedule !== undefined ? defaultSchedule : c.defaultSchedule,
+    } : c)),
+  })),
+
+  setClubSessionOverride: (clubId, override) => set((state) => ({
+    clubs: state.clubs.map((c) => (c.id === clubId ? { ...c, sessionOverride: override } : c)),
   })),
 
   mergeCloudClubs: (cloudClubs, deletedIds = []) => set((state) => {
     const deletedSet = new Set(deletedIds);
     const map = new Map<string, Club>();
     state.clubs.filter((c) => !deletedSet.has(c.id)).forEach((c) => map.set(c.id, c));
-    cloudClubs.forEach((c) => { if (!deletedSet.has(c.id)) map.set(c.id, c); });
+    cloudClubs.forEach((c) => {
+      if (!deletedSet.has(c.id)) {
+        const prev = map.get(c.id);
+        map.set(c.id, {
+          ...prev,
+          ...c,
+          defaultSchedule: c.defaultSchedule || prev?.defaultSchedule,
+          sessionOverride: c.sessionOverride !== undefined ? c.sessionOverride : prev?.sessionOverride,
+        });
+      }
+    });
     return {
       clubs: Array.from(map.values()),
       activeClub: state.activeClub && deletedSet.has(state.activeClub) ? null : state.activeClub,

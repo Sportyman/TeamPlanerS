@@ -136,11 +136,40 @@ export interface BoatInventory {
   [boatTypeId: string]: number;
 }
 
-export type ClubID = string; 
+export type ClubID = string;
+
+export interface ClubLocation {
+  id: string;
+  name: string;
+  createdAt?: string;
+  createdBy?: string;
+}
+
+export interface ClubSchedule {
+  dayOfWeek: number;
+  startTime: string;
+  endTime?: string;
+  locationId?: string;
+  locationName: string;
+}
+
+export interface SessionOverride {
+  targetDate: string;
+  dateOverride?: string;
+  startTime?: string;
+  endTime?: string;
+  locationName?: string;
+  isCancelled?: boolean;
+  note?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
 
 export interface Club {
-    id: ClubID;
-    label: string;
+  id: ClubID;
+  label: string;
+  defaultSchedule?: ClubSchedule;
+  sessionOverride?: SessionOverride | null;
 }
 
 export interface ClubSettings {

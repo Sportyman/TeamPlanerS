@@ -8,7 +8,9 @@ import { StepIndicator } from './session/StepIndicator';
 import { AttendanceList } from './session/AttendanceList';
 import { InventorySelector } from './session/InventorySelector';
 import { LoadingScreen } from './layout/LoadingScreen';
+import { UpcomingSessionBanner } from './schedule/UpcomingSessionBanner';
 import { useWhatsAppPolls } from '../hooks/useWhatsAppPolls';
+import { usePermissions } from '../hooks/usePermissions';
 import { calculateSessionBoatRecommendation } from '../services/boatAllocationLogic';
 import { recordClubAttendance } from '../services/syncService';
 import { getDefaultBoatDefs } from '../services/clubEquipmentService';
@@ -22,12 +24,14 @@ export const SessionManager: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { effectiveClubPeople, updateMemberRole } = useWhatsAppPolls();
+  const { isStaff } = usePermissions();
 
   const currentSession = activeClub ? sessions[activeClub] : undefined;
   const [localInventory, setLocalInventory] = useState<BoatInventory>(currentSession?.inventory || {});
   const [hasManualInventoryEdit, setHasManualInventoryEdit] = useState(false);
 
-  const currentClubLabel = activeClub ? (clubs.find((c) => c.id === activeClub)?.label || '') : '';
+  const currentClubObj = activeClub ? clubs.find((c) => c.id === activeClub) : undefined;
+  const currentClubLabel = currentClubObj?.label || '';
   const storedDefs = activeClub ? clubSettings[activeClub]?.boatDefinitions : undefined;
   const boatDefinitions = useMemo(
     () => (storedDefs && storedDefs.length > 0 ? storedDefs : activeClub ? getDefaultBoatDefs(activeClub, currentClubLabel) : []),
@@ -119,6 +123,7 @@ export const SessionManager: React.FC = () => {
           <button onClick={() => handleStepChange(2)} className="text-sm font-black text-brand-600 hover:text-brand-700 flex items-center gap-2"><ArrowRight size={20} /> חזרה להגדרות</button>
           <button onClick={handleReset} className="text-sm font-black text-red-500 hover:bg-red-50 px-4 py-2 rounded-xl transition-all flex items-center gap-2"><RotateCcw size={16} /> איפוס אימון</button>
         </div>
+        <UpcomingSessionBanner club={currentClubObj} canEdit={isStaff} />
         <PairingBoard />
       </div>
     );
@@ -127,6 +132,7 @@ export const SessionManager: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <StepIndicator currentStep={step} onStepClick={handleStepChange} isStep2Disabled={currentSession.presentPersonIds.length === 0} />
+      <UpcomingSessionBanner club={currentClubObj} canEdit={isStaff} />
       {step === 1 && (
         <AttendanceList
           people={clubPeople} presentIds={currentSession.presentPersonIds}

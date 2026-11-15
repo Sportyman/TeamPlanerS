@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { BoatTypeLabel, getRoleLabel, Role, TEAM_COLORS, BoatType, Gender } from '../types';
-import { Ship, Calendar, AlertCircle, Printer } from 'lucide-react';
+import { Ship, Calendar, Clock, MapPin, AlertCircle, Printer } from 'lucide-react';
 
 interface PublicMember {
   name: string;
@@ -20,29 +20,27 @@ export const PublicPairingView: React.FC = () => {
   const location = useLocation();
   const [teams, setTeams] = useState<PublicTeam[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [clubName, setClubName] = useState('');
   const [dateStr, setDateStr] = useState('');
+  const [timeStr, setTimeStr] = useState('');
+  const [locationName, setLocationName] = useState('');
+  const [sessionNote, setSessionNote] = useState('');
   const [customLabels, setCustomLabels] = useState<Record<string, string>>({ ...BoatTypeLabel });
 
   useEffect(() => {
     try {
       const params = new URLSearchParams(location.search);
       const data = params.get('data');
-      
-      if (!data) {
-        setError('לא נמצאו נתוני שיבוץ בקישור.');
-        return;
-      }
-
-      // Decode Base64
+      if (!data) { setError('לא נמצאו נתוני שיבוץ בקישור.'); return; }
       const jsonString = decodeURIComponent(escape(atob(data)));
       const parsedData = JSON.parse(jsonString);
-      
       setTeams(parsedData.teams);
+      setClubName(parsedData.clubName || '');
       setDateStr(parsedData.date || new Date().toLocaleDateString('he-IL'));
-      if (parsedData.labels) {
-          setCustomLabels(parsedData.labels);
-      }
-      
+      setTimeStr(parsedData.time || '');
+      setLocationName(parsedData.location || '');
+      setSessionNote(parsedData.note || '');
+      if (parsedData.labels) setCustomLabels(parsedData.labels);
     } catch (err) {
       console.error(err);
       setError('הקישור אינו תקין או פג תוקף.');
@@ -81,11 +79,13 @@ export const PublicPairingView: React.FC = () => {
           <div className="inline-flex items-center justify-center w-12 h-12 bg-brand-100 text-brand-600 rounded-full mb-4 print:hidden">
             <Ship size={24} />
           </div>
-          <h1 className="text-2xl font-bold text-slate-800">שיבוצי אימון</h1>
-          <div className="flex items-center justify-center gap-2 mt-2 text-slate-500">
-            <Calendar size={16} />
-            <span>{dateStr}</span>
+          <h1 className="text-2xl font-bold text-slate-800">שיבוצי אימון{clubName ? ` — ${clubName}` : ''}</h1>
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 mt-2 text-sm font-semibold text-slate-600">
+            <span className="flex items-center gap-1.5"><Calendar size={16} className="text-brand-600" /><span>{dateStr}</span></span>
+            {timeStr && <span className="flex items-center gap-1.5"><Clock size={15} className="text-slate-400" /><span>{timeStr}</span></span>}
+            {locationName && <span className="flex items-center gap-1.5"><MapPin size={15} className="text-emerald-600" /><span>{locationName}</span></span>}
           </div>
+          {sessionNote && <p className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 mt-3 inline-block">{sessionNote}</p>}
         </div>
 
         {/* List */}

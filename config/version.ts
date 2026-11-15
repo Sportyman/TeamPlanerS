@@ -1,3 +1,3 @@
-export const APP_VERSION = '6.3.13';
+export const APP_VERSION = '6.3.14';
 export const LAST_COMMIT_MESSAGE =
-  'feat(admin,whatsapp): club editing, group dropdown select, JID filter, keyword guide modal, and mock user purge';
+  'feat(schedule): add shared global location catalog, default club schedule, upcoming session calculation, temporary overrides, and pairing board banner';

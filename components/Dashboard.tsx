@@ -2,19 +2,21 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { Role, Person, AccessLevel } from '../types';
-import { Trash2, UserPlus, Ship, Users, Calendar, Clock, Sparkles, ArrowRight, MessageSquare } from 'lucide-react';
+import { Trash2, UserPlus, Ship, Users, Calendar, CalendarClock, Clock, Sparkles, ArrowRight, MessageSquare } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { InviteManager } from './invites/InviteManager';
 import { PeopleManagementView } from './dashboard/PeopleManagementView';
 import { InventoryEditor } from './dashboard/InventoryEditor';
 import { MembershipRequests } from './dashboard/MembershipRequests';
+import { ClubScheduleView } from './dashboard/ClubScheduleView';
 import { WhatsAppDashboardView } from './whatsapp/WhatsAppDashboardView';
 import { approveMembership, saveUserProfile } from '../services/profileService';
 import { getDefaultBoatDefs, saveClubBoatDefinitions } from '../services/clubEquipmentService';
+import { formatScheduleSummary } from '../services/scheduleService';
 import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 
-type ViewMode = 'MENU' | 'PEOPLE' | 'INVENTORY' | 'MEMBERSHIPS' | 'INVITES' | 'WHATSAPP';
+type ViewMode = 'MENU' | 'PEOPLE' | 'INVENTORY' | 'MEMBERSHIPS' | 'INVITES' | 'WHATSAPP' | 'SCHEDULE';
 
 export const Dashboard: React.FC = () => {
   const { people, activeClub, clubs, clubSettings, addNotification } = useAppStore();
@@ -27,7 +29,8 @@ export const Dashboard: React.FC = () => {
   }, [searchParams]);
 
   if (!activeClub) return null;
-  const currentClubLabel = clubs.find(c => c.id === activeClub)?.label || '';
+  const currentClub = clubs.find(c => c.id === activeClub);
+  const currentClubLabel = currentClub?.label || '';
   const clubPeople = people.filter(p => p.clubId === activeClub);
   const rawSettings = clubSettings[activeClub];
   const boatDefs = rawSettings?.boatDefinitions?.length ? rawSettings.boatDefinitions : getDefaultBoatDefs(activeClub, currentClubLabel);
@@ -62,6 +65,7 @@ export const Dashboard: React.FC = () => {
 
   if (view === 'INVITES') return <div className="max-w-4xl mx-auto py-6"><button onClick={() => navigate('/app/manage')} className="flex items-center gap-2 text-slate-500 mb-6"><ArrowRight size={20} /> חזרה</button><InviteManager /></div>;
   if (view === 'WHATSAPP') return <WhatsAppDashboardView />;
+  if (view === 'SCHEDULE' && currentClub) return <ClubScheduleView club={currentClub} onBack={() => navigate('/app/manage')} />;
   if (view === 'MEMBERSHIPS') return <MembershipRequests clubId={activeClub} onApprove={handleApprove} onBack={() => navigate('/app/manage')} />;
   if (view === 'INVENTORY') return (
     <InventoryEditor
@@ -95,6 +99,7 @@ export const Dashboard: React.FC = () => {
               <button onClick={() => navigate('/app/manage?view=INVITES')} className="bg-white p-8 rounded-3xl border flex flex-col items-center gap-4 shadow-sm hover:shadow-lg transition-all"><Sparkles size={32} className="text-brand-600"/><h3 className="font-bold">לינקים וצירוף</h3></button>
               <button onClick={() => navigate('/app/manage?view=MEMBERSHIPS')} className="bg-white p-8 rounded-3xl border flex flex-col items-center gap-4 shadow-sm hover:shadow-lg transition-all"><Clock size={32} className="text-emerald-600"/><h3 className="font-bold">בקשות הצטרפות</h3></button>
               <button onClick={() => navigate('/app/manage?view=INVENTORY')} className="bg-white p-8 rounded-3xl border flex flex-col items-center gap-4 shadow-sm hover:shadow-lg transition-all"><Ship size={32} className="text-orange-600"/><h3 className="font-bold">ניהול ציוד</h3></button>
+              <button onClick={() => navigate('/app/manage?view=SCHEDULE')} className="col-span-1 md:col-span-2 bg-white p-6 rounded-3xl border flex items-center justify-center gap-4 shadow-sm hover:shadow-lg transition-all"><CalendarClock size={28} className="text-brand-600"/><div className="text-right"><h3 className="font-bold text-slate-900">לו״ז ומיקום קבוע</h3><p className="text-xs text-slate-500">{formatScheduleSummary(currentClub?.defaultSchedule)}</p></div></button>
               <button onClick={() => navigate('/app/manage?view=WHATSAPP')} className="col-span-1 md:col-span-2 bg-white p-6 rounded-3xl border flex items-center justify-center gap-4 shadow-sm hover:shadow-lg transition-all"><MessageSquare size={28} className="text-emerald-600"/><div className="text-right"><h3 className="font-bold text-slate-900">ניהול וואטסאפ ומיפוי</h3><p className="text-xs text-slate-500">סיכום הצבעות, שיוך תמונות פרופיל והגדרות קבוצה</p></div></button>
           </div>
       </div>

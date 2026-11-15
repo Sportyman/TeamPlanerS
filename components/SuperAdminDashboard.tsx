@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { Shield, Trash2, UserCheck, Home, Waves, Plus, LayoutGrid, Edit2, Check, X, Eraser } from 'lucide-react';
+import { ClubSchedule } from '../types';
+import { Shield, UserCheck, Home, Waves, Plus, LayoutGrid, Eraser } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AdminDashboardShell } from './admin/AdminDashboardShell';
+import { ClubCardItem } from './admin/ClubCardItem';
+import { DEFAULT_SCHEDULE_DRAFT, ScheduleFieldsForm } from './schedule/ScheduleFieldsForm';
 import { fetchGlobalConfig, addLog } from '../services/syncService';
 import {
   isLegacyMockId, markClubDeletedInCloud, purgeLegacyMockMemberships, saveClubLabelToCloud,
@@ -17,8 +20,7 @@ export const SuperAdminDashboard: React.FC = () => {
   const activeTab = (searchParams.get('tab') as AdminTab) || 'CLUBS';
 
   const [newClubName, setNewClubName] = useState('');
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingLabel, setEditingLabel] = useState('');
+  const [newSchedule, setNewSchedule] = useState<ClubSchedule>(DEFAULT_SCHEDULE_DRAFT);
   const [isPurging, setIsPurging] = useState(false);
 
   useEffect(() => {
@@ -36,26 +38,22 @@ export const SuperAdminDashboard: React.FC = () => {
   }
 
   const mockCountInState = people.filter((p) => isLegacyMockId(p.id)).length;
-
   const setActiveTab = (tab: AdminTab) => setSearchParams({ tab });
 
   const handleAddClub = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = newClubName.trim();
     if (!trimmed) return;
-    const newId = addClub(trimmed);
+    const newId = addClub(trimmed, newSchedule);
     setNewClubName('');
-    await saveClubLabelToCloud(newId, trimmed).catch(() => {});
+    await saveClubLabelToCloud(newId, trimmed, newSchedule).catch(() => {});
     addNotification(`החוג "${trimmed}" נוסף בהצלחה`, 'SUCCESS');
   };
 
-  const handleSaveEdit = async (id: string) => {
-    const trimmed = editingLabel.trim();
-    if (!trimmed) return;
-    updateClub(id, trimmed);
-    setEditingId(null);
-    await saveClubLabelToCloud(id, trimmed).catch(() => {});
-    addNotification(`שם החוג עודכן ל-"${trimmed}"`, 'SUCCESS');
+  const handleSaveEdit = async (id: string, label: string, schedule?: ClubSchedule) => {
+    updateClub(id, label, schedule);
+    await saveClubLabelToCloud(id, label, schedule).catch(() => {});
+    addNotification(`פרטי החוג "${label}" עודכנו בהצלחה`, 'SUCCESS');
   };
 
   const handleDeleteClub = async (id: string, label: string) => {
@@ -90,7 +88,7 @@ export const SuperAdminDashboard: React.FC = () => {
           </div>
           <div>
             <h1 className="text-3xl font-black text-slate-800 tracking-tight">ניהול מערכת (Super Admin)</h1>
-            <p className="text-slate-500 font-medium">ניהול מועדונים, הרשאות והגדרות ליבה</p>
+            <p className="text-slate-500 font-medium">ניהול מועדונים, ימים, שעות, מיקומים והרשאות</p>
           </div>
         </div>
         <button onClick={() => navigate('/')} className="flex items-center justify-center gap-3 px-6 py-3 bg-white border border-slate-200 text-slate-600 hover:text-brand-600 rounded-2xl transition-all font-bold">
@@ -109,7 +107,7 @@ export const SuperAdminDashboard: React.FC = () => {
 
       {activeTab === 'CLUBS' ? (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6">
+          <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <h2 className="font-black text-2xl flex items-center gap-3 text-slate-800"><Waves size={28} className="text-brand-600" /> ניהול רשימת חוגים</h2>
               <button
@@ -123,44 +121,33 @@ export const SuperAdminDashboard: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleAddClub} className="flex flex-col md:flex-row gap-4">
-              <input type="text" value={newClubName} onChange={(e) => setNewClubName(e.target.value)} className="flex-1 px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-brand-500 focus:bg-white outline-none font-bold transition-all" placeholder="שם החוג החדש..." />
-              <button type="submit" className="bg-brand-600 hover:bg-brand-500 text-white px-10 py-4 rounded-2xl font-black text-lg shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all"><Plus size={24} /> הוסף חוג</button>
+            <form onSubmit={handleAddClub} className="bg-slate-50/80 border border-slate-200 rounded-3xl p-5 space-y-4">
+              <div className="text-xs font-black text-slate-700">יצירת חוג חדש (שם, יום ושעה קבועים ומיקום מהמאגר הכללי):</div>
+              <div className="flex flex-col md:flex-row gap-3">
+                <input
+                  type="text"
+                  value={newClubName}
+                  onChange={(e) => setNewClubName(e.target.value)}
+                  className="flex-1 px-5 py-3 bg-white border border-slate-200 rounded-2xl focus:border-brand-500 outline-none font-bold text-sm"
+                  placeholder="שם החוג החדש (למשל: קייאקים רביעי בוקר)..."
+                  required
+                />
+                <button type="submit" className="bg-brand-600 hover:bg-brand-500 text-white px-8 py-3 rounded-2xl font-black text-sm shadow-md flex items-center justify-center gap-2 whitespace-nowrap">
+                  <Plus size={18} /> הוסף חוג
+                </button>
+              </div>
+              <ScheduleFieldsForm value={newSchedule} onChange={setNewSchedule} compact />
             </form>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {clubs.map((club) => {
-                const isEditing = editingId === club.id;
-                return (
-                  <div key={club.id} className="group p-5 bg-slate-50 border-2 border-slate-100 rounded-3xl flex justify-between items-center gap-3 hover:bg-white hover:border-brand-200 transition-all hover:shadow-lg">
-                    {isEditing ? (
-                      <div className="flex items-center gap-2 w-full">
-                        <input
-                          type="text"
-                          value={editingLabel}
-                          onChange={(e) => setEditingLabel(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(club.id); if (e.key === 'Escape') setEditingId(null); }}
-                          autoFocus
-                          className="flex-1 min-w-0 px-3 py-2 text-sm font-bold bg-white border border-brand-400 rounded-xl focus:outline-none"
-                        />
-                        <button type="button" onClick={() => handleSaveEdit(club.id)} aria-label="שמור שם חוג" className="p-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"><Check size={16} /></button>
-                        <button type="button" onClick={() => setEditingId(null)} aria-label="ביטול עריכה" className="p-2 rounded-xl bg-slate-200 text-slate-600 hover:bg-slate-300"><X size={16} /></button>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-11 h-11 bg-white rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-brand-50 group-hover:text-brand-600 shrink-0 transition-colors"><Waves size={22} /></div>
-                          <span className="font-black text-base text-slate-800 truncate">{club.label}</span>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button type="button" onClick={() => { setEditingId(club.id); setEditingLabel(club.label); }} title="ערוך שם חוג" aria-label="ערוך שם חוג" className="p-2.5 rounded-xl text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"><Edit2 size={18} /></button>
-                          <button type="button" onClick={() => handleDeleteClub(club.id, club.label)} title="מחק חוג" aria-label="מחק חוג" className="p-2.5 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 size={18} /></button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {clubs.map((club) => (
+                <ClubCardItem
+                  key={club.id}
+                  club={club}
+                  onSave={handleSaveEdit}
+                  onDelete={handleDeleteClub}
+                />
+              ))}
             </div>
           </div>
         </div>
@@ -170,3 +157,4 @@ export const SuperAdminDashboard: React.FC = () => {
     </div>
   );
 };
+

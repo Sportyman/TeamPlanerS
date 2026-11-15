@@ -37,12 +37,18 @@ export const removeSuperAdminFromCloud = async (email: string, protectedAdmins: 
   return true;
 };
 
-export const saveClubLabelToCloud = async (clubId: string, label: string): Promise<void> => {
-  await setDoc(doc(db, 'clubs', clubId), {
+export const saveClubLabelToCloud = async (
+  clubId: string,
+  label: string,
+  defaultSchedule?: Club['defaultSchedule']
+): Promise<void> => {
+  const payload: Record<string, any> = {
     label: label.trim(),
     isDeleted: false,
     updatedAt: new Date().toISOString(),
-  }, { merge: true });
+  };
+  if (defaultSchedule) payload.defaultSchedule = defaultSchedule;
+  await setDoc(doc(db, 'clubs', clubId), payload, { merge: true });
 };
 
 export const markClubDeletedInCloud = async (clubId: string): Promise<void> => {
@@ -62,7 +68,12 @@ export const fetchCloudClubsCatalog = async (): Promise<{ clubs: Club[]; deleted
     if (data.isDeleted) {
       deletedIds.push(d.id);
     } else if (typeof data.label === 'string' && data.label.trim()) {
-      clubs.push({ id: d.id, label: data.label.trim() });
+      clubs.push({
+        id: d.id,
+        label: data.label.trim(),
+        defaultSchedule: data.defaultSchedule || undefined,
+        sessionOverride: data.sessionOverride || null,
+      });
     }
   });
   return { clubs, deletedIds };
