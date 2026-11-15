@@ -75,15 +75,18 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, people, onNotify 
     return () => { unsubConfig(); unsubMembers(); };
   }, [userId, activeClub, retryKey]);
 
+  const pollColorsKey = JSON.stringify(clubConfig.pollColors || {});
+
   useEffect(() => {
     if (!userId || !activeClub) return;
+    const parsedColors = JSON.parse(pollColorsKey) as Record<string, string>;
     const unsubPolls = subscribeToPollsEvents(
-      clubConfig.pollColors,
+      parsedColors,
       (list) => { setPolls(list); setIsLoading(false); },
       (err) => { setError(err.message); setIsLoading(false); }
     );
     return () => unsubPolls();
-  }, [userId, activeClub, clubConfig.pollColors, retryKey]);
+  }, [userId, activeClub, pollColorsKey, retryKey]);
 
   const relevantPolls = useMemo(() => {
     if (!clubConfig.linkedGroups.length) return [];

@@ -1,5 +1,5 @@
 import { db } from '../../firebase';
-import { collection, doc, getDocs, limit, onSnapshot, query, Unsubscribe, where } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, query, Unsubscribe, where } from 'firebase/firestore';
 import { ClubID } from '../../types';
 import { ClubWhatsAppConfig, PollEvent, PollVote, WhatsAppMemberMapping } from '../../types/whatsapp';
 import { DEFAULT_KEYWORD_RULES } from '../../config/whatsappDefaults';
@@ -13,20 +13,23 @@ export const subscribeToPollsEvents = (
   onError: (err: Error) => void
 ): Unsubscribe => {
   const path = 'polls_events';
-  const q = query(collection(db, path), limit(60));
   return onSnapshot(
-    q,
+    collection(db, path),
     (snap) => {
       const parsed: PollEvent[] = snap.docs
         .map((d) => {
           const data = d.data();
           const pollId = String(data.pollId || d.id);
-          const createdAtMs = toTimestampMs(data.createdAt);
+          const createdAtMs =
+            toTimestampMs(data.createdAt) ||
+            toTimestampMs(data.timestamp) ||
+            toTimestampMs(data.created_at) ||
+            toTimestampMs(data.updatedAt);
           const { displayDate, displayTime } = formatHebrewPollDate(createdAtMs);
           return {
             id: d.id,
             pollId,
-            group: String(data.groupName || data.group || 'קבוצה כללית'),
+            group: String(data.groupName || data.group || 'קבוצה כללית').trim(),
             question: String(data.question || 'סקר ללא כותרת'),
             options: extractOptionLabels(data.options),
             createdAtMs,
