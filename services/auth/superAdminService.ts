@@ -101,3 +101,27 @@ export const purgeLegacyMockMemberships = async (): Promise<number> => {
   addLog(`Purged ${toDelete.length} legacy mock memberships`, 'SYNC');
   return toDelete.length;
 };
+
+export const syncStrandedLocalClubsToCloud = async (
+  localClubs: Club[],
+  cloudClubs: Club[],
+  deletedIds: string[]
+): Promise<Club[]> => {
+  const cloudSet = new Set(cloudClubs.map((c) => c.id));
+  const deletedSet = new Set(deletedIds);
+  const stranded = localClubs.filter(
+    (c) => c.id.startsWith('CLUB-') && !cloudSet.has(c.id) && !deletedSet.has(c.id)
+  );
+  if (stranded.length === 0) return cloudClubs;
+  const merged = [...cloudClubs];
+  for (const club of stranded) {
+    try {
+      await saveClubLabelToCloud(club.id, club.label, club.defaultSchedule);
+      merged.push(club);
+      addLog(`Synced local club "${club.label}" (${club.id}) to cloud`, 'SYNC');
+    } catch (err) {
+      addLog(`Failed to sync local club ${club.id}: ${err}`, 'WARN');
+    }
+  }
+  return merged;
+};

@@ -2,7 +2,7 @@ import { db } from '../firebase';
 import { doc, getDoc, getDocFromServer, getDocs, getDocsFromServer, setDoc, collection, query, where, onSnapshot, Unsubscribe, addDoc, increment } from 'firebase/firestore';
 import { useAppStore } from '../store';
 import { Person, ClubID, MembershipStatus, UserProfile, Role, AccessLevel, Gender } from '../types';
-import { fetchCloudClubsCatalog, isLegacyMockId } from './auth/superAdminService';
+import { fetchCloudClubsCatalog, isLegacyMockId, syncStrandedLocalClubsToCloud } from './auth/superAdminService';
 import { fetchGlobalLocations } from './scheduleService';
 
 const systemLogs: { time: string; msg: string; type: 'INFO' | 'WARN' | 'ERROR' | 'SYNC' }[] = [];
@@ -175,7 +175,7 @@ export const ensureAdminMembership = async (clubId: ClubID, user: { uid: string;
 };
 
 export const fetchGlobalConfig = async () => {
-    const { setGlobalConfig, mergeCloudClubs, setLocations } = useAppStore.getState();
+    const { setGlobalConfig, mergeCloudClubs, setLocations, user } = useAppStore.getState();
     try {
         const docRef = doc(db, 'config', 'global');
         const docSnap = await getDocFromServer(docRef).catch(() => getDoc(docRef));
@@ -184,13 +184,17 @@ export const fetchGlobalConfig = async () => {
             setGlobalConfig({ superAdmins: d.superAdmins || [], protectedAdmins: d.protectedAdmins || [], permissions: d.permissions || [] });
         }
         const [catalog, locs] = await Promise.all([fetchCloudClubsCatalog().catch(() => null), fetchGlobalLocations().catch(() => null)]);
-        if (catalog) mergeCloudClubs(catalog.clubs, catalog.deletedIds);
+        if (catalog) {
+            const clubs = user?.isAdmin && !user.isDev
+                ? await syncStrandedLocalClubsToCloud(useAppStore.getState().clubs, catalog.clubs, catalog.deletedIds)
+                : catalog.clubs;
+            mergeCloudClubs(clubs, catalog.deletedIds);
+        }
         if (locs) setLocations(locs);
     } catch (error) { addLog(`Global config fetch error: ${error}`, 'ERROR'); }
 };
 
 export const sendNotificationToClub = async (clubId: ClubID, message: string, type: 'INFO' | 'SUCCESS' | 'WARN' = 'INFO', senderId?: string) => {
-    try {
-        await addDoc(collection(db, 'notifications'), { clubId, message, type, senderId: senderId || null, timestamp: new Date().toISOString(), read: false });
-    } catch (e) { addLog(`Failed to send notification: ${e}`, 'ERROR'); }
+    try { await addDoc(collection(db, 'notifications'), { clubId, message, type, senderId: senderId || null, timestamp: new Date().toISOString(), read: false }); }
+    catch (e) { addLog(`Failed to send notification: ${e}`, 'ERROR'); }
 };

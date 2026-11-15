@@ -46,21 +46,36 @@ export const SuperAdminDashboard: React.FC = () => {
     if (!trimmed) return;
     const newId = addClub(trimmed, newSchedule);
     setNewClubName('');
-    await saveClubLabelToCloud(newId, trimmed, newSchedule).catch(() => {});
-    addNotification(`החוג "${trimmed}" נוסף בהצלחה`, 'SUCCESS');
+    try {
+      await saveClubLabelToCloud(newId, trimmed, newSchedule);
+      addNotification(`החוג "${trimmed}" נוסף ונשמר בענן בהצלחה`, 'SUCCESS');
+    } catch (err) {
+      addLog(`Failed saving new club ${newId} to cloud: ${err}`, 'ERROR');
+      addNotification(`החוג "${trimmed}" נוסף מקומית אך נכשלה השמירה לענן`, 'WARN');
+    }
   };
 
   const handleSaveEdit = async (id: string, label: string, schedule?: ClubSchedule) => {
     updateClub(id, label, schedule);
-    await saveClubLabelToCloud(id, label, schedule).catch(() => {});
-    addNotification(`פרטי החוג "${label}" עודכנו בהצלחה`, 'SUCCESS');
+    try {
+      await saveClubLabelToCloud(id, label, schedule);
+      addNotification(`פרטי החוג "${label}" עודכנו בענן בהצלחה`, 'SUCCESS');
+    } catch (err) {
+      addLog(`Failed updating club ${id} in cloud: ${err}`, 'ERROR');
+      addNotification(`שגיאה בשמירת עדכון החוג "${label}" לענן`, 'WARN');
+    }
   };
 
   const handleDeleteClub = async (id: string, label: string) => {
     if (window.confirm(`האם למחוק את החוג "${label}"? פעולה זו אינה הפיכה!`)) {
       removeClub(id);
-      await markClubDeletedInCloud(id).catch(() => {});
-      addNotification(`החוג "${label}" הוסר`, 'INFO');
+      try {
+        await markClubDeletedInCloud(id);
+        addNotification(`החוג "${label}" הוסר`, 'INFO');
+      } catch (err) {
+        addLog(`Failed deleting club ${id} in cloud: ${err}`, 'ERROR');
+        addNotification(`שגיאה במחיקת החוג "${label}" מהענן`, 'WARN');
+      }
     }
   };
 
