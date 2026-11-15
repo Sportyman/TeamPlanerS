@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, MapPin, Plus } from 'lucide-react';
+import { ClubLocation } from '../../types';
 import { useAppStore } from '../../store';
-import { fetchGlobalLocations, normalizeLocationName } from '../../services/scheduleService';
+import { deleteGlobalLocation, fetchGlobalLocations, normalizeLocationName } from '../../services/scheduleService';
 import { NewLocationFormCard } from './NewLocationFormCard';
 import { LocationDropdownMenu } from './LocationDropdownMenu';
 
@@ -25,11 +26,12 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
   allowOneOffCustom = false,
   compact = false,
 }) => {
-  const { locations, setLocations } = useAppStore();
+  const { locations, setLocations, addNotification } = useAppStore();
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [isAddingNew, setIsAddingNew] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<ClubLocation | null>(null);
   const [oneOffMode, setOneOffMode] = useState(false);
 
   useEffect(() => {
@@ -42,9 +44,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
 
   useEffect(() => {
     const onOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setMenuOpen(false);
     };
     const onEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setMenuOpen(false);
@@ -68,6 +68,20 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
 
   const showOneOffInput =
     allowOneOffCustom && (oneOffMode || (Boolean(value) && !isValueInCatalog && locationId === undefined));
+
+  const handleDeleteCatalogLocation = async (loc: ClubLocation) => {
+    try {
+      await deleteGlobalLocation(loc.id);
+      const isSelected =
+        (locationId && locationId === loc.id) ||
+        normalizeLocationName(value).toLowerCase() === normalizeLocationName(loc.name).toLowerCase();
+      if (isSelected) onChange('', undefined, undefined, undefined);
+      if (editingLocation?.id === loc.id) setEditingLocation(null);
+      addNotification(`המיקום "${loc.name}" נמחק מהמאגר הכללי`, 'INFO');
+    } catch {
+      addNotification('שגיאה במחיקת המיקום מהמאגר', 'WARN');
+    }
+  };
 
   return (
     <div ref={containerRef} className="space-y-2.5">
@@ -109,21 +123,24 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
               selectedValue={value}
               allowOneOffCustom={allowOneOffCustom}
               onSelectCatalog={(loc) => {
-                onChange(
-                  loc.name,
-                  loc.id,
-                  loc.lat !== undefined && loc.lng !== undefined ? { lat: loc.lat, lng: loc.lng } : undefined,
-                  loc.areaLabel
-                );
+                const coords = loc.lat !== undefined && loc.lng !== undefined ? { lat: loc.lat, lng: loc.lng } : undefined;
+                onChange(loc.name, loc.id, coords, loc.areaLabel);
                 setOneOffMode(false);
                 setMenuOpen(false);
               }}
+              onEditLocation={(loc) => {
+                setEditingLocation(loc);
+                setIsAddingNew(false);
+                setMenuOpen(false);
+              }}
+              onDeleteLocation={handleDeleteCatalogLocation}
               onSelectOneOff={() => {
                 setOneOffMode(true);
                 onChange('', undefined);
                 setMenuOpen(false);
               }}
               onRequestAddNew={() => {
+                setEditingLocation(null);
                 setIsAddingNew(true);
                 setMenuOpen(false);
               }}
@@ -133,10 +150,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
 
         <button
           type="button"
-          onClick={() => {
-            setIsAddingNew((v) => !v);
-            setMenuOpen(false);
-          }}
+          onClick={() => { setEditingLocation(null); setIsAddingNew((v) => !v); setMenuOpen(false); }}
           className={`px-3.5 rounded-xl border border-brand-200 bg-brand-50 hover:bg-brand-100 text-brand-800 font-bold flex items-center justify-center gap-1.5 whitespace-nowrap ${
             compact ? 'py-2 text-xs' : 'py-2.5 text-xs'
           }`}
@@ -156,20 +170,24 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         />
       )}
 
-      {isAddingNew && (
+      {(isAddingNew || editingLocation) && (
         <NewLocationFormCard
           existingLocations={sortedLocations}
+          editingLocation={editingLocation}
           onSaved={(saved) => {
-            onChange(
-              saved.name,
-              saved.id,
-              saved.lat !== undefined && saved.lng !== undefined ? { lat: saved.lat, lng: saved.lng } : undefined,
-              saved.areaLabel
-            );
+            const shouldApply =
+              !editingLocation ||
+              (locationId && locationId === editingLocation.id) ||
+              normalizeLocationName(value).toLowerCase() === normalizeLocationName(editingLocation.name).toLowerCase();
+            if (shouldApply) {
+              const coords = saved.lat !== undefined && saved.lng !== undefined ? { lat: saved.lat, lng: saved.lng } : undefined;
+              onChange(saved.name, saved.id, coords, saved.areaLabel);
+            }
             setOneOffMode(false);
             setIsAddingNew(false);
+            setEditingLocation(null);
           }}
-          onClose={() => setIsAddingNew(false)}
+          onClose={() => { setIsAddingNew(false); setEditingLocation(null); }}
         />
       )}
     </div>

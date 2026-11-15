@@ -4,6 +4,7 @@ import { ClubSchedule } from '../types';
 import { Shield, UserCheck, Home, Waves, Plus, LayoutGrid, Eraser } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AdminDashboardShell } from './admin/AdminDashboardShell';
+import { CleanResetPanel } from './admin/CleanResetPanel';
 import { ClubCardItem } from './admin/ClubCardItem';
 import { DEFAULT_SCHEDULE_DRAFT, ScheduleFieldsForm } from './schedule/ScheduleFieldsForm';
 import { fetchGlobalConfig, addLog } from '../services/syncService';
@@ -125,15 +126,18 @@ export const SuperAdminDashboard: React.FC = () => {
           <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <h2 className="font-black text-2xl flex items-center gap-3 text-slate-800"><Waves size={28} className="text-brand-600" /> ניהול רשימת חוגים</h2>
-              <button
-                type="button"
-                disabled={isPurging}
-                onClick={handlePurgeMock}
-                className="px-4 py-2 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold flex items-center gap-2"
-              >
-                <Eraser size={15} />
-                <span>{isPurging ? 'מנקה...' : `נקה חברי דמה מהמסד${mockCountInState > 0 ? ` (${mockCountInState})` : ''}`}</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isPurging}
+                  onClick={handlePurgeMock}
+                  className="px-4 py-2 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold flex items-center gap-2"
+                >
+                  <Eraser size={15} />
+                  <span>{isPurging ? 'מנקה...' : `נקה חברי דמה מהמסד${mockCountInState > 0 ? ` (${mockCountInState})` : ''}`}</span>
+                </button>
+                <CleanResetPanel />
+              </div>
             </div>
 
             <form onSubmit={handleAddClub} className="bg-slate-50/80 border border-slate-200 rounded-3xl p-5 space-y-4">

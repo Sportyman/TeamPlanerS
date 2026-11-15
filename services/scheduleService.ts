@@ -3,7 +3,13 @@ import { db } from '../firebase';
 import { Club, ClubSchedule, SessionOverride } from '../types';
 import { saveClubLabelToCloud } from './auth/superAdminService';
 
-export { normalizeLocationName, fetchGlobalLocations, addGlobalLocation } from './locationCatalogService';
+export {
+  normalizeLocationName,
+  fetchGlobalLocations,
+  addGlobalLocation,
+  updateGlobalLocation,
+  deleteGlobalLocation,
+} from './locationCatalogService';
 
 export const DAY_NAMES_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'] as const;
 

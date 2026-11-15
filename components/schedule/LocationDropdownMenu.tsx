@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Check, Compass, Edit3, MapPin, Plus, Search } from 'lucide-react';
+import { Check, Compass, Edit3, MapPin, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { ClubLocation } from '../../types';
 import { normalizeLocationName } from '../../services/scheduleService';
 
@@ -8,6 +8,8 @@ interface LocationDropdownMenuProps {
   selectedValue: string;
   allowOneOffCustom: boolean;
   onSelectCatalog: (loc: ClubLocation) => void;
+  onEditLocation: (loc: ClubLocation) => void;
+  onDeleteLocation: (loc: ClubLocation) => Promise<void> | void;
   onSelectOneOff: () => void;
   onRequestAddNew: () => void;
 }
@@ -17,15 +19,29 @@ export const LocationDropdownMenu: React.FC<LocationDropdownMenuProps> = ({
   selectedValue,
   allowOneOffCustom,
   onSelectCatalog,
+  onEditLocation,
+  onDeleteLocation,
   onSelectOneOff,
   onRequestAddNew,
 }) => {
   const [filterText, setFilterText] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = filterText.trim().toLowerCase();
     return q ? locations.filter((l) => l.name.toLowerCase().includes(q)) : locations;
   }, [locations, filterText]);
+
+  const handleConfirmDelete = async (loc: ClubLocation) => {
+    setDeletingId(loc.id);
+    try {
+      await onDeleteLocation(loc);
+    } finally {
+      setDeletingId(null);
+      setConfirmDeleteId(null);
+    }
+  };
 
   return (
     <div className="absolute right-0 left-0 top-full mt-1.5 z-50 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
@@ -53,40 +69,84 @@ export const LocationDropdownMenu: React.FC<LocationDropdownMenuProps> = ({
           </div>
         ) : (
           filtered.map((loc) => {
+            const key = loc.id || loc.name;
             const isSelected =
-              normalizeLocationName(selectedValue).toLowerCase() ===
-              normalizeLocationName(loc.name).toLowerCase();
+              normalizeLocationName(selectedValue).toLowerCase() === normalizeLocationName(loc.name).toLowerCase();
             const hasCoords = typeof loc.lat === 'number' && typeof loc.lng === 'number';
+            const isConfirming = confirmDeleteId === key;
+
             return (
-              <button
-                key={loc.id || loc.name}
-                type="button"
-                onClick={() => onSelectCatalog(loc)}
-                className={`w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl text-right transition-colors ${
+              <div
+                key={key}
+                className={`flex items-start gap-1 rounded-xl transition-colors ${
                   isSelected ? 'bg-brand-50 text-brand-900' : 'hover:bg-slate-50 text-slate-800'
                 }`}
               >
-                <MapPin
-                  size={15}
-                  className={`shrink-0 mt-0.5 ${isSelected ? 'text-brand-600' : 'text-slate-400'}`}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold leading-relaxed whitespace-normal break-words">
-                    {loc.name}
+                <button
+                  type="button"
+                  onClick={() => onSelectCatalog(loc)}
+                  className="flex-1 min-w-0 flex items-start gap-2.5 px-3 py-2.5 text-right"
+                >
+                  <MapPin size={15} className={`shrink-0 mt-0.5 ${isSelected ? 'text-brand-600' : 'text-slate-400'}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold leading-relaxed whitespace-normal break-words">{loc.name}</div>
+                    {loc.areaLabel && loc.areaLabel !== loc.name && (
+                      <div className="text-[11px] font-medium text-slate-500 whitespace-normal break-words leading-snug">
+                        {loc.areaLabel}
+                      </div>
+                    )}
                   </div>
-                  {loc.areaLabel && loc.areaLabel !== loc.name && (
-                    <div className="text-[11px] font-medium text-slate-500 whitespace-normal break-words leading-snug">
-                      {loc.areaLabel}
+                  {hasCoords && (
+                    <span title="כולל נ״צ לתחזית מזג אוויר וגלים" className="text-sky-600 shrink-0 mt-1">
+                      <Compass size={13} />
+                    </span>
+                  )}
+                  {isSelected && <Check size={16} className="text-brand-600 shrink-0 mt-0.5" />}
+                </button>
+
+                <div className="flex items-center gap-0.5 px-1.5 py-2 shrink-0">
+                  {isConfirming ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        disabled={deletingId === loc.id}
+                        onClick={() => handleConfirmDelete(loc)}
+                        className="px-2 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold"
+                      >
+                        {deletingId === loc.id ? '...' : 'מחק'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="px-2 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-[11px] font-bold"
+                      >
+                        ביטול
+                      </button>
                     </div>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onEditLocation(loc)}
+                        title="ערוך מיקום"
+                        aria-label={`ערוך ${loc.name}`}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-white transition-colors"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(key)}
+                        title="מחק מיקום"
+                        aria-label={`מחק ${loc.name}`}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-white transition-colors"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </>
                   )}
                 </div>
-                {hasCoords && (
-                  <span title="כולל נ״צ לתחזית מזג אוויר וגלים" className="text-sky-600 shrink-0 mt-1">
-                    <Compass size={13} />
-                  </span>
-                )}
-                {isSelected && <Check size={16} className="text-brand-600 shrink-0 mt-0.5" />}
-              </button>
+              </div>
             );
           })
         )}
