@@ -8,7 +8,12 @@ import { LocationDropdownMenu } from './LocationDropdownMenu';
 interface LocationPickerProps {
   value: string;
   locationId?: string;
-  onChange: (locationName: string, locationId?: string, coords?: { lat?: number; lng?: number }) => void;
+  onChange: (
+    locationName: string,
+    locationId?: string,
+    coords?: { lat?: number; lng?: number },
+    areaLabel?: string
+  ) => void;
   allowOneOffCustom?: boolean;
   compact?: boolean;
 }
@@ -104,7 +109,12 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
               selectedValue={value}
               allowOneOffCustom={allowOneOffCustom}
               onSelectCatalog={(loc) => {
-                onChange(loc.name, loc.id, loc.lat !== undefined && loc.lng !== undefined ? { lat: loc.lat, lng: loc.lng } : undefined);
+                onChange(
+                  loc.name,
+                  loc.id,
+                  loc.lat !== undefined && loc.lng !== undefined ? { lat: loc.lat, lng: loc.lng } : undefined,
+                  loc.areaLabel
+                );
                 setOneOffMode(false);
                 setMenuOpen(false);
               }}
@@ -150,7 +160,12 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         <NewLocationFormCard
           existingLocations={sortedLocations}
           onSaved={(saved) => {
-            onChange(saved.name, saved.id, saved.lat !== undefined && saved.lng !== undefined ? { lat: saved.lat, lng: saved.lng } : undefined);
+            onChange(
+              saved.name,
+              saved.id,
+              saved.lat !== undefined && saved.lng !== undefined ? { lat: saved.lat, lng: saved.lng } : undefined,
+              saved.areaLabel
+            );
             setOneOffMode(false);
             setIsAddingNew(false);
           }}

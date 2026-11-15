@@ -1,3 +1,3 @@
-export const APP_VERSION = '6.3.19';
+export const APP_VERSION = '6.3.20';
 export const LAST_COMMIT_MESSAGE =
-  'fix(clubs,sync): backfill stranded local-only clubs from admin devices to Firestore and surface club cloud save errors';
+  'feat(locations): add interactive OpenStreetMap pin-drop map and reverse geocoding in location creator';

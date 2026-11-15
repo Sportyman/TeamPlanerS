@@ -94,11 +94,12 @@ export const ScheduleFieldsForm: React.FC<ScheduleFieldsFormProps> = ({
         <LocationPicker
           value={value.locationName}
           locationId={value.locationId}
-          onChange={(locationName, locationId, coords) =>
+          onChange={(locationName, locationId, coords, areaLabel) =>
             onChange({
               ...value,
               locationName,
               locationId,
+              areaLabel,
               lat: coords?.lat,
               lng: coords?.lng,
             })

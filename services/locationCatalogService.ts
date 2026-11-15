@@ -20,6 +20,9 @@ const sanitizeLocationItem = (loc: ClubLocation): ClubLocation => {
     id: String(loc.id || `loc-${Date.now()}`),
     name: normalizeLocationName(loc.name),
   };
+  if (typeof loc.areaLabel === 'string' && loc.areaLabel.trim()) {
+    clean.areaLabel = normalizeLocationName(loc.areaLabel);
+  }
   const lat = toValidCoord(loc.lat);
   const lng = toValidCoord(loc.lng);
   if (lat !== undefined && lng !== undefined) {
@@ -42,6 +45,7 @@ export const fetchGlobalLocations = async (): Promise<ClubLocation[]> => {
         map.set(name.toLowerCase(), sanitizeLocationItem({
           id: String(item.id || name),
           name,
+          areaLabel: item.areaLabel,
           lat: item.lat,
           lng: item.lng,
           createdAt: item.createdAt,
@@ -58,6 +62,7 @@ export const fetchGlobalLocations = async (): Promise<ClubLocation[]> => {
           map.set(clean.toLowerCase(), sanitizeLocationItem({
             id: sched?.locationId || clean,
             name: clean,
+            areaLabel: sched?.areaLabel,
             lat: sched?.lat,
             lng: sched?.lng,
           }));
@@ -74,7 +79,8 @@ export const fetchGlobalLocations = async (): Promise<ClubLocation[]> => {
 export const addGlobalLocation = async (
   rawName: string,
   createdBy?: string,
-  coords?: { lat?: number; lng?: number }
+  coords?: { lat?: number; lng?: number },
+  areaLabel?: string
 ): Promise<ClubLocation> => {
   const normalized = normalizeLocationName(rawName);
   if (!normalized) throw new Error('יש להזין שם מיקום');
@@ -89,7 +95,9 @@ export const addGlobalLocation = async (
 
   const existingMatch = mergedMap.get(normalized.toLowerCase());
   const hasNewCoords = coords?.lat !== undefined && coords?.lng !== undefined;
-  if (existingMatch && (!hasNewCoords || (existingMatch.lat !== undefined && existingMatch.lng !== undefined))) {
+  const cleanArea = typeof areaLabel === 'string' && areaLabel.trim() ? normalizeLocationName(areaLabel) : undefined;
+  const hasNewArea = Boolean(cleanArea && !existingMatch?.areaLabel);
+  if (existingMatch && !hasNewCoords && !hasNewArea) {
     useAppStore.getState().setLocations(Array.from(mergedMap.values()));
     return existingMatch;
   }
@@ -97,6 +105,7 @@ export const addGlobalLocation = async (
   const created = sanitizeLocationItem({
     id: existingMatch?.id || `loc-${Date.now()}`,
     name: normalized,
+    areaLabel: cleanArea || existingMatch?.areaLabel,
     lat: coords?.lat ?? existingMatch?.lat,
     lng: coords?.lng ?? existingMatch?.lng,
     createdAt: existingMatch?.createdAt || new Date().toISOString(),

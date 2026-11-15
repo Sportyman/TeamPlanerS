@@ -141,6 +141,7 @@ export type ClubID = string;
 export interface ClubLocation {
   id: string;
   name: string;
+  areaLabel?: string;
   lat?: number;
   lng?: number;
   createdAt?: string;
@@ -153,6 +154,7 @@ export interface ClubSchedule {
   endTime?: string;
   locationId?: string;
   locationName: string;
+  areaLabel?: string;
   lat?: number;
   lng?: number;
 }

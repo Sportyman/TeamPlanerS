@@ -1,54 +1,23 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, MapPin, Search, X } from 'lucide-react';
-
-interface NominatimItem {
-  place_id: number;
-  display_name: string;
-  name?: string;
-  lat: string;
-  lon: string;
-  address?: {
-    city?: string;
-    town?: string;
-    village?: string;
-    municipality?: string;
-    suburb?: string;
-  };
-}
+import { GeoPlaceResult, searchPlacesInIsrael } from '../../services/geocodingService';
 
 interface PlaceSearchInputProps {
-  value: string;
-  onChangeText: (name: string) => void;
-  onSelectPlace: (name: string, coords?: { lat: number; lng: number }) => void;
-  onSubmitEnter: () => void;
+  query: string;
+  onChangeQuery: (q: string) => void;
+  onSelectPlace: (place: GeoPlaceResult) => void;
 }
 
-const formatPlaceSuggestion = (item: NominatimItem): { primary: string; secondary: string; combined: string } => {
-  const parts = item.display_name.split(',').map((p) => p.trim()).filter(Boolean);
-  const primary = (item.name || parts[0] || '').trim();
-  const city =
-    item.address?.city ||
-    item.address?.town ||
-    item.address?.village ||
-    item.address?.municipality ||
-    parts[1] ||
-    '';
-  const secondary = parts.slice(1, 3).join(', ');
-  const combined =
-    primary && city && !primary.includes(city) ? `${primary} (${city})` : primary || item.display_name;
-  return { primary, secondary, combined };
-};
-
 export const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
-  value,
-  onChangeText,
+  query,
+  onChangeQuery,
   onSelectPlace,
-  onSubmitEnter,
 }) => {
   const skipNextFetchRef = useRef(false);
-  const [suggestions, setSuggestions] = useState<NominatimItem[]>([]);
+  const [suggestions, setSuggestions] = useState<GeoPlaceResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [noMatchForQuery, setNoMatchForQuery] = useState(false);
 
   useEffect(() => {
     if (skipNextFetchRef.current) {
@@ -56,40 +25,31 @@ export const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
       return;
     }
 
-    const trimmed = value.trim();
+    const trimmed = query.trim();
     if (trimmed.length < 2) {
       setSuggestions([]);
+      setNoMatchForQuery(false);
       setIsLoading(false);
       return;
     }
 
     const controller = new AbortController();
     setIsLoading(true);
+    setNoMatchForQuery(false);
 
     const timer = window.setTimeout(async () => {
       try {
-        const params = new URLSearchParams({
-          format: 'jsonv2',
-          addressdetails: '1',
-          'accept-language': 'he',
-          countrycodes: 'il',
-          limit: '6',
-          q: trimmed,
-        });
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
-          signal: controller.signal,
-        });
-        if (!res.ok) {
-          setSuggestions([]);
-          return;
-        }
-        const data = (await res.json()) as NominatimItem[];
-        if (!controller.signal.aborted && Array.isArray(data)) {
-          setSuggestions(data);
-          setDropdownOpen(data.length > 0);
+        const results = await searchPlacesInIsrael(trimmed, controller.signal);
+        if (!controller.signal.aborted) {
+          setSuggestions(results);
+          setDropdownOpen(results.length > 0);
+          setNoMatchForQuery(results.length === 0);
         }
       } catch {
-        if (!controller.signal.aborted) setSuggestions([]);
+        if (!controller.signal.aborted) {
+          setSuggestions([]);
+          setNoMatchForQuery(false);
+        }
       } finally {
         if (!controller.signal.aborted) setIsLoading(false);
       }
@@ -99,17 +59,14 @@ export const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [value]);
+  }, [query]);
 
-  const handlePick = (item: NominatimItem) => {
-    const { combined } = formatPlaceSuggestion(item);
-    const lat = parseFloat(item.lat);
-    const lng = parseFloat(item.lon);
-    const coords = Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined;
+  const handlePick = (item: GeoPlaceResult) => {
     skipNextFetchRef.current = true;
     setDropdownOpen(false);
+    setNoMatchForQuery(false);
     setSuggestions([]);
-    onSelectPlace(combined, coords);
+    onSelectPlace(item);
   };
 
   return (
@@ -118,32 +75,27 @@ export const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
         <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         <input
           type="text"
-          value={value}
+          value={query}
           onFocus={() => suggestions.length > 0 && setDropdownOpen(true)}
-          onChange={(e) => onChangeText(e.target.value)}
+          onChange={(e) => onChangeQuery(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              setDropdownOpen(false);
-              onSubmitEnter();
-            } else if (e.key === 'Escape') {
-              setDropdownOpen(false);
-            }
+            if (e.key === 'Escape') setDropdownOpen(false);
           }}
-          placeholder="חפש אזור / מרינה / חוף / כתובת בישראל, או הקלד שם..."
-          className="w-full pr-9 pl-9 py-2.5 text-sm bg-white border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:border-brand-500"
+          placeholder="חפש אזור למיקוד המפה (למשל: מרינה תל אביב, חוף הכרמל)..."
+          className="w-full pr-9 pl-9 py-2 text-xs sm:text-sm bg-white border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:border-brand-500"
         />
         {isLoading ? (
           <Loader2 size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500 animate-spin" />
-        ) : value ? (
+        ) : query ? (
           <button
             type="button"
             onClick={() => {
-              onChangeText('');
+              onChangeQuery('');
               setSuggestions([]);
+              setNoMatchForQuery(false);
               setDropdownOpen(false);
             }}
-            aria-label="נקה חיפוש"
+            aria-label="נקה חיפוש אזור"
             className="absolute left-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600"
           >
             <X size={14} />
@@ -151,36 +103,35 @@ export const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
         ) : null}
       </div>
 
-      <div className="flex items-center justify-between mt-1 px-1 text-[10px] text-slate-400 font-medium">
-        <span>חיפוש חינמי פתוח (OpenStreetMap) לשמירת אזור לחיווי מזג אוויר וגלים</span>
-      </div>
+      {noMatchForQuery && !isLoading && (
+        <p className="mt-1.5 text-[11px] text-amber-700 font-medium leading-snug">
+          לא נמצאה כתובת מדויקת לשם זה — חפש אזור כללי (כמו &ldquo;מרינה תל אביב&rdquo;) או לחץ ישירות על המפה למטה כדי לנעוץ סיכה.
+        </p>
+      )}
 
       {dropdownOpen && suggestions.length > 0 && (
-        <ul className="absolute right-0 left-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100 p-1">
-          {suggestions.map((item) => {
-            const { primary, secondary } = formatPlaceSuggestion(item);
-            return (
-              <li key={item.place_id}>
-                <button
-                  type="button"
-                  onClick={() => handlePick(item)}
-                  className="w-full text-right px-3 py-2.5 rounded-xl hover:bg-brand-50 flex items-start gap-2.5 transition-colors"
-                >
-                  <MapPin size={15} className="text-brand-600 shrink-0 mt-0.5" />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-bold text-slate-800 whitespace-normal break-words leading-snug">
-                      {primary}
-                    </div>
-                    {secondary && (
-                      <div className="text-xs text-slate-500 whitespace-normal break-words mt-0.5">
-                        {secondary}
-                      </div>
-                    )}
+        <ul className="absolute right-0 left-0 top-full mt-1 z-[500] bg-white border border-slate-200 rounded-2xl shadow-xl max-h-56 overflow-y-auto divide-y divide-slate-100 p-1">
+          {suggestions.map((item) => (
+            <li key={item.placeId}>
+              <button
+                type="button"
+                onClick={() => handlePick(item)}
+                className="w-full text-right px-3 py-2.5 rounded-xl hover:bg-brand-50 flex items-start gap-2.5 transition-colors"
+              >
+                <MapPin size={15} className="text-brand-600 shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-bold text-slate-800 whitespace-normal break-words leading-snug">
+                    {item.primaryName}
                   </div>
-                </button>
-              </li>
-            );
-          })}
+                  {item.secondaryText && (
+                    <div className="text-xs text-slate-500 whitespace-normal break-words mt-0.5">
+                      {item.secondaryText}
+                    </div>
+                  )}
+                </div>
+              </button>
+            </li>
+          ))}
         </ul>
       )}
     </div>

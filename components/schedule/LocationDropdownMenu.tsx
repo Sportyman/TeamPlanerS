@@ -70,9 +70,16 @@ export const LocationDropdownMenu: React.FC<LocationDropdownMenuProps> = ({
                   size={15}
                   className={`shrink-0 mt-0.5 ${isSelected ? 'text-brand-600' : 'text-slate-400'}`}
                 />
-                <span className="flex-1 text-sm font-bold leading-relaxed whitespace-normal break-words">
-                  {loc.name}
-                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold leading-relaxed whitespace-normal break-words">
+                    {loc.name}
+                  </div>
+                  {loc.areaLabel && loc.areaLabel !== loc.name && (
+                    <div className="text-[11px] font-medium text-slate-500 whitespace-normal break-words leading-snug">
+                      {loc.areaLabel}
+                    </div>
+                  )}
+                </div>
                 {hasCoords && (
                   <span title="כולל נ״צ לתחזית מזג אוויר וגלים" className="text-sky-600 shrink-0 mt-1">
                     <Compass size={13} />
