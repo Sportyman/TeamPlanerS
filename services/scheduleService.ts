@@ -83,20 +83,34 @@ export const formatScheduleSummary = (schedule?: ClubSchedule): string => {
 
 export const normalizeLocationName = (name: string): string => name.trim().replace(/\s+/g, ' ');
 
+const SHARED_LOCATIONS_DOC = doc(db, 'clubs', '__SHARED_LOCATIONS__');
+
 export const fetchGlobalLocations = async (): Promise<ClubLocation[]> => {
   try {
-    const ref = doc(db, 'config', 'locations');
-    const snap = await getDocFromServer(ref).catch(() => getDoc(ref));
-    if (!snap.exists()) return [];
-    const items = Array.isArray(snap.data().items) ? snap.data().items : [];
-    return items
-      .filter((item: any) => typeof item?.name === 'string' && item.name.trim())
-      .map((item: any) => ({
-        id: String(item.id || item.name),
-        name: normalizeLocationName(item.name),
-        createdAt: item.createdAt,
-        createdBy: item.createdBy,
-      }));
+    const snap = await getDocFromServer(SHARED_LOCATIONS_DOC).catch(() => getDoc(SHARED_LOCATIONS_DOC));
+    const map = new Map<string, ClubLocation>();
+    const rawItems = snap.exists() && Array.isArray(snap.data().items) ? snap.data().items : [];
+    rawItems.forEach((item: any) => {
+      if (typeof item?.name === 'string' && item.name.trim()) {
+        const name = normalizeLocationName(item.name);
+        map.set(name.toLowerCase(), {
+          id: String(item.id || name),
+          name,
+          createdAt: item.createdAt,
+          createdBy: item.createdBy,
+        });
+      }
+    });
+    useAppStore.getState().clubs.forEach((club) => {
+      const locName = club.defaultSchedule?.locationName;
+      if (locName && locName.trim()) {
+        const clean = normalizeLocationName(locName);
+        if (!map.has(clean.toLowerCase())) {
+          map.set(clean.toLowerCase(), { id: club.defaultSchedule?.locationId || clean, name: clean });
+        }
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'he'));
   } catch (err) {
     addLog(`Failed to fetch global locations: ${err}`, 'WARN');
     return [];
@@ -130,7 +144,9 @@ export const addGlobalLocation = async (rawName: string, createdBy?: string): Pr
   mergedMap.set(normalized.toLowerCase(), created);
   const nextList = Array.from(mergedMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'he'));
 
-  await setDoc(doc(db, 'config', 'locations'), {
+  await setDoc(SHARED_LOCATIONS_DOC, {
+    isSystemCatalog: true,
+    isDeleted: false,
     items: nextList,
     updatedAt: new Date().toISOString(),
   }, { merge: true });

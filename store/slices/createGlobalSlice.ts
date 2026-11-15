@@ -74,7 +74,9 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
   setSyncStatus: (status) => set({ syncStatus: status }),
   setInitialLoading: (isLoading) => set({ isInitialLoading: isLoading }),
   setHasHydrated: (val) => set({ _hasHydrated: val }),
-  setLocations: (locations) => set({ locations }),
+  setLocations: (locations) => set((state) => (
+    JSON.stringify(state.locations) === JSON.stringify(locations) ? state : { locations }
+  )),
   addLocation: (location) => set((state) => {
     const key = location.name.trim().toLowerCase();
     if (state.locations.some((l) => l.name.trim().toLowerCase() === key)) return state;
@@ -128,10 +130,12 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
         });
       }
     });
-    return {
-      clubs: Array.from(map.values()),
-      activeClub: state.activeClub && deletedSet.has(state.activeClub) ? null : state.activeClub,
-    };
+    const nextClubs = Array.from(map.values());
+    const nextActiveClub = state.activeClub && deletedSet.has(state.activeClub) ? null : state.activeClub;
+    if (nextActiveClub === state.activeClub && JSON.stringify(nextClubs) === JSON.stringify(state.clubs)) {
+      return state;
+    }
+    return { clubs: nextClubs, activeClub: nextActiveClub };
   }),
 
   removeClub: (id) => set(state => ({

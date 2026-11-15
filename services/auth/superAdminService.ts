@@ -65,6 +65,7 @@ export const fetchCloudClubsCatalog = async (): Promise<{ clubs: Club[]; deleted
   const deletedIds: string[] = [];
   snap.docs.forEach((d) => {
     const data = d.data();
+    if (d.id === '__SHARED_LOCATIONS__' || data.isSystemCatalog) return;
     if (data.isDeleted) {
       deletedIds.push(d.id);
     } else if (typeof data.label === 'string' && data.label.trim()) {

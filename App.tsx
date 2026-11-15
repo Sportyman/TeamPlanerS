@@ -22,25 +22,28 @@ import { subscribeToClubBoatDefinitions } from './services/clubEquipmentService'
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
-const AppContent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, activeClub, clubs, isInitialLoading } = useAppStore();
-  
+const AppContent: React.FC<{ children: React.ReactNode; skipClubLoading?: boolean }> = ({
+  children,
+  skipClubLoading = false,
+}) => {
+  const { user, activeClub, isInitialLoading } = useAppStore();
+
   useEffect(() => {
     let unsubData: (() => void) | undefined;
     let unsubBoats: (() => void) | undefined;
     if (user && activeClub && !user.isDev) {
-        const clubLabel = clubs.find((c) => c.id === activeClub)?.label || '';
-        unsubData = subscribeToClubData(activeClub);
-        unsubBoats = subscribeToClubBoatDefinitions(activeClub, clubLabel);
+      const clubLabel = useAppStore.getState().clubs.find((c) => c.id === activeClub)?.label || '';
+      unsubData = subscribeToClubData(activeClub);
+      unsubBoats = subscribeToClubBoatDefinitions(activeClub, clubLabel);
     }
     return () => {
-        if (unsubData) unsubData();
-        if (unsubBoats) unsubBoats();
+      if (unsubData) unsubData();
+      if (unsubBoats) unsubBoats();
     };
-  }, [user, activeClub, clubs]);
+  }, [user?.uid, user?.isDev, activeClub]);
 
-  if (activeClub && isInitialLoading) {
-      return <MainLayout><LoadingScreen message="מסנכרן נתוני מועדון..." /></MainLayout>;
+  if (!skipClubLoading && activeClub && isInitialLoading) {
+    return <MainLayout><LoadingScreen message="מסנכרן נתוני מועדון..." /></MainLayout>;
   }
 
   return <MainLayout>{children}</MainLayout>;
@@ -92,7 +95,7 @@ const App: React.FC = () => {
         <Route path="/share" element={<PublicPairingView />} />
         <Route path="/registration-status" element={<AuthGuard requireProfile={false} requiredLevel={AccessLevel.NONE}><RegistrationStatus /></AuthGuard>} />
         <Route path="/profile-setup" element={<AuthGuard requireProfile={false} requiredLevel={AccessLevel.NONE}><ProfileSetup /></AuthGuard>} />
-        <Route path="/super-admin" element={<AuthGuard requiredLevel={AccessLevel.SUPER_ADMIN}><AppContent><SuperAdminDashboard /></AppContent></AuthGuard>} />
+        <Route path="/super-admin" element={<AuthGuard requiredLevel={AccessLevel.SUPER_ADMIN}><AppContent skipClubLoading><SuperAdminDashboard /></AppContent></AuthGuard>} />
         <Route path="/app" element={<AuthGuard requiredLevel={AccessLevel.STAFF}><AppContent><SessionManager /></AppContent></AuthGuard>} />
         <Route path="/app/whatsapp" element={<AuthGuard requiredLevel={AccessLevel.STAFF}><AppContent><WhatsAppDashboardView /></AppContent></AuthGuard>} />
         <Route path="/app/manage" element={<AuthGuard requiredLevel={AccessLevel.CLUB_ADMIN}><AppContent><Dashboard /></AppContent></AuthGuard>} />
