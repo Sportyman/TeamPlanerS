@@ -141,6 +141,7 @@ export type ClubID = string;
 export interface ClubLocation {
   id: string;
   name: string;
+  placeId?: string;
   createdAt?: string;
   createdBy?: string;
 }

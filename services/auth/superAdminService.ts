@@ -47,7 +47,16 @@ export const saveClubLabelToCloud = async (
     isDeleted: false,
     updatedAt: new Date().toISOString(),
   };
-  if (defaultSchedule) payload.defaultSchedule = defaultSchedule;
+  if (defaultSchedule) {
+    const cleanSched: Record<string, any> = {
+      dayOfWeek: defaultSchedule.dayOfWeek,
+      startTime: defaultSchedule.startTime,
+      locationName: defaultSchedule.locationName || '',
+    };
+    if (defaultSchedule.endTime) cleanSched.endTime = defaultSchedule.endTime;
+    if (defaultSchedule.locationId) cleanSched.locationId = defaultSchedule.locationId;
+    payload.defaultSchedule = cleanSched;
+  }
   await setDoc(doc(db, 'clubs', clubId), payload, { merge: true });
 };
 
@@ -65,7 +74,7 @@ export const fetchCloudClubsCatalog = async (): Promise<{ clubs: Club[]; deleted
   const deletedIds: string[] = [];
   snap.docs.forEach((d) => {
     const data = d.data();
-    if (d.id === '__SHARED_LOCATIONS__' || data.isSystemCatalog) return;
+    if (d.id === 'shared_locations_catalog' || d.id === '__SHARED_LOCATIONS__' || data.isSystemCatalog) return;
     if (data.isDeleted) {
       deletedIds.push(d.id);
     } else if (typeof data.label === 'string' && data.label.trim()) {

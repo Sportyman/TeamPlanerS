@@ -1,0 +1,12 @@
+[2026-11-15T08:18:24.045Z] [INFO] System starting v6.0.0 (Reactive)
+[2026-11-15T08:18:25.147Z] [WARN] Failed to fetch global locations: FirebaseError: [code=invalid-argument]: Resource id "__SHARED_LOCATIONS__" is invalid because it is reserved.
+[2026-11-15T08:18:25.148Z] [WARN] Failed to fetch global locations: FirebaseError: [code=invalid-argument]: Resource id "__SHARED_LOCATIONS__" is invalid because it is reserved.
+[2026-11-15T08:18:25.547Z] [WARN] Failed to fetch global locations: FirebaseError: [code=invalid-argument]: Resource id "__SHARED_LOCATIONS__" is invalid because it is reserved.
+[2026-11-15T08:18:25.722Z] [SYNC] SuperAdmin: Refreshing global configuration on mount
+[2026-11-15T08:18:25.723Z] [SYNC] Starting reactive subscription for club: SAILING
+[2026-11-15T08:18:26.122Z] [SYNC] Synced 1 participants reactively
+[2026-11-15T08:18:26.227Z] [WARN] Failed to fetch global locations: FirebaseError: [code=invalid-argument]: Resource id "__SHARED_LOCATIONS__" is invalid because it is reserved.
+[2026-11-15T08:18:27.663Z] [SYNC] Purged 0 legacy mock memberships
+[2026-11-15T08:18:30.370Z] [SYNC] Purged 0 legacy mock memberships
+[2026-11-15T08:19:19.342Z] [WARN] Failed to fetch global locations: FirebaseError: [code=invalid-argument]: Resource id "__SHARED_LOCATIONS__" is invalid because it is reserved.
+[2026-11-15T08:19:54.333Z] [WARN] Failed to fetch global locations: FirebaseError: [code=invalid-argument]: Resource id "__SHARED_LOCATIONS__" is invalid because it is reserved.

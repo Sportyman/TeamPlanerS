@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { MapPin, Plus, Check, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, MapPin, Plus } from 'lucide-react';
 import { useAppStore } from '../../store';
-import { addGlobalLocation, normalizeLocationName } from '../../services/scheduleService';
+import { fetchGlobalLocations, normalizeLocationName } from '../../services/scheduleService';
+import { NewLocationFormCard } from './NewLocationFormCard';
+import { LocationDropdownMenu } from './LocationDropdownMenu';
 
 interface LocationPickerProps {
   value: string;
@@ -18,86 +20,114 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
   allowOneOffCustom = false,
   compact = false,
 }) => {
-  const { locations, user, addNotification } = useAppStore();
-  const [isAddingNew, setIsAddingNew] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [saving, setSaving] = useState(false);
+  const { locations, setLocations } = useAppStore();
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const sortedLocations = [...locations].sort((a, b) => a.name.localeCompare(b.name, 'he'));
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [oneOffMode, setOneOffMode] = useState(false);
+
+  useEffect(() => {
+    if (locations.length === 0) {
+      fetchGlobalLocations().then((locs) => {
+        if (locs.length > 0) setLocations(locs);
+      });
+    }
+  }, [locations.length, setLocations]);
+
+  useEffect(() => {
+    const onOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onOutside);
+    document.addEventListener('keydown', onEscape);
+    return () => {
+      document.removeEventListener('mousedown', onOutside);
+      document.removeEventListener('keydown', onEscape);
+    };
+  }, []);
+
+  const sortedLocations = useMemo(
+    () => [...locations].sort((a, b) => a.name.localeCompare(b.name, 'he')),
+    [locations]
+  );
+
   const isValueInCatalog = sortedLocations.some(
     (l) => normalizeLocationName(l.name).toLowerCase() === normalizeLocationName(value).toLowerCase()
   );
 
-  const handleSelectChange = (selectedVal: string) => {
-    if (selectedVal === '__ADD_NEW__') {
-      setIsAddingNew(true);
-      setNewName('');
-      return;
-    }
-    if (selectedVal === '__ONE_OFF__') {
-      onChange('', undefined);
-      return;
-    }
-    const found = sortedLocations.find((l) => l.name === selectedVal || l.id === selectedVal);
-    onChange(found ? found.name : selectedVal, found?.id);
-  };
-
-  const handleSaveToCatalog = async () => {
-    const trimmed = normalizeLocationName(newName);
-    if (!trimmed || saving) return;
-    setSaving(true);
-    try {
-      const existedBefore = sortedLocations.some(
-        (l) => normalizeLocationName(l.name).toLowerCase() === trimmed.toLowerCase()
-      );
-      const saved = await addGlobalLocation(trimmed, user?.email);
-      onChange(saved.name, saved.id);
-      setIsAddingNew(false);
-      setNewName('');
-      addNotification(
-        existedBefore
-          ? `המיקום "${saved.name}" כבר קיים במאגר — נבחר מהמאגר הקיים למניעת כפילויות`
-          : `המיקום "${saved.name}" נוסף למאגר המיקומים הכללי`,
-        existedBefore ? 'INFO' : 'SUCCESS'
-      );
-    } catch {
-      addNotification('שגיאה בשמירת המיקום למאגר', 'WARN');
-    } finally {
-      setSaving(false);
-    }
-  };
+  const showOneOffInput =
+    allowOneOffCustom && (oneOffMode || (Boolean(value) && !isValueInCatalog && locationId === undefined));
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
+    <div ref={containerRef} className="space-y-2.5">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-2">
         <div className="relative flex-1">
-          <MapPin size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <select
-            value={isValueInCatalog ? value : value && allowOneOffCustom ? '__ONE_OFF__' : ''}
-            onChange={(e) => handleSelectChange(e.target.value)}
-            aria-label="מיקום הפעילות"
-            className={`w-full pr-9 pl-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-brand-500 ${
-              compact ? 'py-2 text-xs' : 'py-2.5 text-sm'
-            }`}
+          <button
+            type="button"
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-expanded={menuOpen}
+            aria-label="בחירת מיקום מהמאגר"
+            className={`w-full flex items-center justify-between gap-2.5 bg-white border rounded-xl text-right transition-all ${
+              menuOpen ? 'border-brand-500 ring-2 ring-brand-500/15' : 'border-slate-200 hover:border-slate-300'
+            } ${compact ? 'px-3 py-2' : 'px-3.5 py-2.5'}`}
           >
-            <option value="">
-              {sortedLocations.length === 0 ? 'אין עדיין מיקומים במאגר — הוסף מיקום' : 'בחר מיקום קבוע מהמאגר...'}
-            </option>
-            {sortedLocations.map((loc) => (
-              <option key={loc.id || loc.name} value={loc.name}>
-                {loc.name}
-              </option>
-            ))}
-            {allowOneOffCustom && <option value="__ONE_OFF__">אחר (חד-פעמי לאימון זה)</option>}
-            <option value="__ADD_NEW__">+ הוסף מיקום חדש למאגר הכללי...</option>
-          </select>
+            <span className="flex items-center gap-2.5 min-w-0 flex-1">
+              <span className="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+                <MapPin size={15} />
+              </span>
+              <span
+                className={`whitespace-normal break-words leading-snug font-bold ${
+                  value ? 'text-slate-900' : 'text-slate-400 font-medium'
+                } ${compact ? 'text-xs' : 'text-sm'}`}
+              >
+                {value ||
+                  (sortedLocations.length === 0
+                    ? 'אין עדיין מיקומים במאגר — הוסף מיקום חדש'
+                    : 'בחר מיקום קבוע מהמאגר...')}
+              </span>
+            </span>
+            <ChevronDown
+              size={16}
+              className={`text-slate-400 shrink-0 transition-transform ${menuOpen ? 'rotate-180 text-brand-600' : ''}`}
+            />
+          </button>
+
+          {menuOpen && (
+            <LocationDropdownMenu
+              locations={sortedLocations}
+              selectedValue={value}
+              allowOneOffCustom={allowOneOffCustom}
+              onSelectCatalog={(loc) => {
+                onChange(loc.name, loc.id);
+                setOneOffMode(false);
+                setMenuOpen(false);
+              }}
+              onSelectOneOff={() => {
+                setOneOffMode(true);
+                onChange('', undefined);
+                setMenuOpen(false);
+              }}
+              onRequestAddNew={() => {
+                setIsAddingNew(true);
+                setMenuOpen(false);
+              }}
+            />
+          )}
         </div>
 
         <button
           type="button"
-          onClick={() => setIsAddingNew((v) => !v)}
-          title="הוסף מיקום חדש למאגר הכללי"
-          className={`px-3 rounded-xl border border-brand-200 bg-brand-50 hover:bg-brand-100 text-brand-800 font-bold flex items-center gap-1 whitespace-nowrap ${
+          onClick={() => {
+            setIsAddingNew((v) => !v);
+            setMenuOpen(false);
+          }}
+          className={`px-3.5 rounded-xl border border-brand-200 bg-brand-50 hover:bg-brand-100 text-brand-800 font-bold flex items-center justify-center gap-1.5 whitespace-nowrap ${
             compact ? 'py-2 text-xs' : 'py-2.5 text-xs'
           }`}
         >
@@ -106,54 +136,26 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         </button>
       </div>
 
-      {allowOneOffCustom && (!isValueInCatalog || locationId === undefined) && value !== undefined && (
+      {showOneOffInput && (
         <input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value, undefined)}
           placeholder="הקלד מיקום חלופי לאימון הקרוב (למשל: מזח צפוני)..."
-          className="w-full px-3 py-2 text-xs bg-amber-50/70 border border-amber-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:border-amber-400"
+          className="w-full px-3.5 py-2.5 text-sm bg-amber-50/70 border border-amber-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:border-amber-400"
         />
       )}
 
       {isAddingNew && (
-        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-          <div className="text-[11px] font-bold text-slate-600">
-            הוספת מיקום חדש למאגר הכללי (זמין לכל החוגים והמנהלים למניעת כפילויות):
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleSaveToCatalog();
-                }
-              }}
-              placeholder="למשל: מרכז דניאל לחתירה / מרינה הרצליה..."
-              className="flex-1 px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg font-bold focus:outline-none focus:border-brand-500"
-            />
-            <button
-              type="button"
-              disabled={!newName.trim() || saving}
-              onClick={handleSaveToCatalog}
-              className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1 whitespace-nowrap"
-            >
-              <Check size={14} />
-              <span>{saving ? 'שומר...' : 'שמור למאגר'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsAddingNew(false)}
-              aria-label="סגור"
-              className="p-2 rounded-lg bg-slate-200 text-slate-600 hover:bg-slate-300"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        </div>
+        <NewLocationFormCard
+          existingLocations={sortedLocations}
+          onSaved={(saved) => {
+            onChange(saved.name, saved.id);
+            setOneOffMode(false);
+            setIsAddingNew(false);
+          }}
+          onClose={() => setIsAddingNew(false)}
+        />
       )}
     </div>
   );

@@ -83,7 +83,18 @@ export const formatScheduleSummary = (schedule?: ClubSchedule): string => {
 
 export const normalizeLocationName = (name: string): string => name.trim().replace(/\s+/g, ' ');
 
-const SHARED_LOCATIONS_DOC = doc(db, 'clubs', '__SHARED_LOCATIONS__');
+const SHARED_LOCATIONS_DOC = doc(db, 'clubs', 'shared_locations_catalog');
+
+const sanitizeLocationItem = (loc: ClubLocation): ClubLocation => {
+  const clean: ClubLocation = {
+    id: String(loc.id || `loc-${Date.now()}`),
+    name: normalizeLocationName(loc.name),
+  };
+  if (loc.placeId) clean.placeId = String(loc.placeId);
+  if (loc.createdAt) clean.createdAt = String(loc.createdAt);
+  if (loc.createdBy) clean.createdBy = String(loc.createdBy);
+  return clean;
+};
 
 export const fetchGlobalLocations = async (): Promise<ClubLocation[]> => {
   try {
@@ -93,12 +104,13 @@ export const fetchGlobalLocations = async (): Promise<ClubLocation[]> => {
     rawItems.forEach((item: any) => {
       if (typeof item?.name === 'string' && item.name.trim()) {
         const name = normalizeLocationName(item.name);
-        map.set(name.toLowerCase(), {
+        map.set(name.toLowerCase(), sanitizeLocationItem({
           id: String(item.id || name),
           name,
+          placeId: item.placeId,
           createdAt: item.createdAt,
           createdBy: item.createdBy,
-        });
+        }));
       }
     });
     useAppStore.getState().clubs.forEach((club) => {
@@ -117,7 +129,11 @@ export const fetchGlobalLocations = async (): Promise<ClubLocation[]> => {
   }
 };
 
-export const addGlobalLocation = async (rawName: string, createdBy?: string): Promise<ClubLocation> => {
+export const addGlobalLocation = async (
+  rawName: string,
+  createdBy?: string,
+  placeId?: string
+): Promise<ClubLocation> => {
   const normalized = normalizeLocationName(rawName);
   if (!normalized) throw new Error('יש להזין שם מיקום');
 
@@ -126,7 +142,7 @@ export const addGlobalLocation = async (rawName: string, createdBy?: string): Pr
   const mergedMap = new Map<string, ClubLocation>();
   [...storeLocs, ...existingRemote].forEach((loc) => {
     const key = normalizeLocationName(loc.name).toLowerCase();
-    if (!mergedMap.has(key)) mergedMap.set(key, loc);
+    if (key && !mergedMap.has(key)) mergedMap.set(key, sanitizeLocationItem(loc));
   });
 
   const existingMatch = mergedMap.get(normalized.toLowerCase());
@@ -135,12 +151,13 @@ export const addGlobalLocation = async (rawName: string, createdBy?: string): Pr
     return existingMatch;
   }
 
-  const created: ClubLocation = {
+  const created = sanitizeLocationItem({
     id: `loc-${Date.now()}`,
     name: normalized,
+    placeId,
     createdAt: new Date().toISOString(),
     createdBy,
-  };
+  });
   mergedMap.set(normalized.toLowerCase(), created);
   const nextList = Array.from(mergedMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'he'));
 
