@@ -67,7 +67,7 @@ export const NewLocationFormCard: React.FC<NewLocationFormCardProps> = ({
     reverseAbortRef.current?.abort();
     setResolvingArea(false);
     setSelectedCoords({ lat: place.lat, lng: place.lng });
-    setAreaLabel(place.areaLabel);
+    setAreaLabel(place.areaLabel || place.primaryName);
     setMapQuery(place.areaLabel || place.primaryName);
     if (!displayName.trim()) setDisplayName(place.areaLabel || place.primaryName);
   };
@@ -123,7 +123,7 @@ export const NewLocationFormCard: React.FC<NewLocationFormCardProps> = ({
             {isEditing ? 'עריכת מיקום במאגר הכללי' : 'הוספת מיקום חדש למאגר הכללי'}
           </h4>
           <p className="text-[11px] text-slate-500 mt-0.5">
-            קבע שם לתצוגה במערכת ונעץ סיכה על המפה כדי לזהות אזור תקני לתחזית מזג אוויר וגלים.
+            קבע שם לתצוגה במערכת ונעץ סיכה על המפה לזיהוי המיקום והתחזית באזור.
           </p>
         </div>
         <button type="button" onClick={onClose} aria-label="סגור" className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-700">
@@ -138,13 +138,13 @@ export const NewLocationFormCard: React.FC<NewLocationFormCardProps> = ({
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSave(); } }}
-          placeholder="למשל: מועדון אתגרים מרינה תל אביב"
+          placeholder="למשל: מרכז דניאל לחתירה / אולם ספורט עירוני"
           className="w-full px-3.5 py-2 text-sm bg-white border border-slate-200 rounded-xl font-bold text-slate-900 focus:outline-none focus:border-brand-500"
         />
       </div>
 
       <div className="pt-3 border-t border-slate-200/80 space-y-2.5">
-        <div className="text-[11px] font-bold text-slate-600">איתור אזור במפה ונעיצת סיכה (מומלץ לזיהוי תחזית ים ומזג אוויר)</div>
+        <div className="text-[11px] font-bold text-slate-600">איתור מקום במפה — חיפוש חופשי, הדבקת קישור מ-Google Maps / Waze או לחיצה על המפה</div>
         <PlaceSearchInput query={mapQuery} onChangeQuery={setMapQuery} onSelectPlace={handleSelectSearchPlace} />
         <LocationPinMap lat={selectedCoords?.lat} lng={selectedCoords?.lng} onChangePin={handleMapPinChange} />
 
@@ -167,7 +167,7 @@ export const NewLocationFormCard: React.FC<NewLocationFormCardProps> = ({
               </button>
             </div>
           ) : (
-            <span className="text-[11px] text-slate-400">חפש אזור למעלה או לחץ ישירות על המפה כדי לקבוע נקודה תקנית.</span>
+            <span className="text-[11px] text-slate-400">חפש מקום/כתובת למעלה, הדבק קישור מפה, או לחץ ישירות על המפה כדי לנעוץ סיכה.</span>
           )}
         </div>
       </div>
