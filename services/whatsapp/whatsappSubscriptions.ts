@@ -26,10 +26,15 @@ export const subscribeToPollsEvents = (
             toTimestampMs(data.created_at) ||
             toTimestampMs(data.updatedAt);
           const { displayDate, displayTime } = formatHebrewPollDate(createdAtMs);
+          const rawGroup = typeof data.group === 'string' ? data.group.trim() : '';
+          const rawGroupId = typeof data.groupId === 'string' ? data.groupId.trim() : '';
+          const groupId = rawGroupId || (/@g\.us$/i.test(rawGroup) ? rawGroup : undefined);
+          const group = String(data.groupName || (!/@g\.us$/i.test(rawGroup) ? rawGroup : '') || 'קבוצה כללית').trim();
           return {
             id: d.id,
             pollId,
-            group: String(data.groupName || data.group || 'קבוצה כללית').trim(),
+            group,
+            groupId,
             question: String(data.question || 'סקר ללא כותרת'),
             options: extractOptionLabels(data.options),
             createdAtMs,
@@ -132,6 +137,8 @@ export const subscribeToClubWhatsAppConfig = (
   const defaultConfig: ClubWhatsAppConfig = {
     clubId,
     linkedGroups: [],
+    linkedGroupIds: [],
+    linkedGroupMeta: {},
     keywordRules: DEFAULT_KEYWORD_RULES,
     pollColors: {},
   };
@@ -145,6 +152,8 @@ export const subscribeToClubWhatsAppConfig = (
         onData({
           clubId,
           linkedGroups: Array.isArray(cfg.linkedGroups) ? cfg.linkedGroups : [],
+          linkedGroupIds: Array.isArray(cfg.linkedGroupIds) ? cfg.linkedGroupIds : [],
+          linkedGroupMeta: cfg.linkedGroupMeta && typeof cfg.linkedGroupMeta === 'object' ? cfg.linkedGroupMeta : {},
           keywordRules:
             Array.isArray(cfg.keywordRules) && cfg.keywordRules.length > 0
               ? cfg.keywordRules

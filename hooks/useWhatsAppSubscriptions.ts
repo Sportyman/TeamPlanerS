@@ -1,24 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ClubID, Person } from '../types';
-import {
-  ClubWhatsAppConfig,
-  PollEvent,
-  PollVote,
-  ResolvedVoter,
-  VoteChangeAlert,
-  WhatsAppMemberMapping,
-} from '../types/whatsapp';
+import { ClubWhatsAppConfig, PollEvent, PollVote, ResolvedVoter, VoteChangeAlert, WhatsAppMemberMapping } from '../types/whatsapp';
 import { DEFAULT_KEYWORD_RULES } from '../config/whatsappDefaults';
 import { deduplicateLatestVotes } from '../services/whatsapp/pollResolver';
 import { detectVoteChanges } from '../services/whatsapp/pollMatching';
 import { getPollColorToken } from '../services/whatsapp/pollFormatting';
 import { enrichVoteAlertsWithContacts, isNumericFallbackName } from '../services/whatsapp/mappingDedup';
+import { buildWhatsAppGroupCatalog, doesPollMatchConfig, getEffectiveLinkedIds, resolveLinkedGroupItems } from '../services/whatsapp/groupCatalog';
 import {
-  fetchRecentPollVotesForClub,
-  subscribeToClubWhatsAppConfig,
-  subscribeToPollsEvents,
-  subscribeToPollVotes,
-  subscribeToWhatsAppMembers,
+  fetchRecentPollVotesForClub, subscribeToClubWhatsAppConfig, subscribeToPollsEvents,
+  subscribeToPollVotes, subscribeToWhatsAppMembers,
 } from '../services/whatsapp/whatsappSubscriptions';
 
 interface UseWhatsAppSubscriptionsParams {
@@ -90,12 +81,21 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, people, onNotify 
   }, [userId, activeClub, retryKey]);
 
   const pollColors = clubConfig.pollColors;
+  const groupCatalog = useMemo(() => buildWhatsAppGroupCatalog(polls, mappings, clubConfig), [polls, mappings, clubConfig]);
+  const effectiveLinkedGroupIds = useMemo(() => getEffectiveLinkedIds(clubConfig, groupCatalog), [clubConfig, groupCatalog]);
+  const linkedGroupItems = useMemo(() => resolveLinkedGroupItems(clubConfig, groupCatalog), [clubConfig, groupCatalog]);
+  const groupNameById = useMemo(() => new Map(groupCatalog.filter((g) => g.id).map((g) => [g.id!, g.name])), [groupCatalog]);
+
   const relevantPolls = useMemo(() => {
-    if (!clubConfig.linkedGroups.length) return [];
+    if (!clubConfig.linkedGroups.length && !effectiveLinkedGroupIds.length) return [];
     return polls
-      .filter((p) => clubConfig.linkedGroups.some((g) => p.group.toLowerCase().includes(g.trim().toLowerCase())))
-      .map((p) => (pollColors?.[p.pollId] ? { ...p, colorToken: getPollColorToken(p.pollId, pollColors[p.pollId]) } : p));
-  }, [polls, clubConfig.linkedGroups, pollColors]);
+      .filter((p) => doesPollMatchConfig(p, clubConfig, effectiveLinkedGroupIds))
+      .map((p) => {
+        const latestName = p.groupId ? groupNameById.get(p.groupId) : undefined;
+        const colorToken = pollColors?.[p.pollId] ? getPollColorToken(p.pollId, pollColors[p.pollId]) : p.colorToken;
+        return { ...p, group: latestName || p.group, colorToken };
+      });
+  }, [polls, clubConfig, effectiveLinkedGroupIds, groupNameById, pollColors]);
 
   const relevantPollIdsKey = useMemo(
     () => relevantPolls.map((p) => p.pollId).slice(0, 10).join(','),
@@ -181,6 +181,7 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, people, onNotify 
   return {
     polls, relevantPolls, votes, votesLoadedPollId, historicalVotes, mappings, clubConfig, selectedPollId,
     setSelectedPollId, voteAlerts, setVoteAlerts, recentChangedVoters, isLoading, error,
+    groupCatalog, effectiveLinkedGroupIds, linkedGroupItems,
     retry: () => setRetryKey((k) => k + 1), setResolvedVotersRef,
   };
 };

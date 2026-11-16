@@ -23,9 +23,9 @@ export const WhatsAppDashboardView: React.FC = () => {
 
   const {
     polls, activePoll, setSelectedPollId, summary, clubConfig, clubPeople, mappings, syncCandidates,
-    availableGroups, voteAlerts, dismissAlert, clearAlerts, isLoading, error, retry,
+    availableGroups, groupCatalog, linkedGroupItems, voteAlerts, dismissAlert, clearAlerts, isLoading, error, retry,
     applyPollAttendance, linkVoterToPerson, confirmSyncCandidate, importRosterMembers,
-    unlinkVoter, addGuestFromVoter, saveConfig, setPollColor, linkClubGroup, updateMemberRole,
+    unlinkVoter, addGuestFromVoter, saveConfig, setPollColor, linkClubGroup, unlinkClubGroup, updateMemberRole,
   } = useWhatsAppPolls();
 
   const presentIds = activeClub ? sessions[activeClub]?.presentPersonIds || [] : [];
@@ -34,15 +34,6 @@ export const WhatsAppDashboardView: React.FC = () => {
   const handleRefresh = () => {
     forceFullSync(user?.uid, activeClub);
     retry();
-  };
-
-  const handleUnlinkGroup = async (groupName: string) => {
-    if (!activeClub) return;
-    await saveConfig({
-      ...clubConfig,
-      clubId: activeClub,
-      linkedGroups: clubConfig.linkedGroups.filter((g) => g !== groupName),
-    });
   };
 
   return (
@@ -112,10 +103,10 @@ export const WhatsAppDashboardView: React.FC = () => {
       {!isLoading && activeClub && (
         <ClubGroupPairingCard
           clubName={clubName}
-          linkedGroups={clubConfig.linkedGroups}
-          availableGroups={availableGroups}
+          linkedItems={linkedGroupItems}
+          groupCatalog={groupCatalog}
           onLinkGroup={linkClubGroup}
-          onUnlinkGroup={handleUnlinkGroup}
+          onUnlinkGroup={unlinkClubGroup}
           onRefresh={handleRefresh}
         />
       )}
@@ -161,7 +152,7 @@ export const WhatsAppDashboardView: React.FC = () => {
           )}
           {activeTab === 'SUMMARY' && !summary && (
             <div className="border border-slate-200 rounded-2xl bg-white p-6 sm:p-8 text-center text-sm text-slate-500">
-              {clubConfig.linkedGroups.length === 0
+              {linkedGroupItems.length === 0
                 ? 'לאחר ציוות קבוצת הוואטסאפ של החוג למעלה, הסקרים האחרונים יופיעו כאן אוטומטית.'
                 : 'עדיין לא נקלטו סקרים מקבוצת הוואטסאפ של חוג זה.'}
             </div>
@@ -176,7 +167,7 @@ export const WhatsAppDashboardView: React.FC = () => {
             />
           )}
           {activeTab === 'SETTINGS' && (
-            <WhatsAppSettingsTab config={clubConfig} availableGroups={availableGroups} onSave={saveConfig} />
+            <WhatsAppSettingsTab config={clubConfig} groupCatalog={groupCatalog} onSave={saveConfig} />
           )}
         </>
       )}

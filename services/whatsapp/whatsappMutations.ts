@@ -87,6 +87,8 @@ export const saveClubWhatsAppConfig = async (config: ClubWhatsAppConfig): Promis
         whatsappConfig: {
           clubId: config.clubId,
           linkedGroups: config.linkedGroups.slice(0, 30),
+          linkedGroupIds: (config.linkedGroupIds || []).slice(0, 30),
+          linkedGroupMeta: config.linkedGroupMeta || {},
           keywordRules: cleanRules,
           pollColors: config.pollColors || {},
           activePollId: config.activePollId || null,

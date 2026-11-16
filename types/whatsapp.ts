@@ -22,6 +22,7 @@ export interface PollEvent {
   id: string;
   pollId: string;
   group: string;
+  groupId?: string;
   question: string;
   options: string[];
   createdAtMs: number;
@@ -70,6 +71,8 @@ export interface KeywordRule {
 export interface ClubWhatsAppConfig {
   clubId: ClubID;
   linkedGroups: string[];
+  linkedGroupIds?: string[];
+  linkedGroupMeta?: Record<string, string>;
   keywordRules: KeywordRule[];
   pollColors?: Record<string, string>;
   activePollId?: string;

@@ -1,55 +1,73 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ClubWhatsAppConfig, KeywordRule } from '../../types/whatsapp';
 import { DEFAULT_KEYWORD_RULES } from '../../config/whatsappDefaults';
 import { KeywordRulesEditor } from './KeywordRulesEditor';
-import { isRawWhatsAppJid } from '../../services/whatsapp/clubDedupSync';
+import {
+  buildLinkGroupConfigPatch,
+  buildUnlinkGroupConfigPatch,
+  resolveLinkedGroupItems,
+  WhatsAppGroupEntry,
+} from '../../services/whatsapp/groupCatalog';
 import { Plus, Save, X } from 'lucide-react';
 
 interface WhatsAppSettingsTabProps {
   config: ClubWhatsAppConfig;
-  availableGroups: string[];
+  groupCatalog: WhatsAppGroupEntry[];
   onSave: (config: ClubWhatsAppConfig) => Promise<void>;
 }
 
 export const WhatsAppSettingsTab: React.FC<WhatsAppSettingsTabProps> = ({
   config,
-  availableGroups,
+  groupCatalog,
   onSave,
 }) => {
-  const [linkedGroups, setLinkedGroups] = useState<string[]>(config.linkedGroups || []);
+  const [draftConfig, setDraftConfig] = useState<ClubWhatsAppConfig>(config);
   const [customGroup, setCustomGroup] = useState('');
   const [rules, setRules] = useState<KeywordRule[]>(config.keywordRules || DEFAULT_KEYWORD_RULES);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    setLinkedGroups(config.linkedGroups || []);
+    setDraftConfig(config);
     setRules(config.keywordRules?.length ? config.keywordRules : DEFAULT_KEYWORD_RULES);
   }, [config]);
 
-  const toggleGroup = (group: string) => {
-    setLinkedGroups((prev) =>
-      prev.includes(group) ? prev.filter((g) => g !== group) : [...prev, group]
+  const linkedItems = useMemo(() => resolveLinkedGroupItems(draftConfig, groupCatalog), [draftConfig, groupCatalog]);
+
+  const allOptions = useMemo(() => {
+    const map = new Map<string, { key: string; name: string; active: boolean }>();
+    groupCatalog.forEach((g) => {
+      const isActive = linkedItems.some((i) => (g.id && i.id === g.id) || i.name.toLowerCase() === g.name.toLowerCase());
+      map.set(g.key, { key: g.key, name: g.name, active: isActive });
+    });
+    linkedItems.forEach((i) => {
+      if (!map.has(i.key) && !(i.id && map.has(i.id))) {
+        map.set(i.key, { key: i.key, name: i.name, active: true });
+      }
+    });
+    return Array.from(map.values());
+  }, [groupCatalog, linkedItems]);
+
+  const toggleGroup = (key: string, isActive: boolean) => {
+    setDraftConfig((prev) =>
+      isActive ? buildUnlinkGroupConfigPatch(prev, key, groupCatalog) : buildLinkGroupConfigPatch(prev, key, groupCatalog).nextConfig
     );
   };
 
   const addCustomGroup = () => {
     const trimmed = customGroup.trim();
     if (!trimmed) return;
-    if (!linkedGroups.includes(trimmed)) setLinkedGroups((prev) => [...prev, trimmed]);
+    setDraftConfig((prev) => buildLinkGroupConfigPatch(prev, trimmed, groupCatalog).nextConfig);
     setCustomGroup('');
   };
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await onSave({ ...config, linkedGroups, keywordRules: rules });
+      await onSave({ ...draftConfig, keywordRules: rules });
     } finally {
       setIsSaving(false);
     }
   };
-
-  const cleanAvailable = availableGroups.filter((g) => !isRawWhatsAppJid(g));
-  const allGroups = Array.from(new Set([...cleanAvailable, ...linkedGroups]));
 
   return (
     <div className="space-y-5">
@@ -57,32 +75,29 @@ export const WhatsAppSettingsTab: React.FC<WhatsAppSettingsTabProps> = ({
         <div>
           <h3 className="text-base font-bold text-slate-900">קבוצות וואטסאפ מקושרות לחוג</h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            סמן אילו קבוצות שייכות לחוג זה כדי שהסקר הרלוונטי ייבחר אוטומטית. אל תשכח ללחוץ על כפתור השמירה מטה.
+            סמן אילו קבוצות שייכות לחוג זה. השיוך נשמר לפי מזהה הקבוצה הקבוע כך ששינוי שם הקבוצה בוואטסאפ לא ינתק אותה.
           </p>
         </div>
 
         <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-2">
-          {allGroups.length === 0 ? (
+          {allOptions.length === 0 ? (
             <span className="text-xs text-slate-500">טרם זוהו קבוצות תקינות מהבוט. ניתן להוסיף שם קבוצה ידנית מטה.</span>
           ) : (
-            allGroups.map((group) => {
-              const active = linkedGroups.includes(group);
-              return (
-                <button
-                  key={group}
-                  type="button"
-                  onClick={() => toggleGroup(group)}
-                  className={`px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-colors flex items-center justify-between sm:justify-start gap-2 min-h-[44px] ${
-                    active
-                      ? 'border-brand-600 bg-brand-50 text-brand-800'
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="truncate">{group}</span>
-                  {active && <X size={15} className="text-brand-700 shrink-0" />}
-                </button>
-              );
-            })
+            allOptions.map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => toggleGroup(opt.key, opt.active)}
+                className={`px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-colors flex items-center justify-between sm:justify-start gap-2 min-h-[44px] ${
+                  opt.active
+                    ? 'border-brand-600 bg-brand-50 text-brand-800'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <span className="truncate">{opt.name}</span>
+                {opt.active && <X size={15} className="text-brand-700 shrink-0" />}
+              </button>
+            ))
           )}
         </div>
 
