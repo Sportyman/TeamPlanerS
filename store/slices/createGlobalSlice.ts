@@ -5,7 +5,6 @@ import {
   Club, ClubID, ClubLocation, ClubSchedule, ClubWeatherConfig, SessionOverride, Person, ClubSettings, SyncStatus, BoatDefinition, UserPermission,
 } from '../../types';
 import { DEFAULT_CLUBS, KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from '../../mockData';
-import { clearSensitiveBrowserStorage, STORE_STORAGE_KEY } from '../storagePersistence';
 
 const defaultBoatsForClub = (clubId: string, label = ''): BoatDefinition[] => {
   const combined = `${clubId} ${label}`.toLowerCase();
@@ -159,8 +158,7 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
   })),
 
   hardReset: () => {
-      clearSensitiveBrowserStorage();
-      localStorage.removeItem(STORE_STORAGE_KEY);
+      localStorage.removeItem('etgarim-storage');
       window.location.reload();
   }
 });

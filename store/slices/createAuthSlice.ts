@@ -4,7 +4,6 @@ import { auth, googleProvider } from '../../firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { getUserProfile, getUserMemberships } from '../../services/profileService';
 import { fetchGlobalConfig } from '../../services/syncService';
-import { clearSensitiveBrowserStorage } from '../storagePersistence';
 import { UserProfile, ClubMembership, UserPermission, ClubID, AccessLevel } from '../../types';
 
 export interface AuthSlice {
@@ -69,32 +68,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
   logout: async () => {
     try { await signOut(auth); } catch {}
-    clearSensitiveBrowserStorage();
-    set((state) => {
-      const clearedSessions: typeof state.sessions = {};
-      Object.entries(state.sessions).forEach(([clubId, sess]) => {
-        clearedSessions[clubId] = { inventory: sess.inventory || {}, presentPersonIds: [], teams: [] };
-      });
-      return {
-        user: null,
-        userProfile: null,
-        memberships: [],
-        activeClub: null,
-        people: [],
-        invites: [],
-        pendingInvite: null,
-        superAdmins: [],
-        protectedAdmins: [],
-        permissions: [],
-        snapshots: {},
-        notifications: [],
-        unreadCount: 0,
-        histories: {},
-        futures: {},
-        sessions: clearedSessions,
-        isLoadingResources: false,
-      };
-    });
+    set({ user: null, userProfile: null, memberships: [], activeClub: null, isLoadingResources: false });
   },
 
   setUserProfile: (profile) => set({ userProfile: profile }),
