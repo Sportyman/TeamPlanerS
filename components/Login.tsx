@@ -2,14 +2,13 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../store';
-import { ShieldCheck, Mail, Zap, AlertTriangle, ArrowRight, Loader2, ShieldAlert } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, ArrowRight, Loader2, ShieldAlert } from 'lucide-react';
 import { APP_VERSION } from '../types';
 
 export const Login: React.FC = () => {
-  const { loginWithGoogle, loginDev, user, activeClub, clubs, authError, setAuthError } = useAppStore();
+  const { loginWithGoogle, user, activeClub, clubs, authError, setAuthError } = useAppStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [emailInput, setEmailInput] = useState('');
   const [localError, setLocalError] = useState('');
   const [isRedirecting, setIsRedirecting] = useState(false);
   
@@ -42,19 +41,6 @@ export const Login: React.FC = () => {
       const success = await loginWithGoogle();
       if (!success) {
           setIsRedirecting(false);
-          // General errors are handled by localError, specific kick-outs are handled by authError
-      }
-  };
-
-  const handleDevLogin = (e: React.FormEvent) => {
-      e.preventDefault();
-      setLocalError('');
-      setAuthError(null);
-      setIsRedirecting(true);
-      const success = loginDev(emailInput.trim(), isAdminLogin);
-      if (!success) {
-          setIsRedirecting(false);
-          setLocalError('שגיאה בתהליך ההתחברות.');
       }
   };
 
@@ -118,36 +104,6 @@ export const Login: React.FC = () => {
             </div>
             המשך עם Google
         </button>
-
-        <div className="relative py-2">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-100"></div>
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="px-4 bg-white text-slate-400 font-bold uppercase tracking-widest">או כניסה חופשית למפתחים</span>
-            </div>
-        </div>
-
-        <form onSubmit={handleDevLogin} className="space-y-4">
-            <div className="relative group">
-                <Mail className="absolute right-4 top-3.5 text-slate-400 group-focus-within:text-brand-500 transition-colors" size={20} />
-                <input 
-                    type="email" 
-                    className="w-full pr-12 pl-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
-                    placeholder="אימייל (אופציונלי)..."
-                    value={emailInput}
-                    onChange={e => setEmailInput(e.target.value)}
-                    dir="ltr"
-                />
-            </div>
-            <button
-                type="submit"
-                className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-xl transition-all shadow-sm active:scale-95"
-            >
-                <Zap size={18} className="text-yellow-400 fill-current" />
-                כניסה מהירה
-            </button>
-        </form>
 
       </div>
       

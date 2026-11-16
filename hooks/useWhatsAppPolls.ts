@@ -85,7 +85,7 @@ export const useWhatsAppPolls = () => {
   }, [activeClub, isLoading, relevantPolls.length, selectedPollId, votesLoadedPollId, summary, recentChangedVoters, sessions, setBulkAttendance, addNotification]);
 
   useEffect(() => {
-    if (!activeClub || !user || user.isDev) return;
+    if (!activeClub || !user) return;
     const phoneMatches = syncCandidates.filter((c) => c.confidence === 'PHONE_EXACT' && !attemptedAutoLinkRef.current.has(`${activeClub}:${c.mapping.voterId}:${c.person.id}`));
     if (phoneMatches.length === 0) return;
     phoneMatches.forEach((c) => attemptedAutoLinkRef.current.add(`${activeClub}:${c.mapping.voterId}:${c.person.id}`));
@@ -95,7 +95,7 @@ export const useWhatsAppPolls = () => {
   }, [activeClub, user, syncCandidates, addNotification]);
 
   useEffect(() => {
-    if (!activeClub || !user || user.isDev || clubPeople.length < 2) return;
+    if (!activeClub || !user || clubPeople.length < 2) return;
     runClubDuplicateCleanup({
       clubId: activeClub, clubPeople, allPeople: useAppStore.getState().people,
       mappings: clubMappings, attemptedSet: attemptedAutoLinkRef.current, updatedBy: user.email || user.uid,
@@ -104,7 +104,7 @@ export const useWhatsAppPolls = () => {
 
   const availableGroups = useMemo(() => groupCatalog.map((g) => g.name), [groupCatalog]);
   const { linkClubGroup, unlinkClubGroup, saveConfig, setPollColor } = useWhatsAppGroupConfigActions({
-    activeClub, userId: user?.uid, isDev: user?.isDev, isLoading, clubConfig, groupCatalog, onNotify: addNotification,
+    activeClub, userId: user?.uid, isLoading, clubConfig, groupCatalog, onNotify: addNotification,
   });
 
   const updateMemberRole = useCallback(async (person: Person, nextRole: Role, nextIsSkipper?: boolean, nextTags?: string[]) => {

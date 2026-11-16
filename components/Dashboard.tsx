@@ -43,13 +43,26 @@ export const Dashboard: React.FC = () => {
           if (m.role === Role.INSTRUCTOR) accessLevel = AccessLevel.CLUB_ADMIN;
           else if (m.role === Role.VOLUNTEER) accessLevel = AccessLevel.STAFF;
 
-          await approveMembership(m.id, { role: m.role, rank: m.rank, accessLevel });
-          if (m.profile) await saveUserProfile({ ...m.profile, isSkipper: m.isSkipper });
+          await approveMembership(m.id, {
+            role: m.role,
+            rank: m.rank,
+            accessLevel,
+            clubSpecificNotes: m.clubSpecificNotes || '',
+            ...(typeof m.isSkipper === 'boolean' ? { isSkipper: m.isSkipper } : {}),
+            ...(typeof m.medicalNotes === 'string' ? { notes: m.medicalNotes } : {}),
+          } as any);
+          if (m.profile) {
+            await saveUserProfile({
+              ...m.profile,
+              isSkipper: Boolean(m.isSkipper),
+              medicalNotes: typeof m.medicalNotes === 'string' ? m.medicalNotes : m.profile.medicalNotes,
+            });
+          }
 
-          addNotification(`אושר חבר חדש: ${m.profile?.firstName || m.uid}`, 'SUCCESS');
+          addNotification(`אושר חבר חדש: ${m.profile?.firstName || m.displayName || m.uid}`, 'SUCCESS');
           navigate('/app/manage');
       } catch (err) {
-          alert('שגיאה בתהליך האישור.');
+          addNotification('שגיאה בתהליך האישור.', 'WARN');
       }
   };
 
@@ -60,7 +73,7 @@ export const Dashboard: React.FC = () => {
               await deleteDoc(doc(db, 'memberships', membershipId));
               addNotification('חבר הוסר מהחוג', 'INFO');
           } catch (e) {
-              alert('שגיאה במחיקה.');
+              addNotification('שגיאה במחיקה.', 'WARN');
           }
       }
   };

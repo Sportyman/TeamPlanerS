@@ -20,7 +20,7 @@ import { AccessLevel } from './types';
 import { fetchGlobalConfig, addLog, subscribeToClubData } from './services/syncService';
 import { subscribeToClubBoatDefinitions } from './services/clubEquipmentService';
 import { auth } from './firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 const AppContent: React.FC<{ children: React.ReactNode; skipClubLoading?: boolean }> = ({
   children,
@@ -31,7 +31,7 @@ const AppContent: React.FC<{ children: React.ReactNode; skipClubLoading?: boolea
   useEffect(() => {
     let unsubData: (() => void) | undefined;
     let unsubBoats: (() => void) | undefined;
-    if (user && activeClub && !user.isDev) {
+    if (user && activeClub) {
       const clubLabel = useAppStore.getState().clubs.find((c) => c.id === activeClub)?.label || '';
       unsubData = subscribeToClubData(activeClub);
       unsubBoats = subscribeToClubBoatDefinitions(activeClub, clubLabel);
@@ -40,7 +40,7 @@ const AppContent: React.FC<{ children: React.ReactNode; skipClubLoading?: boolea
       if (unsubData) unsubData();
       if (unsubBoats) unsubBoats();
     };
-  }, [user?.uid, user?.isDev, activeClub]);
+  }, [user?.uid, activeClub]);
 
   if (!skipClubLoading && activeClub && isInitialLoading) {
     return <MainLayout><LoadingScreen message="מסנכרן נתוני מועדון..." /></MainLayout>;
@@ -62,19 +62,46 @@ const App: React.FC = () => {
     
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
+            if (!firebaseUser.emailVerified || !firebaseUser.email) {
+              await signOut(auth).catch(() => {});
+              useAppStore.setState({
+                user: null,
+                userProfile: null,
+                memberships: [],
+                people: [],
+                invites: [],
+                superAdmins: [],
+                protectedAdmins: [],
+                permissions: [],
+                authError: 'יש להתחבר באמצעות חשבון Google מאומת.',
+                isLoadingResources: false,
+              });
+              setAuthInitialized(true);
+              return;
+            }
             await fetchGlobalConfig();
             const state = useAppStore.getState();
-            const email = firebaseUser.email?.toLowerCase().trim() || '';
+            const email = firebaseUser.email.toLowerCase().trim();
             const isSuperAdmin = state.superAdmins.some(a => a.toLowerCase() === email) || 
                                state.protectedAdmins.some(a => a.toLowerCase() === email);
             
             useAppStore.setState({ 
-                user: { uid: firebaseUser.uid, email, isAdmin: isSuperAdmin, photoURL: firebaseUser.photoURL || undefined, isDev: false },
+                user: { uid: firebaseUser.uid, email, isAdmin: isSuperAdmin, photoURL: firebaseUser.photoURL || undefined },
                 isLoadingResources: true
             });
             await loadUserResources(firebaseUser.uid);
         } else {
-            useAppStore.setState({ user: null, userProfile: null, memberships: [], isLoadingResources: false });
+            useAppStore.setState({
+              user: null,
+              userProfile: null,
+              memberships: [],
+              people: [],
+              invites: [],
+              superAdmins: [],
+              protectedAdmins: [],
+              permissions: [],
+              isLoadingResources: false,
+            });
         }
         setAuthInitialized(true);
     });

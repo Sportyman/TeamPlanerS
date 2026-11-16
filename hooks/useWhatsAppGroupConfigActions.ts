@@ -12,7 +12,6 @@ import { saveClubWhatsAppConfig } from '../services/whatsapp/whatsappMutations';
 interface UseWhatsAppGroupConfigActionsParams {
   activeClub: ClubID | null;
   userId?: string;
-  isDev?: boolean;
   isLoading: boolean;
   clubConfig: ClubWhatsAppConfig;
   groupCatalog: WhatsAppGroupEntry[];
@@ -22,7 +21,6 @@ interface UseWhatsAppGroupConfigActionsParams {
 export const useWhatsAppGroupConfigActions = ({
   activeClub,
   userId,
-  isDev,
   isLoading,
   clubConfig,
   groupCatalog,
@@ -31,14 +29,14 @@ export const useWhatsAppGroupConfigActions = ({
   const syncedConfigKeyRef = useRef<string>('');
 
   useEffect(() => {
-    if (!activeClub || !userId || isDev || isLoading) return;
+    if (!activeClub || !userId || isLoading) return;
     const patch = computeGroupConfigSyncPatch(clubConfig, groupCatalog);
     if (!patch) return;
     const sig = `${activeClub}|${(patch.linkedGroupIds || []).join(',')}|${patch.linkedGroups.join(',')}`;
     if (syncedConfigKeyRef.current === sig) return;
     syncedConfigKeyRef.current = sig;
     saveClubWhatsAppConfig({ ...patch, clubId: activeClub }).catch(() => {});
-  }, [activeClub, userId, isDev, isLoading, clubConfig, groupCatalog]);
+  }, [activeClub, userId, isLoading, clubConfig, groupCatalog]);
 
   const linkClubGroup = useCallback(async (groupInput: string) => {
     if (!activeClub || !groupInput.trim()) return;

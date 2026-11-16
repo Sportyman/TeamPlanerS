@@ -97,10 +97,7 @@ export const ProfileSetup: React.FC = () => {
       // 4. Navigate to correct landing
       if (isSuperAdmin) {
           navigate('/app');
-      } else if (pendingInvite) {
-          if (pendingInvite.autoApprove) navigate('/app');
-          else navigate('/registration-status');
-      } else if (memberships.length > 0) {
+      } else if (pendingInvite || memberships.length > 0) {
           navigate('/registration-status');
       } else {
           navigate('/');

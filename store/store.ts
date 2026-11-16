@@ -7,8 +7,13 @@ import { createSessionSlice, SessionSlice } from './slices/createSessionSlice';
 import { createPairingSlice, PairingSlice } from './slices/createPairingSlice';
 import { createInviteSlice, InviteSlice } from './slices/createInviteSlice';
 import { createNotificationSlice, NotificationSlice } from './slices/createNotificationSlice';
+import {
+  migratePersistedAppState,
+  partializeAppState,
+  STORE_PERSIST_VERSION,
+  STORE_STORAGE_KEY,
+} from './storagePersistence';
 import { BoatDefinition, BoatInventory } from '../types';
-import { KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from '../mockData';
 
 export type AppState = AuthSlice & GlobalSlice & SessionSlice & PairingSlice & InviteSlice & NotificationSlice;
 
@@ -31,42 +36,15 @@ export const useAppStore = create<AppState>()(
       ...createNotificationSlice(...args),
     }),
     {
-      name: 'etgarim-storage',
-      version: 48.0,
-      migrate: (persistedState: unknown, version: number) => {
-        const state = persistedState as Partial<AppState> | null;
-        if (state && version < 48 && state.sessions) {
-          const cleanedSessions: typeof state.sessions = {};
-          Object.entries(state.sessions).forEach(([clubId, sess]) => {
-            cleanedSessions[clubId] = { ...sess, presentPersonIds: [], teams: [] };
-          });
-          return { ...state, sessions: cleanedSessions };
-        }
-        return state;
-      },
+      name: STORE_STORAGE_KEY,
+      version: STORE_PERSIST_VERSION,
+      migrate: (persistedState: unknown) => migratePersistedAppState(persistedState),
       onRehydrateStorage: () => (state) => {
           if (state) {
               state.setHasHydrated(true);
           }
       },
-      partialize: (state) => ({
-        user: state.user,
-        userProfile: state.userProfile,
-        activeClub: state.activeClub,
-        memberships: state.memberships,
-        people: state.people,
-        sessions: state.sessions,
-        clubSettings: state.clubSettings,
-        permissions: state.permissions,
-        clubs: state.clubs,
-        superAdmins: state.superAdmins,
-        protectedAdmins: state.protectedAdmins,
-        pairingDirty: state.pairingDirty,
-        snapshots: state.snapshots,
-        invites: state.invites,
-        notifications: state.notifications,
-        unreadCount: state.unreadCount
-      })
+      partialize: (state) => partializeAppState(state),
     }
   )
 );

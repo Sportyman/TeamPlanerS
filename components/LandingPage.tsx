@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
-import { ClubID, APP_VERSION, Role, MembershipStatus, getRoleLabel } from '../types';
+import { AccessLevel, ClubID, APP_VERSION, MembershipStatus, getRoleLabel } from '../types';
+import { calculateEffectiveAccess, hasAccess } from '../services/auth/permissionsService';
 import { Waves, Ship, Settings, Anchor, User, Loader2, LogOut, Clock, ShieldAlert, X } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
@@ -15,22 +16,17 @@ export const LandingPage: React.FC = () => {
     setActiveClub(clubId);
 
     if (user) {
-        const membership = memberships.find(m => m.clubId === clubId);
-        
-        if (user.isAdmin) {
+        const level = calculateEffectiveAccess(user.email, Boolean(user.isAdmin), memberships, clubId);
+        if (hasAccess(level, AccessLevel.STAFF)) {
             navigate('/app');
             return;
         }
-
-        if (membership) {
-            if (membership.status === MembershipStatus.ACTIVE) {
-                const isStaff = (membership.role === Role.INSTRUCTOR || membership.role === Role.VOLUNTEER);
-                if (isStaff) navigate('/app');
-            }
-            return; 
+        const membership = memberships.find(m => m.clubId === clubId);
+        if (membership?.status === MembershipStatus.PENDING) {
+            navigate('/registration-status');
+            return;
         }
-
-        setAuthError("אין לך הרשאת גישה לחוג זה. הצטרפות מתבצעת דרך לינק הזמנה בלבד.");
+        setAuthError("אין לך הרשאת צוות פעילה לחוג זה. הצטרפות מתבצעת דרך לינק הזמנה ובאישור מנהל.");
     } else {
         navigate(`/login?club=${clubId}`);
     }
@@ -95,6 +91,7 @@ export const LandingPage: React.FC = () => {
                             {!user.isAdmin && memberships.map(m => {
                                 const club = clubs.find(c => c.id === m.clubId);
                                 const isActive = m.status === MembershipStatus.ACTIVE;
+                                const canManage = hasAccess(calculateEffectiveAccess(user.email, false, memberships, m.clubId), AccessLevel.STAFF);
                                 return (
                                     <div key={m.clubId} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group transition-all">
                                         <div className="flex items-center gap-4">
@@ -107,7 +104,7 @@ export const LandingPage: React.FC = () => {
                                                 </div>
                                             </div>
                                         </div>
-                                        {isActive && (m.role === Role.INSTRUCTOR || m.role === Role.VOLUNTEER) && (
+                                        {isActive && canManage && (
                                             <button onClick={() => handleClubSelect(m.clubId)} className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-2xl text-sm font-black transition-all shadow-lg shadow-brand-100">ניהול</button>
                                         )}
                                         {!isActive && <div className="text-[10px] text-slate-400 italic font-medium px-4">בטיפול</div>}

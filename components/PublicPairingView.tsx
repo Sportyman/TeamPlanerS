@@ -2,23 +2,12 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { BoatTypeLabel, getRoleLabel, Role, TEAM_COLORS, BoatType, Gender } from '../types';
+import { parsePublicShareEncodedPayload, PublicShareTeam } from '../services/share/sharePayloadSanitizer';
 import { Ship, Calendar, Clock, MapPin, AlertCircle, Printer } from 'lucide-react';
-
-interface PublicMember {
-  name: string;
-  role: Role;
-  gender?: Gender;
-}
-
-interface PublicTeam {
-  id: string;
-  boatType: string;
-  members: PublicMember[];
-}
 
 export const PublicPairingView: React.FC = () => {
   const location = useLocation();
-  const [teams, setTeams] = useState<PublicTeam[]>([]);
+  const [teams, setTeams] = useState<PublicShareTeam[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [clubName, setClubName] = useState('');
   const [dateStr, setDateStr] = useState('');
@@ -32,15 +21,14 @@ export const PublicPairingView: React.FC = () => {
       const params = new URLSearchParams(location.search);
       const data = params.get('data');
       if (!data) { setError('לא נמצאו נתוני שיבוץ בקישור.'); return; }
-      const jsonString = decodeURIComponent(escape(atob(data)));
-      const parsedData = JSON.parse(jsonString);
+      const parsedData = parsePublicShareEncodedPayload(data);
       setTeams(parsedData.teams);
-      setClubName(parsedData.clubName || '');
-      setDateStr(parsedData.date || new Date().toLocaleDateString('he-IL'));
-      setTimeStr(parsedData.time || '');
-      setLocationName(parsedData.location || '');
-      setSessionNote(parsedData.note || '');
-      if (parsedData.labels) setCustomLabels(parsedData.labels);
+      setClubName(parsedData.clubName);
+      setDateStr(parsedData.date);
+      setTimeStr(parsedData.time);
+      setLocationName(parsedData.location);
+      setSessionNote(parsedData.note);
+      setCustomLabels(parsedData.labels);
     } catch (err) {
       console.error(err);
       setError('הקישור אינו תקין או פג תוקף.');

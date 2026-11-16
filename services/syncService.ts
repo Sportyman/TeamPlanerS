@@ -5,13 +5,15 @@ import { Person, ClubID, MembershipStatus, Role, AccessLevel, Gender } from '../
 import { fetchCloudClubsCatalog, syncStrandedLocalClubsToCloud } from './auth/superAdminService';
 import { fetchGlobalLocations } from './scheduleService';
 import { hydratePeopleFromMemberships } from './membershipHydration';
+import { sanitizeLogMessage } from './logging/logSanitizer';
 
 const systemLogs: { time: string; msg: string; type: 'INFO' | 'WARN' | 'ERROR' | 'SYNC' }[] = [];
 
 export const addLog = (msg: string, type: 'INFO' | 'WARN' | 'ERROR' | 'SYNC' = 'INFO') => {
-    systemLogs.push({ time: new Date().toISOString(), msg, type });
+    const safeMsg = sanitizeLogMessage(msg);
+    systemLogs.push({ time: new Date().toISOString(), msg: safeMsg, type });
     if (systemLogs.length > 1000) systemLogs.shift();
-    console.log(`%c[${type}] ${new Date().toLocaleTimeString()}: ${msg}`, type === 'ERROR' ? 'color: #f44' : 'color: #33b5e5');
+    console.log(`%c[${type}] ${new Date().toLocaleTimeString()}: ${safeMsg}`, type === 'ERROR' ? 'color: #f44' : 'color: #33b5e5');
 };
 
 export const downloadSystemLogs = () => {
@@ -50,7 +52,7 @@ export const forceFullSync = async (uid?: string, clubId?: ClubID | null): Promi
     store.setSyncStatus('SYNCING');
     try {
         await fetchGlobalConfig();
-        if (uid && !uid.startsWith('dev-user-')) await store.loadUserResources(uid);
+        if (uid) await store.loadUserResources(uid);
         let syncedCount = 0;
         if (clubId) {
             const q = query(collection(db, 'memberships'), where('clubId', '==', clubId), where('status', '==', MembershipStatus.ACTIVE));
@@ -154,7 +156,7 @@ export const fetchGlobalConfig = async (force = false) => {
             }
             const [catalog, locs] = await Promise.all([fetchCloudClubsCatalog().catch(() => null), fetchGlobalLocations().catch(() => null)]);
             if (catalog) {
-                const clubs = user?.isAdmin && !user.isDev
+                const clubs = user?.isAdmin
                     ? await syncStrandedLocalClubsToCloud(useAppStore.getState().clubs, catalog.clubs, catalog.deletedIds)
                     : catalog.clubs;
                 mergeCloudClubs(clubs, catalog.deletedIds);

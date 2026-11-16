@@ -2,13 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../store';
 import { Role, ClubID, getRoleLabel, Gender } from '../../types';
-import { Plus, Link as LinkIcon, Copy, Trash2, CheckCircle2, Clock, ShieldAlert, Loader2, Sparkles, Share2 } from 'lucide-react';
+import { Plus, Link as LinkIcon, Copy, Trash2, CheckCircle2, Clock, ShieldAlert, Loader2, Sparkles } from 'lucide-react';
 
 export const InviteManager: React.FC = () => {
   const { activeClub, clubs, invites, isLoadingInvites, fetchClubInvites, createClubInvite, deleteClubInvite } = useAppStore();
   
   const [targetRole, setTargetRole] = useState<Role>(Role.MEMBER);
-  const [autoApprove, setAutoApprove] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -25,11 +24,8 @@ export const InviteManager: React.FC = () => {
 
   const handleCreate = async () => {
     setIsCreating(true);
-    const token = await createClubInvite(activeClub, targetRole, autoApprove);
+    await createClubInvite(activeClub, targetRole, false);
     setIsCreating(false);
-    if (token) {
-        setAutoApprove(false);
-    }
   };
 
   const copyToClipboard = (token: string, id: string) => {
@@ -70,19 +66,8 @@ export const InviteManager: React.FC = () => {
 
                 <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-700">מנגנון אישור</label>
-                    <div className="flex gap-2">
-                        <button 
-                            onClick={() => setAutoApprove(true)}
-                            className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all font-bold ${autoApprove ? 'bg-green-50 border-green-600 text-green-700' : 'bg-white border-slate-100 text-slate-400'}`}
-                        >
-                            <CheckCircle2 size={18} /> אוטומטי
-                        </button>
-                        <button 
-                            onClick={() => setAutoApprove(false)}
-                            className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all font-bold ${!autoApprove ? 'bg-amber-50 border-amber-600 text-amber-700' : 'bg-white border-slate-100 text-slate-400'}`}
-                        >
-                            <Clock size={18} /> ידני
-                        </button>
+                    <div className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 bg-amber-50 border-amber-500/60 text-amber-800 font-bold">
+                        <Clock size={18} /> אישור מנהל חובה
                     </div>
                 </div>
 
@@ -98,10 +83,10 @@ export const InviteManager: React.FC = () => {
             </div>
 
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs text-slate-500 flex items-start gap-3">
-                <ShieldAlert size={16} className="shrink-0 mt-0.5" />
+                <ShieldAlert size={16} className="shrink-0 mt-0.5 text-amber-600" />
                 <div>
-                    <span className="font-bold block mb-1">טיפ בטיחות:</span>
-                    לינקים באישור אוטומטי יכניסו את המשתמש ישירות לרשימת השיבוץ הפעילה. השתמש בהם בזהירות.
+                    <span className="font-bold block mb-1">מדיניות אבטחה פעילה:</span>
+                    כל מצטרף דרך קישור הזמנה נכנס תחילה למסך המתנה ונדרש אישור מפורש של מנהל החוג תחת &quot;בקשות הצטרפות&quot; לפני שיקבל גישה לשיבוץ.
                 </div>
             </div>
         </div>
@@ -124,8 +109,8 @@ export const InviteManager: React.FC = () => {
                             <div className="flex justify-between items-start mb-4">
                                 <div>
                                     <div className="flex items-center gap-2 mb-1">
-                                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${invite.autoApprove ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                                            {invite.autoApprove ? 'אישור אוטומטי' : 'אישור ידני'}
+                                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                                            אישור מנהל חובה
                                         </span>
                                         <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">
                                             {getRoleLabel(invite.role, Gender.MALE)}

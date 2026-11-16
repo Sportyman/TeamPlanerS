@@ -19,6 +19,12 @@ export const InviteLanding: React.FC = () => {
   useEffect(() => {
     const checkToken = async () => {
       if (!token || !authInitialized) return;
+      if (!user) {
+        setIsValidating(false);
+        return;
+      }
+      setIsValidating(true);
+      setError(null);
       try {
           const validInvite = await validateInviteToken(token);
           if (validInvite) {
@@ -34,7 +40,7 @@ export const InviteLanding: React.FC = () => {
       }
     };
     if (authInitialized) checkToken();
-  }, [token, authInitialized]);
+  }, [token, authInitialized, user?.uid]);
 
   const handleLogout = async () => {
       if (confirm('האם להתנתק כדי להחליף משתמש?')) {
@@ -53,19 +59,11 @@ export const InviteLanding: React.FC = () => {
         const isProfileComplete = userProfile?.firstName && userProfile?.lastName && userProfile?.primaryPhone;
         
         if (isProfileComplete) {
-            // Existing user with complete profile - Join immediately
             await completeInviteFlow(user, userProfile, invite);
             setActiveClub(invite.clubId);
-            setPendingInvite(null); // Clear context
-            
-            if (invite.autoApprove) {
-                navigate('/app');
-            } else {
-                navigate('/registration-status');
-            }
+            setPendingInvite(null);
+            navigate('/registration-status');
         } else {
-            // New user or incomplete profile - Redirect to setup
-            // This prevents "Ghost Users" from entering via auto-approve links without a name.
             navigate(`/profile-setup?invite=${invite.token}`);
         }
     } catch (err) {

@@ -1,6 +1,6 @@
-export const APP_VERSION = '6.3.28';
+export const APP_VERSION = '6.3.29';
 export const LAST_COMMIT_MESSAGE =
-  'feat(location): add multi-source Hebrew place search (OSM + Photon + Wikipedia Geo) and Google Maps / Waze link & coordinate parsing';
+  'security(auth): remove dev login backdoor, purge PII/privileges from localStorage, enforce admin approval on invites, mask debug log PII, and whitelist /share payloads';
 
 
 

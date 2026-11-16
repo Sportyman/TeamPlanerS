@@ -5,6 +5,7 @@ import { Team, Role, getRoleLabel, BoatType, TEAM_COLORS, Person } from '../type
 import { GripVertical, AlertTriangle, ArrowRightLeft, Check, Printer, Share2, Link as LinkIcon, Eye, Send, RotateCcw, RotateCw, Star, Shuffle, X, Plus, Trash2, Search, UserPlus, Lock, ShieldCheck, Heart, UserX, Shield, ShipWheel } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { computeNextClubSession } from '../services/scheduleService';
+import { buildPublicShareEncodedPayload } from '../services/share/sharePayloadSanitizer';
 
 // Pairing Board Component
 export const PairingBoard: React.FC = () => {
@@ -142,35 +143,16 @@ export const PairingBoard: React.FC = () => {
   };
 
   const generateShareData = () => {
-    const cleanTeams = session.teams.map((t: Team) => ({
-      id: t.id,
-      boatType: t.boatType,
-      members: t.members.map((m: Person) => ({
-        name: m.name,
-        role: m.role,
-        gender: m.gender // Added Gender for correct labeling in public view
-      }))
-    }));
-
     const activeClubObj = clubs.find((c) => c.id === activeClub);
     const upcoming = computeNextClubSession(activeClubObj);
-    const timeStr = upcoming ? (upcoming.endTime ? `${upcoming.startTime}–${upcoming.endTime}` : upcoming.startTime) : '';
-    const payload = {
-      clubName: activeClubObj?.label || '',
-      date: upcoming ? `${upcoming.dayName}, ${upcoming.displayDate}` : new Date().toLocaleDateString('he-IL'),
-      time: timeStr,
-      location: upcoming?.locationName || '',
-      note: upcoming?.note || '',
-      labels: boatLabels,
-      teams: cleanTeams
-    };
-
-    const jsonString = JSON.stringify(payload);
-    const encoded = btoa(unescape(encodeURIComponent(jsonString)));
-    
+    const encoded = buildPublicShareEncodedPayload({
+      teams: session.teams,
+      club: activeClubObj,
+      upcoming,
+      boatLabels,
+    });
     const origin = window.location.origin;
-    const shareUrl = `${origin}${window.location.pathname}#/share?data=${encoded}`;
-    return shareUrl;
+    return `${origin}${window.location.pathname}#/share?data=${encoded}`;
   };
 
   const handleOpenPublicView = () => {

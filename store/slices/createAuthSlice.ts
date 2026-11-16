@@ -4,10 +4,11 @@ import { auth, googleProvider } from '../../firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { getUserProfile, getUserMemberships } from '../../services/profileService';
 import { fetchGlobalConfig } from '../../services/syncService';
-import { UserProfile, ClubMembership, UserPermission, ClubID, Gender, MembershipStatus, AccessLevel } from '../../types';
+import { clearSensitiveBrowserStorage } from '../storagePersistence';
+import { UserProfile, ClubMembership, UserPermission, ClubID, AccessLevel } from '../../types';
 
 export interface AuthSlice {
-  user: { uid: string; email: string; isAdmin: boolean; photoURL?: string; isDev?: boolean } | null;
+  user: { uid: string; email: string; isAdmin: boolean; photoURL?: string } | null;
   userProfile: UserProfile | null;
   memberships: ClubMembership[];
   superAdmins: string[];
@@ -18,7 +19,6 @@ export interface AuthSlice {
   authError: string | null;
 
   loginWithGoogle: () => Promise<boolean>;
-  loginDev: (email: string, isAdmin: boolean) => boolean;
   logout: () => Promise<void>;
   setUserProfile: (profile: UserProfile) => void;
   loadUserResources: (uid: string) => Promise<void>;
@@ -46,13 +46,18 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     set({ authError: null, isLoadingResources: true });
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      const email = result.user.email?.toLowerCase().trim() || '';
+      if (!result.user.emailVerified || !result.user.email) {
+        await signOut(auth).catch(() => {});
+        set({ user: null, authError: 'יש להתחבר באמצעות חשבון Google עם כתובת אימייל מאומתת.', isLoadingResources: false });
+        return false;
+      }
+      const email = result.user.email.toLowerCase().trim();
       const uid = result.user.uid;
       await fetchGlobalConfig();
       const { superAdmins, protectedAdmins } = get();
       const isSuperAdmin = superAdmins.some(a => a.toLowerCase() === email) || protectedAdmins.some(a => a.toLowerCase() === email);
 
-      set({ user: { uid, email, isAdmin: isSuperAdmin, photoURL: result.user.photoURL || undefined, isDev: false }, isLoadingResources: true });
+      set({ user: { uid, email, isAdmin: isSuperAdmin, photoURL: result.user.photoURL || undefined }, isLoadingResources: true });
       await get().loadUserResources(uid);
       return true;
     } catch (error) {
@@ -62,36 +67,40 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     }
   },
 
-  loginDev: (email, isAdmin) => {
-    set({ authError: null, isLoadingResources: false });
-    const uid = 'dev-user-' + Date.now();
-    const devEmail = email || 'dev@example.com';
-    const { activeClub } = get();
-
-    const mockProfile: UserProfile = {
-      uid, firstName: 'מפתח', lastName: 'מערכת', email: devEmail, contactEmail: devEmail,
-      gender: Gender.MALE, birthDate: '1990-01-01', primaryPhone: '050-000-0000',
-      emergencyContacts: [], medicalNotes: 'חשבון פיתוח - כניסה מהירה',
-      certifications: [], isSkipper: true, joinedSystemDate: new Date().toISOString(),
-    };
-    const mockMemberships: ClubMembership[] = activeClub ? [{
-      uid, clubId: activeClub, role: (isAdmin ? 'INSTRUCTOR' : 'VOLUNTEER') as any,
-      status: MembershipStatus.ACTIVE, joinedClubDate: new Date().toISOString(), rank: 5,
-    }] : [];
-
-    set({ user: { uid, email: devEmail, isAdmin, isDev: true }, userProfile: mockProfile, memberships: mockMemberships, authInitialized: true });
-    return true;
-  },
-
   logout: async () => {
     try { await signOut(auth); } catch {}
-    set({ user: null, userProfile: null, memberships: [], activeClub: null, isLoadingResources: false });
+    clearSensitiveBrowserStorage();
+    set((state) => {
+      const clearedSessions: typeof state.sessions = {};
+      Object.entries(state.sessions).forEach(([clubId, sess]) => {
+        clearedSessions[clubId] = { inventory: sess.inventory || {}, presentPersonIds: [], teams: [] };
+      });
+      return {
+        user: null,
+        userProfile: null,
+        memberships: [],
+        activeClub: null,
+        people: [],
+        invites: [],
+        pendingInvite: null,
+        superAdmins: [],
+        protectedAdmins: [],
+        permissions: [],
+        snapshots: {},
+        notifications: [],
+        unreadCount: 0,
+        histories: {},
+        futures: {},
+        sessions: clearedSessions,
+        isLoadingResources: false,
+      };
+    });
   },
 
   setUserProfile: (profile) => set({ userProfile: profile }),
 
   loadUserResources: async (uid) => {
-    if (uid.startsWith('dev-user-')) return;
+    if (!uid) return;
     set({ isLoadingResources: true });
     try {
       await fetchGlobalConfig();
@@ -116,7 +125,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
   refreshMemberships: async () => {
     const { user } = get();
-    if (user && !user.isDev) {
+    if (user) {
       const ms = await getUserMemberships(user.uid);
       set({ memberships: ms });
     }

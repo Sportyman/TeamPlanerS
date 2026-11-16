@@ -1,21 +1,17 @@
 
 import React, { useState } from 'react';
 import { useAppStore } from '../../store';
+import { usePermissions } from '../../hooks/usePermissions';
 import { Terminal, Download, X, Bug, Cloud, RefreshCw, Trash2 } from 'lucide-react';
 import { downloadSystemLogs } from '../../services/syncService';
 
 export const DebugOverlay: React.FC = () => {
   const { user, syncStatus, hardReset } = useAppStore();
+  const { isSuperAdmin } = usePermissions();
   const [isOpen, setIsOpen] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
 
-  // Only show for Super Admins
-  if (!user?.isAdmin) return null;
-
-  const handleHardReset = () => {
-      if (confirm('זהירות: פעולה זו תנקה את כל הזיכרון המקומי ותטען את האפליקציה מחדש. להמשיך?')) {
-          hardReset();
-      }
-  };
+  if (!user || !isSuperAdmin) return null;
 
   return (
     <div className="fixed bottom-6 left-6 z-[9999] print:hidden">
@@ -26,7 +22,7 @@ export const DebugOverlay: React.FC = () => {
               <Bug size={18} className="text-brand-400" />
               <span className="font-black text-xs uppercase tracking-widest">Debug Menu</span>
             </div>
-            <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-white/10 rounded-full">
+            <button onClick={() => { setIsOpen(false); setConfirmReset(false); }} className="p-1 hover:bg-white/10 rounded-full">
               <X size={18} />
             </button>
           </div>
@@ -48,16 +44,26 @@ export const DebugOverlay: React.FC = () => {
               הורד לוג מערכת (.log)
             </button>
 
-            <button
-              onClick={handleHardReset}
-              className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95"
-            >
-              <Trash2 size={18} />
-              ניקוי זיכרון (Hard Reset)
-            </button>
+            {confirmReset ? (
+              <div className="p-3 bg-red-950/80 border border-red-700 rounded-xl space-y-2">
+                <p className="text-xs text-red-200 font-bold text-center">לאפס זיכרון דפדפן ולטעון מחדש?</p>
+                <div className="flex gap-2">
+                  <button onClick={() => hardReset()} className="flex-1 bg-red-600 hover:bg-red-500 py-2 rounded-lg text-xs font-black">אשר</button>
+                  <button onClick={() => setConfirmReset(false)} className="flex-1 bg-slate-700 hover:bg-slate-600 py-2 rounded-lg text-xs font-bold">ביטול</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmReset(true)}
+                className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95"
+              >
+                <Trash2 size={18} />
+                ניקוי זיכרון (Hard Reset)
+              </button>
+            )}
 
-            <div className="text-[10px] text-slate-500 italic text-center">
-              Logs record all data sync, auth, and logic events.
+            <div className="text-[10px] text-slate-400 italic text-center">
+              Super Admin only · PII masked in exported logs.
             </div>
           </div>
         </div>

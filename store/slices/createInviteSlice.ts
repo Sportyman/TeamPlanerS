@@ -16,6 +16,12 @@ export interface InviteSlice {
   setPendingInvite: (invite: ClubInvite | null) => void;
 }
 
+const generateSecureInviteToken = (): string => {
+  const bytes = new Uint8Array(18);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+};
+
 export const createInviteSlice: StateCreator<AppState, [], [], InviteSlice> = (set, get) => ({
   invites: [],
   pendingInvite: null,
@@ -34,16 +40,16 @@ export const createInviteSlice: StateCreator<AppState, [], [], InviteSlice> = (s
     }
   },
 
-  createClubInvite: async (clubId, role, autoApprove) => {
+  createClubInvite: async (clubId, role, _autoApprove) => {
     const { user } = get();
     if (!user) return null;
 
-    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const token = generateSecureInviteToken();
     const newInvite: ClubInvite = {
       id: doc(collection(db, 'invites')).id,
       clubId,
       role,
-      autoApprove,
+      autoApprove: false,
       token,
       usageCount: 0,
       createdAt: new Date().toISOString(),
