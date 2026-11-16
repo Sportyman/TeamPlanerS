@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Person, Role, getRoleLabel, Gender } from '../../types';
 import { ResolvedPollSummary, ResolvedVoter, VoteChangeAlert } from '../../types/whatsapp';
 import { WhatsAppAvatar } from './WhatsAppAvatar';
+import { PollVoterMobileCard } from './PollVoterMobileCard';
 import { Link2, UserPlus } from 'lucide-react';
 
 type SummaryFilter = 'ALL' | 'ATTENDING' | 'VOLUNTEER' | 'MEMBER' | 'GUEST' | 'DECLINING' | 'UNMAPPED';
@@ -55,14 +56,35 @@ export const PollSummaryTab: React.FC<PollSummaryTabProps> = ({
         {filters.map((f) => (
           <button
             key={f.id} type="button" onClick={() => setFilter(f.id)}
-            className={`px-3 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap shrink-0 transition-colors tabular-nums ${filter === f.id ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+            className={`px-3.5 py-2 text-xs font-bold rounded-lg whitespace-nowrap shrink-0 transition-colors tabular-nums min-h-[40px] ${filter === f.id ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
           >
             {f.label}
           </button>
         ))}
       </div>
 
-      <div className="border border-slate-200 rounded-2xl bg-white overflow-x-auto">
+      <div className="md:hidden border border-slate-200 rounded-2xl bg-white divide-y divide-slate-100">
+        {filteredVoters.length === 0 ? (
+          <div className="py-10 text-center text-sm text-slate-500">אין מצביעים התואמים לסינון זה.</div>
+        ) : (
+          filteredVoters.map((voter) => (
+            <PollVoterMobileCard
+              key={voter.voterId}
+              voter={voter}
+              intentLabel={INTENT_LABELS[voter.intent].label}
+              intentClassName={INTENT_LABELS[voter.intent].className}
+              people={people}
+              chosenId={quickSelect[voter.voterId] || voter.suggestedPerson?.id || ''}
+              onSelectPersonId={(id) => setQuickSelect((p) => ({ ...p, [voter.voterId]: id }))}
+              onLinkVoter={onLinkVoter}
+              onAddGuest={onAddGuest}
+              onUpdatePersonRole={onUpdatePersonRole}
+            />
+          ))
+        )}
+      </div>
+
+      <div className="hidden md:block border border-slate-200 rounded-2xl bg-white overflow-x-auto">
         <table className="w-full text-right text-sm">
           <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-600">
             <tr>
@@ -102,12 +124,8 @@ export const PollSummaryTab: React.FC<PollSummaryTabProps> = ({
                     <td className="py-3 px-4 text-xs">
                       {person ? (
                         <div className="space-y-1">
-                          <div className="flex items-center gap-1.5">
-                            <select
-                              value={person.role}
-                              onChange={(e) => onUpdatePersonRole(person, e.target.value as Role)}
-                              className="border border-slate-200 rounded-lg px-2 py-1 bg-white font-semibold text-slate-800"
-                            >
+                          <div className="flex items-center gap-2">
+                            <select value={person.role} onChange={(e) => onUpdatePersonRole(person, e.target.value as Role)} className="border border-slate-200 rounded-lg px-2 py-1.5 bg-white font-semibold text-slate-800 min-h-[38px]">
                               <option value={Role.MEMBER}>{getRoleLabel(Role.MEMBER, person.gender)}</option>
                               <option value={Role.VOLUNTEER}>{getRoleLabel(Role.VOLUNTEER, person.gender)}</option>
                               <option value={Role.INSTRUCTOR}>{getRoleLabel(Role.INSTRUCTOR, person.gender)}</option>
@@ -119,15 +137,12 @@ export const PollSummaryTab: React.FC<PollSummaryTabProps> = ({
                             </label>
                           </div>
                           {voter.pollRole && voter.pollRole !== person.role && (
-                            <div className="text-[11px] text-amber-700">
-                              בסקר סומן: {getRoleLabel(voter.pollRole, person.gender)}
-                            </div>
+                            <div className="text-[11px] text-amber-700">בסקר סומן: {getRoleLabel(voter.pollRole, person.gender)}</div>
                           )}
                         </div>
                       ) : (
                         <span className="font-semibold text-slate-700">
-                          {getRoleLabel(voter.effectiveRole, Gender.MALE)}
-                          {voter.detectedIsSkipper ? ' · מפקד סירה' : ''}
+                          {getRoleLabel(voter.effectiveRole, Gender.MALE)}{voter.detectedIsSkipper ? ' · מפקד סירה' : ''}
                         </span>
                       )}
                     </td>
@@ -139,16 +154,12 @@ export const PollSummaryTab: React.FC<PollSummaryTabProps> = ({
                         </div>
                       ) : (
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <select value={chosenId} onChange={(e) => setQuickSelect((p) => ({ ...p, [voter.voterId]: e.target.value }))} className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white max-w-[145px]">
+                          <select value={chosenId} onChange={(e) => setQuickSelect((p) => ({ ...p, [voter.voterId]: e.target.value }))} className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white max-w-[155px] min-h-[38px]">
                             <option value="">בחר חבר...</option>
                             {people.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
                           </select>
-                          <button type="button" disabled={!chosenId} onClick={() => onLinkVoter(voter, chosenId)} className="p-1.5 rounded-lg bg-brand-600 disabled:opacity-40 text-white hover:bg-brand-700" title="שייך חבר">
-                            <Link2 size={13} />
-                          </button>
-                          <button type="button" onClick={() => onAddGuest(voter, false)} className="p-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100" title="הוסף כאורח לאימון">
-                            <UserPlus size={13} />
-                          </button>
+                          <button type="button" disabled={!chosenId} onClick={() => onLinkVoter(voter, chosenId)} className="p-2 rounded-lg bg-brand-600 disabled:opacity-40 text-white hover:bg-brand-700 min-h-[38px] min-w-[38px] flex items-center justify-center" title="שייך חבר"><Link2 size={14} /></button>
+                          <button type="button" onClick={() => onAddGuest(voter, false)} className="p-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 min-h-[38px] min-w-[38px] flex items-center justify-center" title="הוסף כאורח לאימון"><UserPlus size={14} /></button>
                         </div>
                       )}
                     </td>
@@ -169,10 +180,8 @@ export const PollSummaryTab: React.FC<PollSummaryTabProps> = ({
           <div className="divide-y divide-slate-100 text-xs">
             {voteAlerts.map((a) => (
               <div key={a.id} className="py-2 flex items-center justify-between gap-3">
-                <span className="text-slate-800">
-                  <strong>{a.displayName}</strong> שינה מ״{a.previousOptions.join(', ') || 'לא הצביע'}״ ל״{a.newOptions.join(', ') || 'ביטל'}״
-                </span>
-                <span className="text-slate-500 tabular-nums">{new Date(a.detectedAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</span>
+                <span className="text-slate-800"><strong>{a.displayName}</strong> שינה מ״{a.previousOptions.join(', ') || 'לא הצביע'}״ ל״{a.newOptions.join(', ') || 'ביטל'}״</span>
+                <span className="text-slate-500 tabular-nums shrink-0">{new Date(a.detectedAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</span>
               </div>
             ))}
           </div>

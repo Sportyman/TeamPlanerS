@@ -4,7 +4,6 @@ import { MatchCandidate, ResolvedVoter, WhatsAppMemberMapping } from '../../type
 import { getMappingUidForClub } from '../../services/whatsapp/pollMatching';
 import { WhatsAppAvatar } from './WhatsAppAvatar';
 import { WhatsAppRosterModal } from './WhatsAppRosterModal';
-import { GroupLinkSelect } from './GroupLinkSelect';
 import { Check, Link2, Search, Unlink, UserPlus, Users } from 'lucide-react';
 
 interface VoterMappingTabProps {
@@ -25,8 +24,8 @@ interface VoterMappingTabProps {
 }
 
 export const VoterMappingTab: React.FC<VoterMappingTabProps> = ({
-  activeClub, linkedGroups, availableGroups, voters, mappings, people, syncCandidates,
-  onLinkVoter, onUnlinkVoter, onAddGuest, onConfirmCandidate, onImportRoster, onUpdatePersonRole, onLinkGroup,
+  activeClub, linkedGroups, voters, mappings, people, syncCandidates,
+  onLinkVoter, onUnlinkVoter, onAddGuest, onConfirmCandidate, onImportRoster, onUpdatePersonRole,
 }) => {
   const [search, setSearch] = useState('');
   const [selectionMap, setSelectionMap] = useState<Record<string, string>>({});
@@ -55,47 +54,42 @@ export const VoterMappingTab: React.FC<VoterMappingTabProps> = ({
 
   return (
     <div className="space-y-4">
-      {linkedGroups.length === 0 && (
-        <div className="border border-amber-200 bg-amber-50 rounded-xl p-3 flex items-center justify-between gap-3 flex-wrap text-xs">
-          <span className="font-bold text-amber-900">יש לשייך קבוצת וואטסאפ לחוג זה כדי להציג רק את חברי החוג (גם אם הם חברים במספר חוגים).</span>
-          <GroupLinkSelect groups={availableGroups} onLink={onLinkGroup} />
-        </div>
-      )}
-
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="relative flex-1 max-w-md">
+        <div className="relative flex-1 sm:max-w-md">
           <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="חיפוש לפי שם וואטסאפ, טלפון או שם חבר..." className="w-full pr-9 pl-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-brand-500" />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="חיפוש לפי שם וואטסאפ, טלפון או שם חבר..." className="w-full pr-9 pl-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl min-h-[44px] focus:outline-none focus:border-brand-500" />
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
           <span className="text-xs text-slate-500 tabular-nums">רשומות בחוג: {mergedRows.length} · לא משויכים: {mergedRows.filter((r) => r.matchSource === 'UNMAPPED').length}</span>
-          <button type="button" onClick={() => setShowRosterModal(true)} className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 whitespace-nowrap">
-            <Users size={14} /> <span>ייבוא וסנכרון מהקבוצה ({mappings.length})</span>
+          <button type="button" onClick={() => setShowRosterModal(true)} className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 whitespace-nowrap min-h-[44px]">
+            <Users size={15} /> <span>ייבוא וסנכרון מהקבוצה ({mappings.length})</span>
           </button>
         </div>
       </div>
 
       {syncCandidates.length > 0 && (
-        <div className="border border-emerald-200 bg-emerald-50/70 rounded-xl p-3 space-y-2 text-xs">
+        <div className="border border-emerald-200 bg-emerald-50/70 rounded-xl p-3.5 space-y-2.5 text-xs">
           <div className="flex items-center justify-between gap-2">
             <span className="font-bold text-emerald-900">זיהוי אוטומטי בחוג: נמצאו {syncCandidates.length} התאמות</span>
-            <button type="button" onClick={() => setShowRosterModal(true)} className="text-emerald-800 font-bold underline">רשימה מלאה</button>
+            <button type="button" onClick={() => setShowRosterModal(true)} className="text-emerald-800 font-bold underline py-1">רשימה מלאה</button>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {syncCandidates.slice(0, 4).map((c) => {
               const roleVal = candidateRoles[c.person.id] || c.person.role;
               return (
-                <div key={`${c.mapping.voterId}-${c.person.id}`} className="flex items-center gap-1 bg-white border border-emerald-300 rounded-lg px-2 py-1">
-                  <span className="font-bold text-slate-800">{c.person.name}</span>
-                  <select value={roleVal} onChange={(e) => setCandidateRoles((p) => ({ ...p, [c.person.id]: e.target.value as Role }))} className="text-[11px] border-none bg-transparent text-slate-600 font-semibold">
-                    <option value={Role.MEMBER}>חבר</option>
-                    <option value={Role.VOLUNTEER}>מתנדב</option>
-                    <option value={Role.INSTRUCTOR}>מדריך</option>
-                    <option value={Role.GUEST}>אורח</option>
-                  </select>
-                  <button type="button" onClick={() => onConfirmCandidate(c, roleVal)} className="px-2 py-0.5 rounded bg-emerald-700 text-white font-bold hover:bg-emerald-800 flex items-center gap-1">
-                    <Check size={11} /> אשר
-                  </button>
+                <div key={`${c.mapping.voterId}-${c.person.id}`} className="flex items-center justify-between gap-2 bg-white border border-emerald-300 rounded-xl px-3 py-2 min-h-[44px]">
+                  <span className="font-bold text-slate-800 truncate">{c.person.name}</span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <select value={roleVal} onChange={(e) => setCandidateRoles((p) => ({ ...p, [c.person.id]: e.target.value as Role }))} className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 font-semibold min-h-[36px]">
+                      <option value={Role.MEMBER}>חבר</option>
+                      <option value={Role.VOLUNTEER}>מתנדב</option>
+                      <option value={Role.INSTRUCTOR}>מדריך</option>
+                      <option value={Role.GUEST}>אורח</option>
+                    </select>
+                    <button type="button" onClick={() => onConfirmCandidate(c, roleVal)} className="px-3 py-1.5 rounded-lg bg-emerald-700 text-white font-bold hover:bg-emerald-800 flex items-center gap-1 min-h-[36px]">
+                      <Check size={13} /> אשר
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -113,45 +107,47 @@ export const VoterMappingTab: React.FC<VoterMappingTabProps> = ({
             return (
               <div key={row.voterId} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <WhatsAppAvatar name={row.displayName} src={row.profilePicUrl} sizeClass="w-10 h-10 text-xs" />
+                  <WhatsAppAvatar name={row.displayName} src={row.profilePicUrl} sizeClass="w-11 h-11 text-xs" />
                   <div className="min-w-0">
                     <div className="font-bold text-sm text-slate-900 truncate">{row.displayName}</div>
                     <div className="text-xs text-slate-500 flex items-center gap-1.5 flex-wrap">
                       <span className="font-mono tabular-nums" dir="ltr">{row.phone || row.voterId}</span>
-                      {row.mapping?.groups?.length ? <span>· {row.mapping.groups.join(', ')}</span> : null}
+                      {row.mapping?.groups?.length ? <span className="truncate">· {row.mapping.groups.join(', ')}</span> : null}
                       {row.suggestedPerson && <span className="text-emerald-700 font-semibold">· הצעה: {row.suggestedPerson.name}</span>}
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 shrink-0 w-full md:w-auto">
                   {person ? (
-                    <>
-                      <span className="text-xs text-slate-700 font-semibold">{person.name}</span>
-                      <select value={person.role} onChange={(e) => onUpdatePersonRole(person, e.target.value as Role)} className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white font-semibold">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <span className="text-xs text-slate-700 font-semibold hidden sm:inline">{person.name}</span>
+                      <select value={person.role} onChange={(e) => onUpdatePersonRole(person, e.target.value as Role)} className="flex-1 sm:flex-initial text-sm sm:text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white font-semibold min-h-[44px]">
                         <option value={Role.MEMBER}>{getRoleLabel(Role.MEMBER, person.gender)}</option>
                         <option value={Role.VOLUNTEER}>{getRoleLabel(Role.VOLUNTEER, person.gender)}</option>
                         <option value={Role.INSTRUCTOR}>{getRoleLabel(Role.INSTRUCTOR, person.gender)}</option>
                         <option value={Role.GUEST}>{getRoleLabel(Role.GUEST, person.gender)}</option>
                       </select>
                       {row.matchSource === 'MANUAL_MAP' && (
-                        <button type="button" onClick={() => onUnlinkVoter(row.voterId)} className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 hover:text-red-700 hover:border-red-200 flex items-center gap-1 whitespace-nowrap">
-                          <Unlink size={13} /> <span>נתק</span>
+                        <button type="button" onClick={() => onUnlinkVoter(row.voterId)} className="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:text-red-700 hover:border-red-200 flex items-center justify-center gap-1.5 whitespace-nowrap min-h-[44px]">
+                          <Unlink size={14} /> <span>נתק</span>
                         </button>
                       )}
-                    </>
+                    </div>
                   ) : (
-                    <>
-                      <select value={chosenId} onChange={(e) => setSelectionMap((p) => ({ ...p, [row.voterId]: e.target.value }))} className="text-xs border border-slate-200 rounded-lg px-2.5 py-2 bg-white max-w-[180px]">
+                    <div className="space-y-2 sm:space-y-0 sm:flex sm:items-center sm:gap-2 w-full md:w-auto">
+                      <select value={chosenId} onChange={(e) => setSelectionMap((p) => ({ ...p, [row.voterId]: e.target.value }))} className="w-full sm:w-auto sm:max-w-[190px] text-sm sm:text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white min-h-[44px]">
                         <option value="">בחר חבר לשיוך...</option>
                         {people.map((p) => (<option key={p.id} value={p.id}>{p.name} ({getRoleLabel(p.role, p.gender)})</option>))}
                       </select>
-                      <button type="button" disabled={!chosenId} onClick={() => onLinkVoter(row, chosenId)} className="px-3 py-2 rounded-lg bg-brand-600 disabled:opacity-40 text-white text-xs font-bold hover:bg-brand-700 flex items-center gap-1 whitespace-nowrap">
-                        <Link2 size={14} /> <span>שמור שיוך</span>
-                      </button>
-                      <button type="button" onClick={() => onAddGuest(row, true)} className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold flex items-center gap-1 whitespace-nowrap">
-                        <UserPlus size={14} /> <span>צור כאורח</span>
-                      </button>
-                    </>
+                      <div className="flex items-center gap-2">
+                        <button type="button" disabled={!chosenId} onClick={() => onLinkVoter(row, chosenId)} className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-brand-600 disabled:opacity-40 text-white text-xs font-bold hover:bg-brand-700 flex items-center justify-center gap-1.5 whitespace-nowrap min-h-[44px]">
+                          <Link2 size={14} /> <span>שמור שיוך</span>
+                        </button>
+                        <button type="button" onClick={() => onAddGuest(row, true)} className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold flex items-center justify-center gap-1.5 whitespace-nowrap min-h-[44px]">
+                          <UserPlus size={14} /> <span>צור כאורח</span>
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

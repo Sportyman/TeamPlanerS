@@ -11,6 +11,7 @@ import {
 import { DEFAULT_KEYWORD_RULES } from '../config/whatsappDefaults';
 import { deduplicateLatestVotes } from '../services/whatsapp/pollResolver';
 import { detectVoteChanges } from '../services/whatsapp/pollMatching';
+import { getPollColorToken } from '../services/whatsapp/pollFormatting';
 import { enrichVoteAlertsWithContacts, isNumericFallbackName } from '../services/whatsapp/mappingDedup';
 import {
   fetchRecentPollVotesForClub,
@@ -75,34 +76,40 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, people, onNotify 
     return () => { unsubConfig(); unsubMembers(); };
   }, [userId, activeClub, retryKey]);
 
-  const pollColorsKey = JSON.stringify(clubConfig.pollColors || {});
+  const keywordRulesRef = useRef(clubConfig.keywordRules);
+  keywordRulesRef.current = clubConfig.keywordRules;
 
   useEffect(() => {
     if (!userId || !activeClub) return;
-    const parsedColors = JSON.parse(pollColorsKey) as Record<string, string>;
     const unsubPolls = subscribeToPollsEvents(
-      parsedColors,
+      undefined,
       (list) => { setPolls(list); setIsLoading(false); },
       (err) => { setError(err.message); setIsLoading(false); }
     );
     return () => unsubPolls();
-  }, [userId, activeClub, pollColorsKey, retryKey]);
+  }, [userId, activeClub, retryKey]);
 
+  const pollColors = clubConfig.pollColors;
   const relevantPolls = useMemo(() => {
     if (!clubConfig.linkedGroups.length) return [];
-    return polls.filter((p) =>
-      clubConfig.linkedGroups.some((g) => p.group.toLowerCase().includes(g.trim().toLowerCase()))
-    );
-  }, [polls, clubConfig.linkedGroups]);
+    return polls
+      .filter((p) => clubConfig.linkedGroups.some((g) => p.group.toLowerCase().includes(g.trim().toLowerCase())))
+      .map((p) => (pollColors?.[p.pollId] ? { ...p, colorToken: getPollColorToken(p.pollId, pollColors[p.pollId]) } : p));
+  }, [polls, clubConfig.linkedGroups, pollColors]);
+
+  const relevantPollIdsKey = useMemo(
+    () => relevantPolls.map((p) => p.pollId).slice(0, 10).join(','),
+    [relevantPolls]
+  );
 
   useEffect(() => {
-    if (!userId || relevantPolls.length === 0) { setHistoricalVotes([]); return; }
+    if (!userId || !relevantPollIdsKey) { setHistoricalVotes([]); return; }
     let cancelled = false;
-    fetchRecentPollVotesForClub(relevantPolls.map((p) => p.pollId)).then((allVotes) => {
+    fetchRecentPollVotesForClub(relevantPollIdsKey.split(',')).then((allVotes) => {
       if (!cancelled) setHistoricalVotes(allVotes);
     });
     return () => { cancelled = true; };
-  }, [userId, relevantPolls, retryKey]);
+  }, [userId, relevantPollIdsKey, retryKey]);
 
   useEffect(() => {
     if (relevantPolls.length === 0) {
@@ -134,7 +141,7 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, people, onNotify 
           setVotes(nextVotes);
           return;
         }
-        const rules = clubConfig.keywordRules?.length ? clubConfig.keywordRules : DEFAULT_KEYWORD_RULES;
+        const rules = keywordRulesRef.current?.length ? keywordRulesRef.current : DEFAULT_KEYWORD_RULES;
         const changes = detectVoteChanges(
           baselineVotesRef.current, nextVotes, resolvedVotersRef.current, rules, selectedPollId,
           mappingsRef.current, peopleRef.current, activeClub || undefined
@@ -167,7 +174,7 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, people, onNotify 
       (err) => setError(err.message)
     );
     return () => unsubVotes();
-  }, [userId, activeClub, selectedPollId, clubConfig.keywordRules, onNotify, retryKey]);
+  }, [userId, activeClub, selectedPollId, onNotify, retryKey]);
 
   const setResolvedVotersRef = useCallback((voters: ResolvedVoter[]) => { resolvedVotersRef.current = voters; }, []);
 

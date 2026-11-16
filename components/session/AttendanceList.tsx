@@ -12,16 +12,19 @@ import { AttendancePersonCard } from './AttendancePersonCard';
 
 type SortType = 'ATTENDANCE' | 'ROLE' | 'NAME' | 'RANK';
 
+type WhatsAppHookState = ReturnType<typeof useWhatsAppPolls>;
+
 interface AttendanceListProps {
   people: Person[];
   presentIds: string[];
+  whatsappState: WhatsAppHookState;
   onToggle: (id: string) => void;
   onBulkSelect: (ids: string[]) => void;
   onNext: () => void;
 }
 
 export const AttendanceList: React.FC<AttendanceListProps> = ({
-  people, presentIds, onToggle, onBulkSelect, onNext,
+  people, presentIds, whatsappState, onToggle, onBulkSelect, onNext,
 }) => {
   const { clubSettings, activeClub } = useAppStore();
   const [sortBy, setSortBy] = useState<SortType>('ATTENDANCE');
@@ -34,7 +37,7 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
     mappings, syncCandidates, voteAlerts, dismissAlert, clearAlerts, isLoading: isPollLoading, error: pollError,
     retry: retryPolls, applyPollAttendance, linkVoterToPerson, addGuestFromVoter, linkClubGroup,
     confirmSyncCandidate, importRosterMembers, updateMemberRole,
-  } = useWhatsAppPolls();
+  } = whatsappState;
 
   const displayPeople = useMemo(
     () => (effectiveClubPeople.length > 0 ? effectiveClubPeople : people),

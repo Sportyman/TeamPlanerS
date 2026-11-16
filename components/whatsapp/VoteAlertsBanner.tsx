@@ -65,9 +65,9 @@ export const VoteAlertsBanner: React.FC<VoteAlertsBannerProps> = ({
                       onTogglePerson(alert.personId!);
                       onDismiss(alert.id);
                     }}
-                    className="px-2.5 py-1.5 rounded-lg bg-white border border-amber-300 text-xs font-bold text-slate-800 hover:bg-amber-100 flex items-center gap-1 whitespace-nowrap"
+                    className="px-3 py-2 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-800 hover:bg-amber-100 flex items-center gap-1.5 whitespace-nowrap min-h-[44px]"
                   >
-                    <Check size={13} />
+                    <Check size={14} />
                     <span>{needsManualAdd ? 'סמן כנוכח' : 'הסר מנוכחים'}</span>
                   </button>
                 )}
@@ -75,9 +75,9 @@ export const VoteAlertsBanner: React.FC<VoteAlertsBannerProps> = ({
                   type="button"
                   onClick={() => onDismiss(alert.id)}
                   aria-label="סגור התראה"
-                  className="p-1.5 rounded-lg text-amber-700 hover:bg-amber-100"
+                  className="p-2 rounded-xl text-amber-700 hover:bg-amber-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
                 >
-                  <X size={14} />
+                  <X size={16} />
                 </button>
               </div>
             </div>

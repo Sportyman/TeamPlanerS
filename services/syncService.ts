@@ -1,9 +1,10 @@
 import { db } from '../firebase';
-import { doc, getDoc, getDocFromServer, getDocs, getDocsFromServer, setDoc, collection, query, where, onSnapshot, Unsubscribe, addDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, getDocs, getDocsFromServer, setDoc, collection, query, where, onSnapshot, Unsubscribe, addDoc, increment } from 'firebase/firestore';
 import { useAppStore } from '../store';
-import { Person, ClubID, MembershipStatus, UserProfile, Role, AccessLevel, Gender } from '../types';
-import { fetchCloudClubsCatalog, isLegacyMockId, syncStrandedLocalClubsToCloud } from './auth/superAdminService';
+import { Person, ClubID, MembershipStatus, Role, AccessLevel, Gender } from '../types';
+import { fetchCloudClubsCatalog, syncStrandedLocalClubsToCloud } from './auth/superAdminService';
 import { fetchGlobalLocations } from './scheduleService';
+import { hydratePeopleFromMemberships } from './membershipHydration';
 
 const systemLogs: { time: string; msg: string; type: 'INFO' | 'WARN' | 'ERROR' | 'SYNC' }[] = [];
 
@@ -21,42 +22,8 @@ export const downloadSystemLogs = () => {
     a.click();
 };
 
-const hydratePeopleFromMemberships = async (memberships: any[]): Promise<Person[]> => {
-    const realMemberships = memberships.filter((ms: any) => !isLegacyMockId(String(ms.uid || '')));
-    return Promise.all(realMemberships.map(async (ms: any) => {
-        let profile: UserProfile | null = null;
-        try {
-            const profileRef = doc(db, 'profiles', ms.uid);
-            const profileSnap = await getDocFromServer(profileRef).catch(() => getDoc(profileRef));
-            profile = profileSnap.exists() ? (profileSnap.data() as UserProfile) : null;
-        } catch {
-            profile = null;
-        }
-        const fallbackName = ms.displayName || (ms.firstName ? `${ms.firstName} ${ms.lastName || ''}`.trim() : '');
-        const name = profile
-            ? `${profile.firstName} ${profile.lastName}`.trim()
-            : fallbackName || (ms.uid.includes('@') ? ms.uid : 'משתמש ללא פרופיל');
-        return {
-            id: ms.uid, clubId: ms.clubId, name,
-            firstName: profile?.firstName || ms.firstName || '',
-            lastName: profile?.lastName || ms.lastName || '',
-            gender: profile?.gender || ms.gender || Gender.MALE,
-            role: ms.role || Role.MEMBER, rank: ms.rank || 3,
-            isSkipper: Boolean(profile?.isSkipper || ms.isSkipper),
-            attendanceCount: typeof ms.attendanceCount === 'number' ? ms.attendanceCount : 0,
-            lastAttendedAt: ms.lastAttendedAt || undefined,
-            phone: profile?.primaryPhone || ms.phone || '',
-            notes: profile?.medicalNotes || ms.notes || '',
-            tags: Array.isArray(ms.tags) ? ms.tags : [],
-            photoURL: profile?.photoURL || ms.photoURL || undefined,
-            preferredBoatType: ms.preferredBoatType || undefined,
-            genderConstraint: ms.genderConstraint || undefined,
-            mustPairWith: ms.mustPairWith || [],
-            preferPairWith: ms.preferPairWith || [],
-            cannotPairWith: ms.cannotPairWith || [],
-        } as Person;
-    }));
-};
+let inflightGlobalConfig: Promise<void> | null = null;
+let lastGlobalConfigTs = 0;
 
 export const subscribeToClubData = (clubId: ClubID): Unsubscribe => {
     const { setPeople, setSyncStatus, setInitialLoading } = useAppStore.getState();
@@ -174,24 +141,30 @@ export const ensureAdminMembership = async (clubId: ClubID, user: { uid: string;
     } catch (error) { addLog(`Error ensuring admin membership: ${error}`, 'ERROR'); }
 };
 
-export const fetchGlobalConfig = async () => {
-    const { setGlobalConfig, mergeCloudClubs, setLocations, user } = useAppStore.getState();
-    try {
-        const docRef = doc(db, 'config', 'global');
-        const docSnap = await getDocFromServer(docRef).catch(() => getDoc(docRef));
-        if (docSnap.exists()) {
-            const d = docSnap.data();
-            setGlobalConfig({ superAdmins: d.superAdmins || [], protectedAdmins: d.protectedAdmins || [], permissions: d.permissions || [] });
-        }
-        const [catalog, locs] = await Promise.all([fetchCloudClubsCatalog().catch(() => null), fetchGlobalLocations().catch(() => null)]);
-        if (catalog) {
-            const clubs = user?.isAdmin && !user.isDev
-                ? await syncStrandedLocalClubsToCloud(useAppStore.getState().clubs, catalog.clubs, catalog.deletedIds)
-                : catalog.clubs;
-            mergeCloudClubs(clubs, catalog.deletedIds);
-        }
-        if (locs) setLocations(locs);
-    } catch (error) { addLog(`Global config fetch error: ${error}`, 'ERROR'); }
+export const fetchGlobalConfig = async (force = false) => {
+    if (inflightGlobalConfig) return inflightGlobalConfig;
+    if (!force && Date.now() - lastGlobalConfigTs < 3000) return;
+    inflightGlobalConfig = (async () => {
+        const { setGlobalConfig, mergeCloudClubs, setLocations, user } = useAppStore.getState();
+        try {
+            const docSnap = await getDoc(doc(db, 'config', 'global'));
+            if (docSnap.exists()) {
+                const d = docSnap.data();
+                setGlobalConfig({ superAdmins: d.superAdmins || [], protectedAdmins: d.protectedAdmins || [], permissions: d.permissions || [] });
+            }
+            const [catalog, locs] = await Promise.all([fetchCloudClubsCatalog().catch(() => null), fetchGlobalLocations().catch(() => null)]);
+            if (catalog) {
+                const clubs = user?.isAdmin && !user.isDev
+                    ? await syncStrandedLocalClubsToCloud(useAppStore.getState().clubs, catalog.clubs, catalog.deletedIds)
+                    : catalog.clubs;
+                mergeCloudClubs(clubs, catalog.deletedIds);
+            }
+            if (locs) setLocations(locs);
+            lastGlobalConfigTs = Date.now();
+        } catch (error) { addLog(`Global config fetch error: ${error}`, 'ERROR'); }
+        finally { inflightGlobalConfig = null; }
+    })();
+    return inflightGlobalConfig;
 };
 
 export const sendNotificationToClub = async (clubId: ClubID, message: string, type: 'INFO' | 'SUCCESS' | 'WARN' = 'INFO', senderId?: string) => {

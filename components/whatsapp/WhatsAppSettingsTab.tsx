@@ -52,16 +52,16 @@ export const WhatsAppSettingsTab: React.FC<WhatsAppSettingsTabProps> = ({
   const allGroups = Array.from(new Set([...cleanAvailable, ...linkedGroups]));
 
   return (
-    <div className="space-y-6">
-      <div className="border border-slate-200 rounded-2xl bg-white p-5 space-y-4">
+    <div className="space-y-5">
+      <div className="border border-slate-200 rounded-2xl bg-white p-4 sm:p-5 space-y-4">
         <div>
           <h3 className="text-base font-bold text-slate-900">קבוצות וואטסאפ מקושרות לחוג</h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            סמן אילו קבוצות וואטסאפ שייכות לחוג זה כדי שהסקר הרלוונטי ייבחר אוטומטית לפני האימון. (לחץ על קבוצה מסומנת להסרה)
+            סמן אילו קבוצות שייכות לחוג זה כדי שהסקר הרלוונטי ייבחר אוטומטית. אל תשכח ללחוץ על כפתור השמירה מטה.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-2">
           {allGroups.length === 0 ? (
             <span className="text-xs text-slate-500">טרם זוהו קבוצות תקינות מהבוט. ניתן להוסיף שם קבוצה ידנית מטה.</span>
           ) : (
@@ -72,34 +72,34 @@ export const WhatsAppSettingsTab: React.FC<WhatsAppSettingsTabProps> = ({
                   key={group}
                   type="button"
                   onClick={() => toggleGroup(group)}
-                  className={`px-3 py-2 rounded-xl border text-xs font-bold transition-colors flex items-center gap-1.5 ${
+                  className={`px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-colors flex items-center justify-between sm:justify-start gap-2 min-h-[44px] ${
                     active
                       ? 'border-brand-600 bg-brand-50 text-brand-800'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                   }`}
                 >
-                  <span>{group}</span>
-                  {active && <X size={13} className="text-brand-700" />}
+                  <span className="truncate">{group}</span>
+                  {active && <X size={15} className="text-brand-700 shrink-0" />}
                 </button>
               );
             })
           )}
         </div>
 
-        <div className="flex gap-2 max-w-md">
+        <div className="flex flex-col sm:flex-row gap-2 max-w-md">
           <input
             type="text"
             value={customGroup}
             onChange={(e) => setCustomGroup(e.target.value)}
             placeholder="הוסף שם/מזהה קבוצה ידנית..."
-            className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-brand-500"
+            className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl min-h-[44px] focus:outline-none focus:border-brand-500"
           />
           <button
             type="button"
             onClick={addCustomGroup}
-            className="px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-800 flex items-center gap-1 whitespace-nowrap"
+            className="px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-800 flex items-center justify-center gap-1.5 whitespace-nowrap min-h-[44px]"
           >
-            <Plus size={14} />
+            <Plus size={15} />
             <span>הוסף קבוצה</span>
           </button>
         </div>
@@ -112,7 +112,7 @@ export const WhatsAppSettingsTab: React.FC<WhatsAppSettingsTabProps> = ({
           type="button"
           disabled={isSaving}
           onClick={handleSave}
-          className="px-6 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold flex items-center gap-2 disabled:opacity-50"
+          className="w-full sm:w-auto px-6 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 min-h-[48px]"
         >
           <Save size={16} />
           <span>{isSaving ? 'שומר הגדרות...' : 'שמור הגדרות וואטסאפ'}</span>

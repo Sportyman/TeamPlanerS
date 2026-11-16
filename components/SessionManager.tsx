@@ -23,7 +23,8 @@ export const SessionManager: React.FC = () => {
 
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { effectiveClubPeople, updateMemberRole } = useWhatsAppPolls();
+  const whatsappState = useWhatsAppPolls();
+  const { effectiveClubPeople, updateMemberRole } = whatsappState;
   const { isStaff } = usePermissions();
 
   const currentSession = activeClub ? sessions[activeClub] : undefined;
@@ -136,6 +137,7 @@ export const SessionManager: React.FC = () => {
       {step === 1 && (
         <AttendanceList
           people={clubPeople} presentIds={currentSession.presentPersonIds}
+          whatsappState={whatsappState}
           onToggle={toggleAttendance} onBulkSelect={setBulkAttendance} onNext={handleAdvanceToEquipment}
         />
       )}

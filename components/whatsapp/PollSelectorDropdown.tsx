@@ -22,31 +22,31 @@ export const PollSelectorDropdown: React.FC<PollSelectorDropdownProps> = ({
   if (!activePoll) return null;
 
   return (
-    <div className="relative">
-      <div className="flex items-center gap-2 flex-wrap">
+    <div className="relative w-full md:w-auto">
+      <div className="flex items-stretch sm:items-center gap-2">
         <button
           type="button"
           onClick={() => setIsOpen((v) => !v)}
-          className={`flex items-center gap-3 px-3.5 py-2 rounded-xl border ${activePoll.colorToken.borderClass} ${activePoll.colorToken.surfaceClass} hover:opacity-95 transition-opacity text-right min-h-[44px]`}
+          className={`flex-1 md:flex-initial flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border ${activePoll.colorToken.borderClass} ${activePoll.colorToken.surfaceClass} hover:opacity-95 transition-opacity text-right min-h-[48px] min-w-0`}
         >
           <span className={`w-3 h-3 rounded-full shrink-0 ${activePoll.colorToken.dotClass}`} />
-          <div className="text-right min-w-0">
-            <div className={`text-sm font-bold truncate max-w-[260px] sm:max-w-[360px] ${activePoll.colorToken.textClass}`}>
+          <div className="text-right min-w-0 flex-1">
+            <div className={`text-sm font-bold truncate sm:max-w-[360px] ${activePoll.colorToken.textClass}`}>
               {activePoll.question}
             </div>
-            <div className="text-xs text-slate-600 flex items-center gap-1.5 tabular-nums whitespace-nowrap">
-              <span>{activePoll.displayDate}</span>
+            <div className="text-xs text-slate-600 flex items-center gap-1.5 tabular-nums min-w-0">
+              <span className="shrink-0">{activePoll.displayDate}</span>
               {activePoll.displayTime && (
                 <>
-                  <span aria-hidden="true">·</span>
-                  <span>{activePoll.displayTime}</span>
+                  <span aria-hidden="true" className="shrink-0">·</span>
+                  <span className="shrink-0">{activePoll.displayTime}</span>
                 </>
               )}
-              <span aria-hidden="true">·</span>
-              <span className="truncate max-w-[140px]">{activePoll.group}</span>
+              <span aria-hidden="true" className="shrink-0">·</span>
+              <span className="truncate">{activePoll.group}</span>
             </div>
           </div>
-          <ChevronDown size={16} className="text-slate-500 shrink-0 mr-1" />
+          <ChevronDown size={16} className="text-slate-500 shrink-0" />
         </button>
 
         {onChangeColor && (
@@ -54,9 +54,9 @@ export const PollSelectorDropdown: React.FC<PollSelectorDropdownProps> = ({
             type="button"
             title="שנה צבע סקר"
             onClick={() => setShowColors((v) => !v)}
-            className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors min-h-[48px] min-w-[44px] flex items-center justify-center shrink-0"
           >
-            <Palette size={16} />
+            <Palette size={17} />
           </button>
         )}
       </div>
