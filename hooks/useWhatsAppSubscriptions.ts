@@ -85,17 +85,25 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, people, onNotify 
   const effectiveLinkedGroupIds = useMemo(() => getEffectiveLinkedIds(clubConfig, groupCatalog), [clubConfig, groupCatalog]);
   const linkedGroupItems = useMemo(() => resolveLinkedGroupItems(clubConfig, groupCatalog), [clubConfig, groupCatalog]);
   const groupNameById = useMemo(() => new Map(groupCatalog.filter((g) => g.id).map((g) => [g.id!, g.name])), [groupCatalog]);
+  const latestNameByAlias = useMemo(() => {
+    const map = new Map<string, string>();
+    groupCatalog.forEach((g) => {
+      map.set(g.name.trim().toLowerCase(), g.name);
+      g.knownAliases.forEach((a) => map.set(a.trim().toLowerCase(), g.name));
+    });
+    return map;
+  }, [groupCatalog]);
 
   const relevantPolls = useMemo(() => {
     if (!clubConfig.linkedGroups.length && !effectiveLinkedGroupIds.length) return [];
     return polls
-      .filter((p) => doesPollMatchConfig(p, clubConfig, effectiveLinkedGroupIds))
+      .filter((p) => doesPollMatchConfig(p, clubConfig, effectiveLinkedGroupIds, groupCatalog))
       .map((p) => {
-        const latestName = p.groupId ? groupNameById.get(p.groupId) : undefined;
+        const latestName = (p.groupId ? groupNameById.get(p.groupId) : undefined) || latestNameByAlias.get(p.group.trim().toLowerCase());
         const colorToken = pollColors?.[p.pollId] ? getPollColorToken(p.pollId, pollColors[p.pollId]) : p.colorToken;
         return { ...p, group: latestName || p.group, colorToken };
       });
-  }, [polls, clubConfig, effectiveLinkedGroupIds, groupNameById, pollColors]);
+  }, [polls, clubConfig, effectiveLinkedGroupIds, groupCatalog, groupNameById, latestNameByAlias, pollColors]);
 
   const relevantPollIdsKey = useMemo(
     () => relevantPolls.map((p) => p.pollId).slice(0, 10).join(','),

@@ -4,6 +4,7 @@ import { MatchCandidate, ResolvedVoter, WhatsAppMemberMapping } from '../../type
 import { getMappingUidForClub } from '../../services/whatsapp/pollMatching';
 import { WhatsAppAvatar } from './WhatsAppAvatar';
 import { WhatsAppRosterModal } from './WhatsAppRosterModal';
+import { isRawWhatsAppJid } from '../../services/whatsapp/clubDedupSync';
 import { Check, Link2, Search, Unlink, UserPlus, Users } from 'lucide-react';
 
 interface VoterMappingTabProps {
@@ -112,7 +113,9 @@ export const VoterMappingTab: React.FC<VoterMappingTabProps> = ({
                     <div className="font-bold text-sm text-slate-900 truncate">{row.displayName}</div>
                     <div className="text-xs text-slate-500 flex items-center gap-1.5 flex-wrap">
                       <span className="font-mono tabular-nums" dir="ltr">{row.phone || row.voterId}</span>
-                      {row.mapping?.groups?.length ? <span className="truncate">· {row.mapping.groups.join(', ')}</span> : null}
+                      {row.mapping?.groups?.filter((g) => !isRawWhatsAppJid(g)).length ? (
+                        <span className="truncate">· {row.mapping.groups.filter((g) => !isRawWhatsAppJid(g)).join(', ')}</span>
+                      ) : null}
                       {row.suggestedPerson && <span className="text-emerald-700 font-semibold">· הצעה: {row.suggestedPerson.name}</span>}
                     </div>
                   </div>
