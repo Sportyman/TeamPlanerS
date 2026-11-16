@@ -1,4 +1,6 @@
 import { APP_VERSION as CONFIG_APP_VERSION } from './config/version';
+import { ClubWeatherConfig } from './types/weather';
+export type { WindUnit, SeaAlertAction, ClubWeatherConfig } from './types/weather';
 export enum Role {
   INSTRUCTOR = 'INSTRUCTOR',
   VOLUNTEER = 'VOLUNTEER',
@@ -164,7 +166,11 @@ export interface SessionOverride {
   dateOverride?: string;
   startTime?: string;
   endTime?: string;
+  locationId?: string;
   locationName?: string;
+  areaLabel?: string;
+  lat?: number;
+  lng?: number;
   isCancelled?: boolean;
   note?: string;
   updatedAt?: string;
@@ -176,6 +182,7 @@ export interface Club {
   label: string;
   defaultSchedule?: ClubSchedule;
   sessionOverride?: SessionOverride | null;
+  weatherConfig?: ClubWeatherConfig;
 }
 
 export interface ClubSettings {

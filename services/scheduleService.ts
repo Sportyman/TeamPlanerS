@@ -1,6 +1,6 @@
 import { doc, setDoc, deleteField } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Club, ClubSchedule, SessionOverride } from '../types';
+import { Club, ClubSchedule, ClubWeatherConfig, SessionOverride } from '../types';
 import { saveClubLabelToCloud } from './auth/superAdminService';
 
 export {
@@ -99,8 +99,25 @@ export const saveSessionOverrideToCloud = async (
   clubId: string,
   override: SessionOverride | null
 ): Promise<void> => {
+  const cleanOverride = override
+    ? Object.fromEntries(Object.entries(override).filter(([, v]) => v !== undefined))
+    : null;
   await setDoc(doc(db, 'clubs', clubId), {
-    sessionOverride: override ? override : deleteField(),
+    sessionOverride: cleanOverride ? cleanOverride : deleteField(),
     updatedAt: new Date().toISOString(),
   }, { merge: true });
 };
+
+export const saveClubWeatherConfigToCloud = async (
+  clubId: string,
+  weatherConfig: ClubWeatherConfig
+): Promise<void> => {
+  const cleanConfig = Object.fromEntries(
+    Object.entries({ ...weatherConfig, updatedAt: new Date().toISOString() }).filter(([, v]) => v !== undefined)
+  );
+  await setDoc(doc(db, 'clubs', clubId), {
+    weatherConfig: cleanConfig,
+    updatedAt: new Date().toISOString(),
+  }, { merge: true });
+};
+

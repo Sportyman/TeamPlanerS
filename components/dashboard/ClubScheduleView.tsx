@@ -7,6 +7,7 @@ import {
 } from '../../services/scheduleService';
 import { DEFAULT_SCHEDULE_DRAFT, ScheduleFieldsForm } from '../schedule/ScheduleFieldsForm';
 import { UpcomingSessionBanner } from '../schedule/UpcomingSessionBanner';
+import { SeaForecastBanner } from '../weather/SeaForecastBanner';
 
 interface ClubScheduleViewProps {
   club: Club;
@@ -55,6 +56,7 @@ export const ClubScheduleView: React.FC<ClubScheduleViewProps> = ({ club, onBack
       </div>
 
       {upcoming && <UpcomingSessionBanner club={{ ...club, defaultSchedule: schedule }} canEdit />}
+      {upcoming && <SeaForecastBanner club={{ ...club, defaultSchedule: schedule }} isAdmin compact />}
 
       <form onSubmit={handleSavePermanent} className="bg-white border border-slate-200 rounded-3xl p-6 space-y-5 shadow-sm">
         <h3 className="text-sm font-black text-slate-800">עריכת ברירת מחדל קבועה של החוג</h3>

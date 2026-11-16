@@ -10,6 +10,8 @@ import { PollSummaryTab } from './PollSummaryTab';
 import { VoterMappingTab } from './VoterMappingTab';
 import { WhatsAppSettingsTab } from './WhatsAppSettingsTab';
 import { formatFirestoreErrorMessage } from '../../services/whatsapp/pollFormatting';
+import { extractPollTargetDate } from '../../services/weather/weatherDefaults';
+import { SeaForecastBanner } from '../weather/SeaForecastBanner';
 import { ArrowRight, Calendar, Download, RefreshCw } from 'lucide-react';
 import { forceFullSync } from '../../services/syncService';
 
@@ -29,7 +31,9 @@ export const WhatsAppDashboardView: React.FC = () => {
   } = useWhatsAppPolls();
 
   const presentIds = activeClub ? sessions[activeClub]?.presentPersonIds || [] : [];
-  const clubName = clubs.find((c) => c.id === activeClub)?.label || activeClub || 'החוג';
+  const currentClubObj = clubs.find((c) => c.id === activeClub);
+  const clubName = currentClubObj?.label || activeClub || 'החוג';
+  const pollTargetDate = extractPollTargetDate(activePoll?.question, activePoll?.createdAtMs);
 
   const handleRefresh = () => {
     forceFullSync(user?.uid, activeClub);
@@ -132,6 +136,10 @@ export const WhatsAppDashboardView: React.FC = () => {
           </div>
           <VoteAlertsBanner alerts={voteAlerts} presentIds={presentIds} onTogglePerson={toggleAttendance} onDismiss={dismissAlert} onClearAll={clearAlerts} />
         </div>
+      )}
+
+      {!isLoading && currentClubObj && (
+        <SeaForecastBanner club={currentClubObj} dateOverride={pollTargetDate} isAdmin={isClubAdmin} compact />
       )}
 
       <nav aria-label="לשוניות וואטסאפ" className="grid grid-cols-3 sm:inline-grid sm:grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl w-full sm:w-auto">

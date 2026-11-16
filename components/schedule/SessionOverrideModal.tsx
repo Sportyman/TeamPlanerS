@@ -19,10 +19,16 @@ export const SessionOverrideModal: React.FC<SessionOverrideModalProps> = ({
   onClose,
 }) => {
   const { user, setClubSessionOverride, addNotification } = useAppStore();
+  const ov = upcoming.isOverridden ? club.sessionOverride : undefined;
   const [dateOverride, setDateOverride] = useState(upcoming.effectiveDate);
   const [startTime, setStartTime] = useState(upcoming.startTime);
   const [endTime, setEndTime] = useState(upcoming.endTime || '');
   const [locationName, setLocationName] = useState(upcoming.locationName);
+  const [locationId, setLocationId] = useState<string | undefined>(ov?.locationId || club.defaultSchedule?.locationId);
+  const [areaLabel, setAreaLabel] = useState<string | undefined>(ov?.areaLabel || club.defaultSchedule?.areaLabel);
+  const [coords, setCoords] = useState<{ lat?: number; lng?: number } | undefined>(
+    ov?.lat !== undefined && ov?.lng !== undefined ? { lat: ov.lat, lng: ov.lng } : undefined
+  );
   const [note, setNote] = useState(upcoming.note || '');
   const [saving, setSaving] = useState(false);
 
@@ -36,7 +42,11 @@ export const SessionOverrideModal: React.FC<SessionOverrideModalProps> = ({
         dateOverride: dateOverride !== upcoming.defaultDate ? dateOverride : undefined,
         startTime: startTime.trim() || undefined,
         endTime: endTime.trim() || undefined,
+        locationId,
         locationName: locationName.trim() || undefined,
+        areaLabel,
+        lat: coords?.lat,
+        lng: coords?.lng,
         note: note.trim() || undefined,
         updatedAt: new Date().toISOString(),
         updatedBy: user?.email,
@@ -124,7 +134,13 @@ export const SessionOverrideModal: React.FC<SessionOverrideModalProps> = ({
             <label className="block text-[11px] font-bold text-slate-500 mb-1">מיקום לאימון זה</label>
             <LocationPicker
               value={locationName}
-              onChange={(name) => setLocationName(name)}
+              locationId={locationId}
+              onChange={(name, id, nextCoords, nextArea) => {
+                setLocationName(name);
+                setLocationId(id);
+                setCoords(nextCoords);
+                setAreaLabel(nextArea);
+              }}
               allowOneOffCustom
               compact
             />

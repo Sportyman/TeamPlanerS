@@ -9,6 +9,7 @@ import { AttendanceList } from './session/AttendanceList';
 import { InventorySelector } from './session/InventorySelector';
 import { LoadingScreen } from './layout/LoadingScreen';
 import { UpcomingSessionBanner } from './schedule/UpcomingSessionBanner';
+import { SeaForecastBanner } from './weather/SeaForecastBanner';
 import { useWhatsAppPolls } from '../hooks/useWhatsAppPolls';
 import { usePermissions } from '../hooks/usePermissions';
 import { calculateSessionBoatRecommendation } from '../services/boatAllocationLogic';
@@ -125,6 +126,7 @@ export const SessionManager: React.FC = () => {
           <button onClick={handleReset} className="text-sm font-black text-red-500 hover:bg-red-50 px-4 py-2 rounded-xl transition-all flex items-center gap-2"><RotateCcw size={16} /> איפוס אימון</button>
         </div>
         <UpcomingSessionBanner club={currentClubObj} canEdit={isStaff} />
+        <SeaForecastBanner club={currentClubObj} isAdmin={isStaff} compact />
         <PairingBoard />
       </div>
     );
@@ -134,6 +136,7 @@ export const SessionManager: React.FC = () => {
     <div className="max-w-4xl mx-auto space-y-8">
       <StepIndicator currentStep={step} onStepClick={handleStepChange} isStep2Disabled={currentSession.presentPersonIds.length === 0} />
       <UpcomingSessionBanner club={currentClubObj} canEdit={isStaff} />
+      <SeaForecastBanner club={currentClubObj} isAdmin={isStaff} compact />
       {step === 1 && (
         <AttendanceList
           people={clubPeople} presentIds={currentSession.presentPersonIds}

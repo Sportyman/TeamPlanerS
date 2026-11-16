@@ -88,6 +88,7 @@ export const fetchCloudClubsCatalog = async (): Promise<{ clubs: Club[]; deleted
         label: data.label.trim(),
         defaultSchedule: data.defaultSchedule || undefined,
         sessionOverride: data.sessionOverride || null,
+        weatherConfig: data.weatherConfig || undefined,
       });
     }
   });

@@ -2,7 +2,7 @@
 import { StateCreator } from 'zustand';
 import { AppState, EMPTY_SESSION, createInventoryFromDefs } from '../store';
 import {
-  Club, ClubID, ClubLocation, ClubSchedule, SessionOverride, Person, ClubSettings, SyncStatus, BoatDefinition, UserPermission,
+  Club, ClubID, ClubLocation, ClubSchedule, ClubWeatherConfig, SessionOverride, Person, ClubSettings, SyncStatus, BoatDefinition, UserPermission,
 } from '../../types';
 import { DEFAULT_CLUBS, KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from '../../mockData';
 
@@ -32,6 +32,7 @@ export interface GlobalSlice {
   addClub: (label: string, defaultSchedule?: ClubSchedule) => string;
   updateClub: (id: string, label: string, defaultSchedule?: ClubSchedule) => void;
   setClubSessionOverride: (clubId: string, override: SessionOverride | null) => void;
+  setClubWeatherConfig: (clubId: string, weatherConfig: ClubWeatherConfig) => void;
   mergeCloudClubs: (cloudClubs: Club[], deletedIds?: string[]) => void;
   removeClub: (id: string) => void;
   setCloudData: (data: any) => void;
@@ -115,6 +116,10 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
     clubs: state.clubs.map((c) => (c.id === clubId ? { ...c, sessionOverride: override } : c)),
   })),
 
+  setClubWeatherConfig: (clubId, weatherConfig) => set((state) => ({
+    clubs: state.clubs.map((c) => (c.id === clubId ? { ...c, weatherConfig } : c)),
+  })),
+
   mergeCloudClubs: (cloudClubs, deletedIds = []) => set((state) => {
     const deletedSet = new Set(deletedIds);
     const map = new Map<string, Club>();
@@ -127,6 +132,7 @@ export const createGlobalSlice: StateCreator<AppState, [], [], GlobalSlice> = (s
           ...c,
           defaultSchedule: c.defaultSchedule || prev?.defaultSchedule,
           sessionOverride: c.sessionOverride !== undefined ? c.sessionOverride : prev?.sessionOverride,
+          weatherConfig: c.weatherConfig || prev?.weatherConfig,
         });
       }
     });
