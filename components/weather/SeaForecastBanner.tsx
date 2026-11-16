@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import {
-  AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Compass, Info, MapPin, RefreshCw, Settings2, Thermometer, Waves, Wind,
+  AlertTriangle, CheckCircle2, Compass, Info, MapPin, RefreshCw, Settings2, Thermometer, Waves, Wind,
 } from 'lucide-react';
 import { Club } from '../../types';
 import { ClubWeatherConfig } from '../../types/weather';
 import { useClubWeatherForecast } from '../../hooks/useClubWeatherForecast';
 import { formatWindUnitLabel, getCompassDirectionHe, toWindUnitValue } from '../../services/weather/weatherDefaults';
+import { SeaHourlyStrip } from './SeaHourlyStrip';
 
 interface SeaForecastBannerProps {
   club?: Club | null;
@@ -29,7 +30,6 @@ const STATUS_STYLE = {
 export const SeaForecastBanner: React.FC<SeaForecastBannerProps> = ({
   club, isAdmin = false, dateOverride, timeOverride, configOverride, compact = false, hideSettingsLink = false,
 }) => {
-  const [expandedHourly, setExpandedHourly] = useState(false);
   const { summary, isLoading, error, missingLocation, target, effectiveConfig, refresh } = useClubWeatherForecast({
     club, dateOverride, timeOverride, configOverride,
   });
@@ -161,33 +161,17 @@ export const SeaForecastBanner: React.FC<SeaForecastBannerProps> = ({
             </div>
           </div>
 
-          {summary.hourlyWindow.length > 0 && (
-            <div>
-              <button type="button" onClick={() => setExpandedHourly((v) => !v)} className="text-[11px] font-bold text-slate-700 hover:text-slate-950 flex items-center gap-1 py-1">
-                {expandedHourly ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                <span>{expandedHourly ? 'הסתר פירוט שעתי' : `פירוט שעתי לחלון הפעילות (${summary.hourlyWindow.length} שעות)`}</span>
-              </button>
-              {expandedHourly && (
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mt-1.5">
-                  {summary.hourlyWindow.map((pt) => {
-                    const w = toWindUnitValue(pt.windSpeedKmh, effectiveConfig.windUnit);
-                    const g = toWindUnitValue(pt.windGustsKmh, effectiveConfig.windUnit);
-                    return (
-                      <div key={pt.isoHour} className="rounded-xl bg-white/90 border border-slate-200 px-2.5 py-1.5 text-[11px] tabular-nums">
-                        <div className="font-black text-slate-900">{pt.hourLabel}</div>
-                        <div className="text-sky-700 font-semibold">{pt.waveHeightCm !== null ? `${pt.waveHeightCm} ס"מ` : '—'}</div>
-                        <div className="text-slate-600">{w !== null ? `${w}${g ? `–${g}` : ''} ${unitLabel}` : '—'}</div>
-                        <div className="text-slate-400">{pt.temperatureC !== null ? `${pt.temperatureC}°` : ''}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+          <SeaHourlyStrip
+            hourlyWindow={summary.hourlyWindow}
+            startTime={summary.startTime}
+            endTime={summary.endTime}
+            windUnit={effectiveConfig.windUnit}
+            unitLabel={unitLabel}
+          />
         </>
       )}
     </section>
   );
 };
+
 

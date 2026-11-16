@@ -1,4 +1,5 @@
-export const APP_VERSION = '6.3.26';
+export const APP_VERSION = '6.3.27';
 export const LAST_COMMIT_MESSAGE =
-  'feat(weather): add smart Open-Meteo marine, wind and wave monitoring with per-club thresholds and advisory alerts';
+  'fix(weather): separate sustained wind and gust labels cleanly in hourly forecast cards and highlight active session hours';
+
 
