@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useWhatsAppPolls } from '../../hooks/useWhatsAppPolls';
 import { useAppStore } from '../../store';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -13,6 +13,7 @@ import { extractPollTargetDate } from '../../services/weather/weatherDefaults';
 import { SeaForecastBanner } from '../weather/SeaForecastBanner';
 import { UnmatchedPollsNotice } from './UnmatchedPollsNotice';
 import { PollManageModal } from './PollManageModal';
+import { RoleStreakSuggestionsBanner } from './RoleStreakSuggestionsBanner';
 import { Archive, ArrowRight, Calendar, Download, Link2, RefreshCw } from 'lucide-react';
 import { forceFullSync } from '../../services/syncService';
 
@@ -20,16 +21,24 @@ type TabId = 'SUMMARY' | 'MAPPING' | 'SETTINGS';
 
 export const WhatsAppDashboardView: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, activeClub, clubs, sessions, toggleAttendance } = useAppStore();
   const { isClubAdmin } = usePermissions();
   const [activeTab, setActiveTab] = useState<TabId>('SUMMARY');
   const [showManageModal, setShowManageModal] = useState(false);
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'MAPPING' || tabParam === 'SETTINGS' || tabParam === 'SUMMARY') setActiveTab(tabParam);
+    else if (searchParams.get('pollId')) setActiveTab('SUMMARY');
+  }, [searchParams]);
 
   const {
     polls, unmatchedPolls, activePoll, setSelectedPollId, summary, clubConfig, clubPeople, mappings, syncCandidates,
     availableGroups, linkedGroupItems, voteAlerts, dismissAlert, clearAlerts, isLoading, error, retry,
     applyPollAttendance, linkVoterToPerson, confirmSyncCandidate, importRosterMembers,
     unlinkVoter, addGuestFromVoter, saveConfig, setPollColor, linkClubGroup, updateMemberRole, pollManageActions,
+    roleSuggestions, acceptRoleSuggestion, dismissRoleSuggestion,
   } = useWhatsAppPolls();
 
   const presentIds = activeClub ? sessions[activeClub]?.presentPersonIds || [] : [];
@@ -37,10 +46,7 @@ export const WhatsAppDashboardView: React.FC = () => {
   const clubName = currentClubObj?.label || activeClub || 'החוג';
   const pollTargetDate = extractPollTargetDate(activePoll?.question, activePoll?.createdAtMs);
 
-  const handleRefresh = () => {
-    forceFullSync(user?.uid, activeClub);
-    retry();
-  };
+  const handleRefresh = () => { forceFullSync(user?.uid, activeClub); retry(); };
 
   return (
     <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 pb-20">
@@ -99,12 +105,8 @@ export const WhatsAppDashboardView: React.FC = () => {
               {linkedGroupItems.length > 0 ? linkedGroupItems.map((i) => i.name).join(' · ') : 'טרם שויכה קבוצת וואטסאפ'}
             </span>
           </div>
-          <Link
-            to="/app/whatsapp/pairing"
-            className="px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-800 flex items-center justify-center gap-1.5 shrink-0 min-h-[40px]"
-          >
-            <Link2 size={14} />
-            <span>{linkedGroupItems.length === 0 ? 'שייך קבוצה לחוג' : 'ניהול שיוך קבוצה'}</span>
+          <Link to="/app/whatsapp/pairing" className="px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-800 flex items-center justify-center gap-1.5 shrink-0 min-h-[40px]">
+            <Link2 size={14} /><span>{linkedGroupItems.length === 0 ? 'שייך קבוצה לחוג' : 'ניהול שיוך קבוצה'}</span>
           </Link>
         </div>
       )}
@@ -132,9 +134,8 @@ export const WhatsAppDashboardView: React.FC = () => {
         </div>
       )}
 
-      {!isLoading && currentClubObj && (
-        <SeaForecastBanner club={currentClubObj} dateOverride={pollTargetDate} isAdmin={isClubAdmin} compact />
-      )}
+      {!isLoading && currentClubObj && <SeaForecastBanner club={currentClubObj} dateOverride={pollTargetDate} isAdmin={isClubAdmin} compact />}
+      {!isLoading && <RoleStreakSuggestionsBanner suggestions={roleSuggestions} onAccept={acceptRoleSuggestion} onDismiss={dismissRoleSuggestion} />}
 
       <nav aria-label="לשוניות וואטסאפ" className="grid grid-cols-3 sm:inline-grid sm:grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl w-full sm:w-auto">
         <button type="button" onClick={() => setActiveTab('SUMMARY')} className={`px-2 sm:px-4 py-2 text-xs font-bold rounded-lg whitespace-nowrap min-h-[44px] ${activeTab === 'SUMMARY' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}>סקר ומצביעים</button>
@@ -143,10 +144,7 @@ export const WhatsAppDashboardView: React.FC = () => {
       </nav>
 
       {isLoading ? (
-        <div className="border border-slate-200 rounded-2xl bg-white p-8 animate-pulse space-y-3">
-          <div className="h-5 w-48 bg-slate-100 rounded" />
-          <div className="h-24 w-full bg-slate-100 rounded" />
-        </div>
+        <div className="border border-slate-200 rounded-2xl bg-white p-8 animate-pulse space-y-3"><div className="h-5 w-48 bg-slate-100 rounded" /><div className="h-24 w-full bg-slate-100 rounded" /></div>
       ) : (
         <>
           {activeTab === 'SUMMARY' && summary && (
@@ -183,9 +181,7 @@ export const WhatsAppDashboardView: React.FC = () => {
               onUpdatePersonRole={updateMemberRole} onLinkGroup={linkClubGroup}
             />
           )}
-          {activeTab === 'SETTINGS' && (
-            <WhatsAppSettingsTab config={clubConfig} onSave={saveConfig} />
-          )}
+          {activeTab === 'SETTINGS' && <WhatsAppSettingsTab config={clubConfig} onSave={saveConfig} />}
         </>
       )}
       {showManageModal && <PollManageModal manage={pollManageActions} onClose={() => setShowManageModal(false)} />}

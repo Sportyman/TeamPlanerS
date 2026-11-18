@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ClubID, Person } from '../types';
 import { KeywordRule, PollVote, ResolvedVoter, VoteChangeAlert, WhatsAppMemberMapping } from '../types/whatsapp';
+import { NotificationAction } from '../store/slices/createNotificationSlice';
 import { DEFAULT_KEYWORD_RULES } from '../config/whatsappDefaults';
 import { deduplicateLatestVotes } from '../services/whatsapp/pollResolver';
 import { detectVoteChanges } from '../services/whatsapp/pollMatching';
@@ -15,7 +16,7 @@ interface UsePollVotesSubscriptionParams {
   keywordRules: KeywordRule[];
   mappings: WhatsAppMemberMapping[];
   people: Person[];
-  onNotify: (msg: string, type?: 'INFO' | 'SUCCESS' | 'WARN') => void;
+  onNotify: (msg: string, type?: 'INFO' | 'SUCCESS' | 'WARN', action?: NotificationAction) => void;
   onError: (msg: string) => void;
 }
 
@@ -88,7 +89,11 @@ export const usePollVotesSubscription = ({
           changes.forEach((c) => {
             const emitToast = (resolvedAlert: VoteChangeAlert) => {
               const newText = resolvedAlert.newOptions.length ? resolvedAlert.newOptions.join(', ') : 'ביטל הצבעה';
-              onNotify(`עדכון בסקר: ${resolvedAlert.displayName} בחר/ה "${newText}"`, 'WARN');
+              onNotify(
+                `עדכון בסקר: ${resolvedAlert.displayName} בחר/ה "${newText}"`,
+                'WARN',
+                { to: `/app/whatsapp?pollId=${encodeURIComponent(selectedPollId)}`, label: 'פתח סקר' }
+              );
             };
             if (isNumericFallbackName(c.displayName)) {
               setTimeout(() => {

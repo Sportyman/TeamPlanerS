@@ -1,11 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '../../store';
+import { Notification, NotificationAction } from '../../store/slices/createNotificationSlice';
 import { usePermissions } from '../../hooks/usePermissions';
 import { LogOut, Menu, X, LayoutGrid, Calendar, Shield, Sparkles, Home, ChevronLeft, Cloud, RefreshCw, Bell, User, Clock, MessageSquare, Link2 } from 'lucide-react';
 import { db } from '../../firebase';
 import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { ensureAdminMembership, forceFullSync } from '../../services/syncService';
+
+const resolveNotificationTarget = (n: Notification): NotificationAction | null => {
+  if (n.action?.to) return n.action;
+  const msg = n.message || '';
+  if (/סקר|הצבע|וואטסאפ/.test(msg)) return { to: '/app/whatsapp', label: 'עבור לסקרים' };
+  if (/נוכחות/.test(msg)) return { to: '/app?step=1', label: 'למסך נוכחות' };
+  if (/קבוצ|שיוך/.test(msg)) return { to: '/app/whatsapp/pairing', label: 'לשיוך קבוצה' };
+  if (/ציוד|סיר/.test(msg)) return { to: '/app/manage?view=INVENTORY', label: 'לניהול ציוד' };
+  if (/תואר|חבר|משתתף/.test(msg)) return { to: '/app/manage?view=PEOPLE', label: 'לניהול משתתפים' };
+  return null;
+};
 
 const NavLink: React.FC<{ to: string; icon: React.ReactNode; text: string; onClick?: () => void; className?: string }> = ({ to, icon, text, onClick, className }) => {
   const location = useLocation();
@@ -45,7 +57,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
       snap.docChanges().forEach((change) => {
         if (change.type === 'added') {
           const data = change.doc.data();
-          addNotification(data.message, data.type);
+          addNotification(data.message, data.type, data.action);
         }
       });
     });
@@ -108,9 +120,27 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                     <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 z-[70]">
                       <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center"><span className="text-xs font-black text-slate-400 uppercase tracking-widest">התראות</span><button onClick={() => setIsNotifOpen(false)} aria-label="סגור התראות"><X size={14} className="text-slate-300" /></button></div>
                       <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
-                        {notifications.length === 0 ? <div className="p-8 text-center text-slate-400 text-xs">אין התראות חדשות</div> : notifications.map((n) => (
-                          <div key={n.id} className="p-4 hover:bg-slate-50 transition-colors"><p className="text-sm font-bold text-slate-700 leading-tight">{n.message}</p><div className="flex items-center gap-1 mt-1 text-[10px] text-slate-400 font-medium"><Clock size={10} /> {new Date(n.timestamp).toLocaleTimeString('he-IL')}</div></div>
-                        ))}
+                        {notifications.length === 0 ? <div className="p-8 text-center text-slate-400 text-xs">אין התראות חדשות</div> : notifications.map((n) => {
+                          const target = resolveNotificationTarget(n);
+                          return target ? (
+                            <button
+                              key={n.id} type="button"
+                              onClick={() => { setIsNotifOpen(false); navigate(target.to); }}
+                              className="w-full text-right p-4 hover:bg-brand-50/70 transition-colors block cursor-pointer"
+                            >
+                              <p className="text-sm font-bold text-slate-800 leading-tight">{n.message}</p>
+                              <div className="flex items-center justify-between gap-2 mt-1.5 text-[11px] font-bold">
+                                <span className="flex items-center gap-1 text-slate-400 font-medium"><Clock size={10} /> {new Date(n.timestamp).toLocaleTimeString('he-IL')}</span>
+                                <span className="text-brand-600 flex items-center gap-0.5">{target.label || 'פתח'} <ChevronLeft size={12} /></span>
+                              </div>
+                            </button>
+                          ) : (
+                            <div key={n.id} className="p-4">
+                              <p className="text-sm font-bold text-slate-700 leading-tight">{n.message}</p>
+                              <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-400 font-medium"><Clock size={10} /> {new Date(n.timestamp).toLocaleTimeString('he-IL')}</div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </>

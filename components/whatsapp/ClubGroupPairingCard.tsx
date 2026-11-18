@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { LinkedGroupDisplayItem, WhatsAppGroupEntry } from '../../services/whatsapp/groupCatalog';
-import { Check, ChevronDown, ChevronUp, Link2, Plus, RefreshCw, Search, ShieldCheck, Trash2 } from 'lucide-react';
+import { Check, CheckCircle2, ChevronDown, ChevronUp, Link2, Plus, RefreshCw, Search, ShieldCheck, Trash2 } from 'lucide-react';
 
 interface ClubGroupPairingCardProps {
   clubName: string;
@@ -43,7 +43,7 @@ export const ClubGroupPairingCard: React.FC<ClubGroupPairingCardProps> = ({
       await onLinkGroup(trimmed);
       setManualName('');
       setSearch('');
-      setIsExpanded(false);
+      if (!alwaysOpen) setIsExpanded(false);
     } finally {
       setBusyKey(null);
     }
@@ -61,22 +61,22 @@ export const ClubGroupPairingCard: React.FC<ClubGroupPairingCardProps> = ({
   };
 
   return (
-    <section className={`border rounded-2xl transition-colors ${isUnlinked ? 'border-amber-300 bg-amber-50/70' : 'border-slate-200 bg-white'}`}>
-      <div className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="min-w-0 space-y-0.5">
+    <section className={`border-2 rounded-2xl transition-colors ${isUnlinked ? 'border-amber-300 bg-amber-50/60' : 'border-slate-200 bg-white'}`}>
+      <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
-            <Link2 size={14} className={isUnlinked ? 'text-amber-700 shrink-0' : 'text-emerald-700 shrink-0'} />
-            <span className="truncate">ציוות קבוצת וואטסאפ לחוג: {clubName}</span>
+            <Link2 size={15} className={isUnlinked ? 'text-amber-700 shrink-0' : 'text-emerald-700 shrink-0'} />
+            <span>שיוך קבוצת וואטסאפ לחוג: {clubName}</span>
           </div>
           {isUnlinked ? (
-            <p className="text-sm font-black text-amber-950">טרם צוותה קבוצת וואטסאפ לחוג זה — בחר קבוצה כדי לקלוט סקרים וחברים</p>
+            <p className="text-base font-black text-amber-950">טרם נבחרה קבוצה — בחר קבוצה מהרשימה מטה</p>
           ) : (
-            <div className="space-y-0.5">
-              <p className="text-sm font-bold text-slate-900 break-words">{linkedItems.map((i) => i.name).join(' · ')}</p>
+            <div className="space-y-1">
+              <p className="text-lg sm:text-xl font-black text-emerald-800 tracking-normal">{linkedItems.map((i) => i.name).join(' · ')}</p>
               {linkedItems.some((i) => Boolean(i.id)) && (
-                <p className="text-[11px] text-emerald-700 flex items-center gap-1 font-medium">
-                  <ShieldCheck size={13} className="shrink-0" />
-                  <span>מזהה קבוצה קבוע משויך ברקע — שינוי שם הקבוצה בוואטסאפ לא ישבור את הציוות</span>
+                <p className="text-xs text-emerald-700 flex items-center gap-1 font-semibold">
+                  <ShieldCheck size={14} className="shrink-0" />
+                  <span>מזהה קבוצה קבוע משויך ברקע — שינוי שם הקבוצה בוואטסאפ לא ישבור את השיוך</span>
                 </p>
               )}
             </div>
@@ -86,81 +86,81 @@ export const ClubGroupPairingCard: React.FC<ClubGroupPairingCardProps> = ({
         {!isUnlinked && !alwaysOpen && (
           <button
             type="button" onClick={() => setIsExpanded((v) => !v)}
-            className="w-full sm:w-auto px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-800 flex items-center justify-center gap-1.5 min-h-[44px] shrink-0"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-800 flex items-center justify-center gap-1.5 min-h-[44px] shrink-0"
           >
-            <span>{showOpen ? 'סגור ניהול קבוצות' : 'שנה / הוסף קבוצה'}</span>
+            <span>{showOpen ? 'סגור רשימת קבוצות' : 'החלף / הוסף קבוצה'}</span>
             {showOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           </button>
         )}
       </div>
 
       {showOpen && (
-        <div className={`px-3.5 pb-4 sm:px-4 pt-3 border-t space-y-3 ${isUnlinked ? 'border-amber-200' : 'border-slate-100'}`}>
-          {linkedItems.length > 0 && (
-            <div className="space-y-1.5">
-              <div className="text-xs font-bold text-slate-600">קבוצות מצוותות לחוג כעת:</div>
-              <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl bg-slate-50/70">
-                {linkedItems.map((item) => (
-                  <div key={item.key} className="px-3 py-2 flex items-center justify-between gap-2 min-h-[48px]">
-                    <span className="text-sm font-bold text-slate-900 truncate">{item.name}</span>
-                    {confirmRemove === item.key ? (
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button type="button" disabled={busyKey === item.key} onClick={() => handleUnlink(item.key)} className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold min-h-[38px]">
-                          {busyKey === item.key ? 'מסיר...' : 'אשר הסרה'}
-                        </button>
-                        <button type="button" onClick={() => setConfirmRemove(null)} className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 min-h-[38px]">ביטול</button>
-                      </div>
-                    ) : (
-                      <button type="button" onClick={() => setConfirmRemove(item.key)} className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-red-700 hover:bg-red-50 flex items-center gap-1 shrink-0 min-h-[40px]">
-                        <Trash2 size={14} /><span>הסר ציוות</span>
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
+        <div className={`px-4 pb-5 sm:px-5 pt-4 border-t space-y-4 ${isUnlinked ? 'border-amber-200' : 'border-slate-100'}`}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-bold text-slate-800">רשימת קבוצות הוואטסאפ מהבוט:</span>
+            <button type="button" onClick={onRefresh} className="text-xs font-bold text-brand-700 hover:text-brand-800 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-brand-50 min-h-[36px]">
+              <RefreshCw size={14} /><span>רענן רשימה</span>
+            </button>
+          </div>
+
+          {cleanCandidates.length > 4 && (
+            <div className="relative">
+              <Search size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="סינון לפי שם קבוצה..." className="w-full pr-10 pl-3 py-2.5 text-base font-medium bg-white border border-slate-300 rounded-xl min-h-[48px] focus:outline-none focus:border-brand-600" />
             </div>
           )}
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold text-slate-700">בחר קבוצה זמינה מהבוט לחיבור מיידי:</span>
-              <button type="button" onClick={onRefresh} className="text-xs font-bold text-brand-700 hover:text-brand-800 flex items-center gap-1 px-2 py-1 min-h-[36px]">
-                <RefreshCw size={13} /><span>רענן רשימה</span>
-              </button>
-            </div>
-
-            {cleanCandidates.length > 4 && (
-              <div className="relative">
-                <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="סנן לפי שם קבוצה..." className="w-full pr-9 pl-3 py-2 text-sm bg-white border border-slate-200 rounded-xl min-h-[44px] focus:outline-none focus:border-brand-500" />
-              </div>
-            )}
-
-            {selectableGroups.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto">
-                {selectableGroups.map((group) => (
-                  <button
-                    key={group.key} type="button" disabled={busyKey !== null} onClick={() => handleLink(group.key)}
-                    className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:border-brand-500 hover:bg-brand-50/40 text-right flex items-center justify-between gap-2 min-h-[48px] transition-colors"
-                  >
-                    <span className="text-sm font-bold text-slate-900 truncate">{group.name}</span>
-                    <span className="text-xs font-bold text-brand-700 flex items-center gap-1 shrink-0">
-                      <Check size={14} /><span>{busyKey === group.key ? 'מחבר...' : 'צוות לחוג'}</span>
-                    </span>
+          <div className="flex flex-col gap-3">
+            {linkedItems.map((item) => (
+              <div
+                key={item.key}
+                className="w-full px-4 py-3.5 rounded-2xl border-2 border-emerald-700 bg-emerald-600 text-white shadow-md ring-2 ring-emerald-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <CheckCircle2 size={24} className="text-white shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-lg sm:text-xl font-extrabold tracking-normal leading-snug text-white break-words">{item.name}</div>
+                    <div className="text-xs font-bold text-emerald-100">קבוצה נבחרה ומשויכת לחוג זה</div>
+                  </div>
+                </div>
+                {confirmRemove === item.key ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button type="button" disabled={busyKey === item.key} onClick={() => handleUnlink(item.key)} className="px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold min-h-[40px]">
+                      {busyKey === item.key ? 'מסיר...' : 'אשר הסרה'}
+                    </button>
+                    <button type="button" onClick={() => setConfirmRemove(null)} className="px-3 py-2 rounded-xl bg-white text-slate-800 text-xs font-bold min-h-[40px]">ביטול</button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setConfirmRemove(item.key)} className="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center gap-1.5 shrink-0 min-h-[40px] self-end sm:self-center">
+                    <Trash2 size={14} /><span>הסר שיוך</span>
                   </button>
-                ))}
+                )}
               </div>
-            ) : (
-              <div className="text-xs text-slate-600 bg-white/80 border border-slate-200 rounded-xl p-3">
-                לא נמצאו קבוצות נוספות ברשימה מהבוט. ניתן לרענן או להזין שם קבוצה מדויק מטה.
+            ))}
+
+            {selectableGroups.map((group) => (
+              <button
+                key={group.key} type="button" disabled={busyKey !== null} onClick={() => handleLink(group.key)}
+                className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-200 bg-white hover:border-brand-600 hover:bg-brand-50/40 text-right flex items-center justify-between gap-3 min-h-[60px] transition-all"
+              >
+                <span className="text-lg sm:text-xl font-extrabold tracking-normal leading-snug text-slate-950 break-words">{group.name}</span>
+                <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-brand-700 text-xs font-bold flex items-center gap-1.5 shrink-0">
+                  <Check size={14} /><span>{busyKey === group.key ? 'משייך...' : 'בחר קבוצה'}</span>
+                </span>
+              </button>
+            ))}
+
+            {linkedItems.length === 0 && selectableGroups.length === 0 && (
+              <div className="text-sm text-slate-600 bg-white border border-slate-200 rounded-2xl p-4">
+                לא נמצאו קבוצות מהבוט. ניתן ללחוץ על ״רענן רשימה״ או להזין את שם הקבוצה ידנית מטה.
               </div>
             )}
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 pt-1">
-            <input type="text" value={manualName} onChange={(e) => setManualName(e.target.value)} placeholder="או הזן שם קבוצת וואטסאפ מדויק..." className="flex-1 px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl min-h-[44px] focus:outline-none focus:border-brand-500" />
-            <button type="button" disabled={!manualName.trim() || busyKey !== null} onClick={() => handleLink(manualName)} className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white text-xs font-bold flex items-center justify-center gap-1.5 min-h-[44px] whitespace-nowrap">
-              <Plus size={15} /><span>צוות לפי שם</span>
+          <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-100">
+            <input type="text" value={manualName} onChange={(e) => setManualName(e.target.value)} placeholder="הזנה ידנית: כתוב שם קבוצת וואטסאפ מדויק..." className="flex-1 px-4 py-2.5 text-base font-medium bg-white border border-slate-300 rounded-xl min-h-[48px] focus:outline-none focus:border-brand-600" />
+            <button type="button" disabled={!manualName.trim() || busyKey !== null} onClick={() => handleLink(manualName)} className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white text-sm font-bold flex items-center justify-center gap-1.5 min-h-[48px] whitespace-nowrap">
+              <Plus size={16} /><span>שייך לפי שם</span>
             </button>
           </div>
         </div>
@@ -168,3 +168,4 @@ export const ClubGroupPairingCard: React.FC<ClubGroupPairingCardProps> = ({
     </section>
   );
 };
+

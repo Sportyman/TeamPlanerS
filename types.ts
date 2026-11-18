@@ -228,6 +228,11 @@ export interface ActivityHistoryEntry {
   source: 'POLL' | 'MANUAL';
 }
 
+export interface RoleStreakDismissal {
+  role: Role;
+  reaskAtStreak: number;
+}
+
 export interface Person {
   id: string;
   clubId: ClubID;
@@ -245,6 +250,7 @@ export interface Person {
   attendanceCount?: number;
   lastAttendedAt?: string;
   activityHistory?: ActivityHistoryEntry[];
+  dismissedRoleStreak?: RoleStreakDismissal;
   isWhatsAppGroupOnly?: boolean;
   preferredBoatType?: string; 
   genderConstraint?: GenderConstraint;

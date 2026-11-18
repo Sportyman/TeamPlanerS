@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ClubID, Person, Role } from '../../types';
 import { ArrowRight, MessageSquare, Search, UserPlus, Users } from 'lucide-react';
 import { useWhatsAppPolls } from '../../hooks/useWhatsAppPolls';
@@ -7,6 +8,7 @@ import { addPersonToClubCloud } from '../../services/syncService';
 import { PeopleTable } from './PeopleTable';
 import { PersonEditorModal } from './PersonEditorModal';
 import { GroupLinkSelect } from '../whatsapp/GroupLinkSelect';
+import { RoleStreakSuggestionsBanner } from '../whatsapp/RoleStreakSuggestionsBanner';
 
 interface PeopleManagementViewProps {
   activeClub: ClubID;
@@ -25,18 +27,23 @@ export const PeopleManagementView: React.FC<PeopleManagementViewProps> = ({
   onDelete,
   onNotify,
 }) => {
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const handledHighlightRef = React.useRef<string | null>(null);
 
   const {
-    effectiveClubPeople,
-    clubConfig,
-    availableGroups,
-    mappings,
-    linkClubGroup,
-    importRosterMembers,
+    effectiveClubPeople, clubConfig, availableGroups, mappings, linkClubGroup, importRosterMembers,
+    roleSuggestions, acceptRoleSuggestion, dismissRoleSuggestion,
   } = useWhatsAppPolls();
+
+  const highlightId = searchParams.get('highlight');
+  useEffect(() => {
+    if (!highlightId || handledHighlightRef.current === highlightId) return;
+    const match = (effectiveClubPeople.length > 0 ? effectiveClubPeople : people).find((p) => p.id === highlightId);
+    if (match) { handledHighlightRef.current = highlightId; setEditingPerson(match); }
+  }, [highlightId, effectiveClubPeople, people]);
 
   const unifiedPeople = useMemo(() => {
     const base = effectiveClubPeople.length > 0 ? effectiveClubPeople : people;
@@ -87,6 +94,8 @@ export const PeopleManagementView: React.FC<PeopleManagementViewProps> = ({
           </button>
         </div>
       </div>
+
+      <RoleStreakSuggestionsBanner suggestions={roleSuggestions} onAccept={acceptRoleSuggestion} onDismiss={dismissRoleSuggestion} />
 
       {clubConfig.linkedGroups.length === 0 && (
         <div className="border border-amber-200 bg-amber-50 rounded-2xl p-4 space-y-2.5">

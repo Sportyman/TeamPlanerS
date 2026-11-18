@@ -1,6 +1,6 @@
-export const APP_VERSION = '6.3.33';
+export const APP_VERSION = '6.3.34';
 export const LAST_COMMIT_MESSAGE =
-  'feat(polls): add split site-only/Firebase deletion, multi-select archive/restore, activity history log, and live per-poll role sync';
+  'feat(ux): smart club base role lifecycle with 7-session streak suggestions, vertical pairing UI, and clickable notifications';
 
 
 

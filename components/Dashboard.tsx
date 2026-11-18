@@ -59,7 +59,7 @@ export const Dashboard: React.FC = () => {
             });
           }
 
-          addNotification(`אושר חבר חדש: ${m.profile?.firstName || m.displayName || m.uid}`, 'SUCCESS');
+          addNotification(`אושר חבר חדש: ${m.profile?.firstName || m.displayName || m.uid}`, 'SUCCESS', { to: '/app/manage?view=PEOPLE', label: 'למשתתפים' });
           navigate('/app/manage');
       } catch (err) {
           addNotification('שגיאה בתהליך האישור.', 'WARN');
@@ -89,7 +89,7 @@ export const Dashboard: React.FC = () => {
       definitions={boatDefs}
       onSave={async (defs) => {
         await saveClubBoatDefinitions(activeClub, defs);
-        addNotification('הגדרות הציוד נשמרו בהצלחה', 'SUCCESS');
+        addNotification('הגדרות הציוד נשמרו בהצלחה', 'SUCCESS', { to: '/app?step=2', label: 'לציוד' });
         navigate('/app');
       }}
       onCancel={() => navigate('/app/manage')}

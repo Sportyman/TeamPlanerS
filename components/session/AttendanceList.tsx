@@ -8,6 +8,7 @@ import { useWhatsAppPolls } from '../../hooks/useWhatsAppPolls';
 import { sortAttendancePeople } from '../../services/whatsapp/rosterMerge';
 import { SessionPollBar } from '../whatsapp/SessionPollBar';
 import { VoteAlertsBanner } from '../whatsapp/VoteAlertsBanner';
+import { RoleStreakSuggestionsBanner } from '../whatsapp/RoleStreakSuggestionsBanner';
 import { AttendancePersonCard } from './AttendancePersonCard';
 
 type SortType = 'ATTENDANCE' | 'ROLE' | 'NAME' | 'RANK';
@@ -37,6 +38,7 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
     mappings, syncCandidates, voteAlerts, dismissAlert, clearAlerts, isLoading: isPollLoading, error: pollError,
     retry: retryPolls, applyPollAttendance, linkVoterToPerson, addGuestFromVoter, linkClubGroup,
     confirmSyncCandidate, importRosterMembers, updateMemberRole, pollManageActions,
+    roleSuggestions, acceptRoleSuggestion, dismissRoleSuggestion,
   } = whatsappState;
 
   const displayPeople = useMemo(
@@ -101,6 +103,7 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
         onLinkVoter={linkVoterToPerson} onAddGuest={addGuestFromVoter} onConfirmCandidate={confirmSyncCandidate}
         onImportRoster={importRosterMembers} onUpdatePersonRole={updateMemberRole} pollManage={pollManageActions} onRetry={retryPolls}
       />
+      <RoleStreakSuggestionsBanner suggestions={roleSuggestions} onAccept={acceptRoleSuggestion} onDismiss={dismissRoleSuggestion} />
 
       <div className="flex flex-col gap-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4">

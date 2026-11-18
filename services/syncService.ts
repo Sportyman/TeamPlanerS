@@ -109,12 +109,15 @@ export const recordClubAttendance = async (
     const store = useAppStore.getState();
     const updatedMap = new Map<string, Person>();
     await Promise.all(attendedPeople.map(async (p) => {
+        const savedBase = store.people.find((existing) => existing.clubId === clubId && existing.id === p.id);
+        const keepBaseRole = Boolean(savedBase && !savedBase.isWhatsAppGroupOnly && savedBase.role !== Role.UNASSIGNED);
+        const persistedRole = keepBaseRole ? savedBase!.role : p.role;
         const { nextHistory, isNewDay, changedRoleOnSameDay } = buildNextActivityHistory(p, today, nowIso, pollMeta);
         if (!isNewDay && !changedRoleOnSameDay) return;
         try {
             const payload: Record<string, any> = {
                 uid: p.id, clubId, displayName: p.name, gender: p.gender || Gender.MALE,
-                role: p.role, rank: p.rank ?? 3, isSkipper: Boolean(p.isSkipper),
+                role: persistedRole, rank: p.rank ?? 3, isSkipper: Boolean(p.isSkipper),
                 phone: p.phone || '', status: MembershipStatus.ACTIVE,
                 activityHistory: nextHistory, lastUpdate: nowIso,
             };
@@ -126,6 +129,7 @@ export const recordClubAttendance = async (
             await setDoc(doc(db, 'memberships', `${clubId}_${p.id}`), payload, { merge: true });
             updatedMap.set(p.id, {
                 ...p,
+                role: persistedRole,
                 isWhatsAppGroupOnly: false,
                 attendanceCount: isNewDay ? (p.attendanceCount || 0) + 1 : p.attendanceCount,
                 lastAttendedAt: isNewDay ? nowIso : p.lastAttendedAt,

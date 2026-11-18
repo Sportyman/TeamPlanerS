@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ClubID, Person } from '../types';
 import { ClubWhatsAppConfig, PollEvent, PollVote, WhatsAppMemberMapping } from '../types/whatsapp';
+import { NotificationAction } from '../store/slices/createNotificationSlice';
 import { DEFAULT_KEYWORD_RULES } from '../config/whatsappDefaults';
 import { getPollColorToken } from '../services/whatsapp/pollFormatting';
 import { buildWhatsAppGroupCatalog, doesPollMatchConfig, getEffectiveLinkedIds, resolveLinkedGroupItems } from '../services/whatsapp/groupCatalog';
@@ -14,10 +15,11 @@ interface UseWhatsAppSubscriptionsParams {
   userId?: string;
   activeClub: ClubID | null;
   people: Person[];
-  onNotify: (msg: string, type?: 'INFO' | 'SUCCESS' | 'WARN') => void;
+  preferredPollId?: string | null;
+  onNotify: (msg: string, type?: 'INFO' | 'SUCCESS' | 'WARN', action?: NotificationAction) => void;
 }
 
-export const useWhatsAppSubscriptions = ({ userId, activeClub, people, onNotify }: UseWhatsAppSubscriptionsParams) => {
+export const useWhatsAppSubscriptions = ({ userId, activeClub, people, preferredPollId, onNotify }: UseWhatsAppSubscriptionsParams) => {
   const [polls, setPolls] = useState<PollEvent[]>([]);
   const [historicalVotes, setHistoricalVotes] = useState<PollVote[]>([]);
   const [mappings, setMappings] = useState<WhatsAppMemberMapping[]>([]);
@@ -109,6 +111,12 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, people, onNotify 
   }, [userId, relevantPollIdsKey, retryKey]);
 
   useEffect(() => {
+    if (preferredPollId && relevantPolls.some((p) => p.pollId === preferredPollId) && selectedPollId !== preferredPollId) {
+      setSelectedPollId(preferredPollId);
+    }
+  }, [preferredPollId, relevantPolls, selectedPollId]);
+
+  useEffect(() => {
     if (relevantPolls.length === 0) {
       if (selectedPollId) setSelectedPollId('');
       return;
@@ -120,7 +128,10 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, people, onNotify 
       knownRelevantIdsRef.current = currentIds;
       if (newlyArrived) {
         setSelectedPollId(newlyArrived.pollId);
-        onNotify(`זוהה סקר חדש: "${newlyArrived.question}"`, 'INFO');
+        onNotify(`זוהה סקר חדש: "${newlyArrived.question}"`, 'INFO', {
+          to: `/app/whatsapp?pollId=${encodeURIComponent(newlyArrived.pollId)}`,
+          label: 'פתח סקר',
+        });
         return;
       }
     } else {

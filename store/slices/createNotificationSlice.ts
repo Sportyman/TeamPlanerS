@@ -1,18 +1,23 @@
-
 import { StateCreator } from 'zustand';
 import { AppState } from '../store';
+
+export interface NotificationAction {
+  to: string;
+  label?: string;
+}
 
 export interface Notification {
   id: string;
   message: string;
   timestamp: string;
   type: 'INFO' | 'SUCCESS' | 'WARN';
+  action?: NotificationAction;
 }
 
 export interface NotificationSlice {
   notifications: Notification[];
   unreadCount: number;
-  addNotification: (message: string, type?: 'INFO' | 'SUCCESS' | 'WARN') => void;
+  addNotification: (message: string, type?: 'INFO' | 'SUCCESS' | 'WARN', action?: NotificationAction) => void;
   clearUnread: () => void;
 }
 
@@ -22,8 +27,11 @@ export const createNotificationSlice: StateCreator<AppState, [], [], Notificatio
   ],
   unreadCount: 1,
 
-  addNotification: (message, type = 'INFO') => set((state) => ({
-    notifications: [{ id: Math.random().toString(), message, timestamp: new Date().toISOString(), type }, ...state.notifications].slice(0, 20),
+  addNotification: (message, type = 'INFO', action) => set((state) => ({
+    notifications: [
+      { id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, message, timestamp: new Date().toISOString(), type, ...(action ? { action } : {}) },
+      ...state.notifications,
+    ].slice(0, 20),
     unreadCount: state.unreadCount + 1
   })),
 
