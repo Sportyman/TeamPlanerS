@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { ClubID, Person, Role, getRoleLabel } from '../types';
 import { ResolvedPollSummary } from '../types/whatsapp';
-import { NotificationAction } from '../store/slices/createNotificationSlice';
+import { AddNotificationOptions, NotificationAction } from '../store/slices/createNotificationSlice';
 import { getRoleStreakSuggestion, RoleStreakSuggestion } from '../services/activityHistoryService';
 import { dismissRoleStreakPrompt, promoteClubBaseRole } from '../services/roleStreakService';
 import { updateClubPersonRole } from '../services/whatsapp/whatsappMutations';
@@ -12,7 +12,7 @@ interface UseSmartRoleLifecycleParams {
   activeClub: ClubID | null;
   clubPeople: Person[];
   summary: ResolvedPollSummary | null;
-  onNotify: (msg: string, type?: 'INFO' | 'SUCCESS' | 'WARN', action?: NotificationAction) => void;
+  onNotify: (msg: string, type?: 'INFO' | 'SUCCESS' | 'WARN', action?: NotificationAction, options?: AddNotificationOptions) => void;
 }
 
 export const useSmartRoleLifecycle = ({
@@ -73,7 +73,8 @@ export const useSmartRoleLifecycle = ({
       onNotify(
         `דפוס חוזר: ${s.person.name} הגיע/ה ${s.streakCount} פעילויות רצופות כ${roleLabel} — לעדכן תואר קבוע?`,
         'WARN',
-        { to: `/app/manage?view=PEOPLE&highlight=${encodeURIComponent(s.person.id)}`, label: 'לניהול משתתפים' }
+        { to: `/app/manage?view=PEOPLE&highlight=${encodeURIComponent(s.person.id)}`, label: 'לניהול משתתפים' },
+        { dedupeKey: `streak:${sig}` }
       );
     });
   }, [activeClub, roleSuggestions, onNotify]);

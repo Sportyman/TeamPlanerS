@@ -4,12 +4,19 @@ import { AppState } from '../store';
 import { ClubID, SessionState, BoatInventory, BoatDefinition, PersonSnapshot } from '../../types';
 import { KAYAK_DEFINITIONS, SAILING_DEFINITIONS } from '../../mockData';
 
+export interface AttendanceHistoryEntry {
+  ids: string[];
+  label: string;
+}
+
 export interface SessionSlice {
   sessions: Record<ClubID, SessionState>;
   snapshots: Record<ClubID, PersonSnapshot[]>;
+  attendanceHistories: Record<ClubID, AttendanceHistoryEntry[]>;
 
   toggleAttendance: (id: string) => void;
-  setBulkAttendance: (ids: string[]) => void;
+  setBulkAttendance: (ids: string[], label?: string) => void;
+  undoAttendance: () => string | null;
   updateInventory: (inventory: BoatInventory) => void;
   addBoatDefinition: (def: BoatDefinition) => void;
   updateBoatDefinition: (def: BoatDefinition) => void;
@@ -35,6 +42,7 @@ export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = 
     'SAILING': { ...INITIAL_EMPTY_SESSION, inventory: createInitialInventory(SAILING_DEFINITIONS) }
   },
   snapshots: {},
+  attendanceHistories: {},
 
   toggleAttendance: (id) => set((state) => {
     const { activeClub } = state;
@@ -42,15 +50,42 @@ export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = 
     const currentSession = state.sessions[activeClub] || { ...INITIAL_EMPTY_SESSION };
     const isPresent = currentSession.presentPersonIds.includes(id);
     const newPresent = isPresent ? currentSession.presentPersonIds.filter(pid => pid !== id) : [...currentSession.presentPersonIds, id];
-    return { sessions: { ...state.sessions, [activeClub]: { ...currentSession, presentPersonIds: newPresent } } };
+    const personName = state.people?.find((p) => p.id === id)?.name;
+    const label = `${isPresent ? 'הסרת' : 'סימון'} ${personName || 'משתתף'}`;
+    const prevHist = state.attendanceHistories?.[activeClub] || [];
+    return {
+      sessions: { ...state.sessions, [activeClub]: { ...currentSession, presentPersonIds: newPresent } },
+      attendanceHistories: { ...(state.attendanceHistories || {}), [activeClub]: [...prevHist, { ids: currentSession.presentPersonIds, label }].slice(-25) },
+    };
   }),
 
-  setBulkAttendance: (ids) => set((state) => {
+  setBulkAttendance: (ids, label = 'עדכון רשימת נוכחות') => set((state) => {
     const { activeClub } = state;
     if (!activeClub) return state;
     const currentSession = state.sessions[activeClub] || { ...INITIAL_EMPTY_SESSION };
-    return { sessions: { ...state.sessions, [activeClub]: { ...currentSession, presentPersonIds: ids } } };
+    const prevIds = currentSession.presentPersonIds;
+    const unchanged = prevIds.length === ids.length && prevIds.every((x) => ids.includes(x));
+    if (unchanged) return state;
+    const prevHist = state.attendanceHistories?.[activeClub] || [];
+    return {
+      sessions: { ...state.sessions, [activeClub]: { ...currentSession, presentPersonIds: ids } },
+      attendanceHistories: { ...(state.attendanceHistories || {}), [activeClub]: [...prevHist, { ids: prevIds, label }].slice(-25) },
+    };
   }),
+
+  undoAttendance: () => {
+    const { activeClub, attendanceHistories, sessions } = get();
+    if (!activeClub) return null;
+    const hist = attendanceHistories[activeClub] || [];
+    if (hist.length === 0) return null;
+    const last = hist[hist.length - 1];
+    const currentSession = sessions[activeClub] || { ...INITIAL_EMPTY_SESSION };
+    set({
+      sessions: { ...sessions, [activeClub]: { ...currentSession, presentPersonIds: last.ids } },
+      attendanceHistories: { ...attendanceHistories, [activeClub]: hist.slice(0, -1) },
+    });
+    return last.label;
+  },
 
   updateInventory: (inventory) => set((state) => {
     const { activeClub } = state;

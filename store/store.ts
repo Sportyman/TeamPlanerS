@@ -64,7 +64,8 @@ export const useAppStore = create<AppState>()(
         snapshots: state.snapshots,
         invites: state.invites,
         notifications: state.notifications,
-        unreadCount: state.unreadCount
+        unreadCount: state.unreadCount,
+        seenNotificationKeys: state.seenNotificationKeys
       })
     }
   )

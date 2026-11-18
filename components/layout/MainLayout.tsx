@@ -41,6 +41,8 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
   const location = useLocation();
   const initialLoadRef = useRef(true);
 
+  const mountedAtRef = useRef<number>(Date.now());
+
   useEffect(() => { setIsMenuOpen(false); setIsNotifOpen(false); }, [location]);
 
   useEffect(() => {
@@ -57,7 +59,9 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
       snap.docChanges().forEach((change) => {
         if (change.type === 'added') {
           const data = change.doc.data();
-          addNotification(data.message, data.type, data.action);
+          const tsMs = data.timestamp ? Date.parse(String(data.timestamp)) : 0;
+          if (tsMs && tsMs < mountedAtRef.current - 5000) return;
+          addNotification(data.message, data.type, data.action, { dedupeKey: `fs:${change.doc.id}` });
         }
       });
     });
@@ -110,7 +114,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
             <div className="flex items-center gap-2">
               <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors" aria-label="תפריט"><Menu size={28} /></button>
               <div className="relative">
-                <button onClick={() => { setIsNotifOpen(!isNotifOpen); if (!isNotifOpen) clearUnread(); }} className="p-2 text-slate-400 hover:text-brand-600 transition-colors relative" aria-label="התראות">
+                <button onClick={() => { setIsNotifOpen(!isNotifOpen); clearUnread(); }} className="p-2 text-slate-400 hover:text-brand-600 transition-colors relative" aria-label="התראות">
                   <Bell size={24} />
                   {unreadCount > 0 && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white shadow-sm animate-bounce" />}
                 </button>

@@ -69,32 +69,30 @@ export const WhatsAppGroupPairingPage: React.FC = () => {
           </button>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              שיוך קבוצת וואטסאפ לחוג
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">חוג פעיל: {clubName}</p>
-          </div>
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-5 text-center space-y-1.5">
+          <p className="text-xs sm:text-sm font-bold text-slate-500">שיוך קבוצת וואטסאפ עבור החוג</p>
+          <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-normal leading-tight text-center">
+            {clubName}
+          </h1>
+        </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/app/whatsapp')}
-              className="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold flex items-center gap-1.5 min-h-[44px]"
-            >
-              <MessageSquare size={15} />
-              <span>מעבר לסקרים</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/app?step=1')}
-              className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 min-h-[44px]"
-            >
-              <Calendar size={15} />
-              <span>מסך נוכחות</span>
-            </button>
-          </div>
+        <div className="flex items-center justify-center sm:justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => navigate('/app/whatsapp')}
+            className="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold flex items-center gap-1.5 min-h-[44px]"
+          >
+            <MessageSquare size={15} />
+            <span>מעבר לסקרים</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/app?step=1')}
+            className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 min-h-[44px]"
+          >
+            <Calendar size={15} />
+            <span>מסך נוכחות</span>
+          </button>
         </div>
       </header>
 

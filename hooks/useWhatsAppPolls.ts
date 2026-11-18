@@ -86,16 +86,15 @@ export const useWhatsAppPolls = () => {
     const decliningIds = Object.entries(summary.personStatusMap).filter(([, st]) => st.intent === 'DECLINING').map(([id]) => id).sort();
     const sig = `${selectedPollId}|${[...summary.attendingPersonIds].sort().join(',')}|${decliningIds.join(',')}`;
     if (autoCheckedPollByClub.get(activeClub) === sig) return;
-    if (recentChangedVoters.size > 0 && autoCheckedPollByClub.get(activeClub)?.startsWith(`${selectedPollId}|`)) return;
     autoCheckedPollByClub.set(activeClub, sig);
     const { nextIds, addedCount } = reconcileInitialPollAttendance(activeClub, summary, currentIds);
     if (nextIds) {
-      setBulkAttendance(nextIds);
+      setBulkAttendance(nextIds, recentChangedVoters.size > 0 ? 'עדכון חי מסקר וואטסאפ' : 'טעינת נוכחות מהסקר');
       if (addedCount > 0) {
-        addNotification(`סומנו אוטומטית ${summary.attendingPersonIds.length} משתתפים מהסקר`, 'INFO', { to: '/app?step=1', label: 'למסך נוכחות' });
+        addNotification(`סומנו אוטומטית ${summary.attendingPersonIds.length} משתתפים מהסקר`, 'INFO', { to: '/app?step=1', label: 'למסך נוכחות' }, { dedupeKey: `poll-sync:${activeClub}:${sig}` });
       }
     }
-  }, [activeClub, isLoading, relevantPolls.length, selectedPollId, votesLoadedPollId, summary, recentChangedVoters, sessions, setBulkAttendance, addNotification]);
+  }, [activeClub, isLoading, relevantPolls.length, selectedPollId, votesLoadedPollId, summary, sessions, setBulkAttendance, addNotification, recentChangedVoters]);
 
   useEffect(() => {
     if (!activeClub || !user) return;
@@ -103,7 +102,7 @@ export const useWhatsAppPolls = () => {
     if (phoneMatches.length === 0) return;
     phoneMatches.forEach((c) => attemptedAutoLinkRef.current.add(`${activeClub}:${c.mapping.voterId}:${c.person.id}`));
     autoLinkPhoneMatches(phoneMatches, activeClub, user.email || user.uid).then((count) => {
-      if (count > 0) addNotification(`סונכרנו אוטומטית ${count} חברים לפי טלפון וואטסאפ`, 'SUCCESS', { to: '/app/whatsapp?tab=MAPPING', label: 'לשיוך מצביעים' });
+      if (count > 0) addNotification(`סונכרנו אוטומטית ${count} חברים לפי טלפון וואטסאפ`, 'SUCCESS', { to: '/app/whatsapp?tab=MAPPING', label: 'לשיוך מצביעים' }, { dedupeKey: `autolink:${activeClub}:${count}` });
     }).catch(() => {});
   }, [activeClub, user, syncCandidates, addNotification]);
 

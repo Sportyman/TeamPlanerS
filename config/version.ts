@@ -1,3 +1,3 @@
-export const APP_VERSION = '6.3.35';
+export const APP_VERSION = '6.3.36';
 export const LAST_COMMIT_MESSAGE =
-  'fix(whatsapp,logs): mute already-synced poll button without badge, surface all unmapped WhatsApp voters with full profile details in attendance list, and upgrade diagnostics logger with live menu & error capture';
+  'fix(notifications,attendance,whatsapp): persist notification read/dedupe state across refresh, restrict attendance card toggling to checkbox button, live auto-sync poll updates with sky-blue flash, centered upright club title, light indigo pairing theme, undo attendance action, and clearer log marker label';

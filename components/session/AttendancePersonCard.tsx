@@ -7,13 +7,14 @@ import { WhatsAppAvatar } from '../whatsapp/WhatsAppAvatar';
 interface AttendancePersonCardProps {
   person: Person;
   isPresent: boolean;
+  isLiveFlash?: boolean;
   pollStatus?: { intent: PollIntent; detectedTags?: string[]; updatedRecently?: boolean };
   onToggle: (id: string) => void;
   onQuickSave: (person: Person, role: Role, isSkipper: boolean, tags: string[]) => Promise<void>;
 }
 
 export const AttendancePersonCard: React.FC<AttendancePersonCardProps> = ({
-  person, isPresent, pollStatus, onToggle, onQuickSave,
+  person, isPresent, isLiveFlash = false, pollStatus, onToggle, onQuickSave,
 }) => {
   const [editing, setEditing] = useState(false);
   const [role, setRole] = useState<Role>(person.role);
@@ -24,11 +25,12 @@ export const AttendancePersonCard: React.FC<AttendancePersonCardProps> = ({
   const isUnassigned = person.role === Role.UNASSIGNED;
 
   const getCardStyle = () => {
-    const base = 'rounded-2xl border text-right transition-all duration-200 select-none shadow-sm p-3.5';
+    const base = 'rounded-2xl border text-right transition-all duration-300 shadow-sm p-3.5';
+    if (isLiveFlash) return `${base} border-sky-400 bg-sky-100 text-slate-900 ring-2 ring-sky-400/50`;
     if (!isPresent) {
       return isUnassigned
-        ? `${base} border-amber-200 bg-amber-50/30 text-slate-700 hover:border-amber-400`
-        : `${base} border-slate-200 bg-white text-slate-600 hover:border-slate-300`;
+        ? `${base} border-amber-200 bg-amber-50/30 text-slate-700`
+        : `${base} border-slate-200 bg-white text-slate-600`;
     }
     switch (person.role) {
       case Role.INSTRUCTOR: return `${base} border-cyan-500 bg-cyan-50 text-cyan-900 ring-2 ring-cyan-500/20`;
@@ -39,8 +41,7 @@ export const AttendancePersonCard: React.FC<AttendancePersonCardProps> = ({
     }
   };
 
-  const openEditor = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const openEditor = () => {
     setRole(person.role);
     setIsSkipper(Boolean(person.isSkipper));
     setTagsText((person.tags || []).filter((t) => t !== 'קבוצת וואטסאפ').join(', '));
@@ -49,7 +50,6 @@ export const AttendancePersonCard: React.FC<AttendancePersonCardProps> = ({
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    e.stopPropagation();
     setSaving(true);
     try {
       const nextTags = tagsText.split(',').map((t) => t.trim()).filter(Boolean);
@@ -62,7 +62,7 @@ export const AttendancePersonCard: React.FC<AttendancePersonCardProps> = ({
 
   if (editing) {
     return (
-      <form onSubmit={handleSave} onClick={(e) => e.stopPropagation()} className="rounded-2xl border-2 border-brand-400 bg-white p-3.5 space-y-2.5 shadow-md text-right">
+      <form onSubmit={handleSave} className="rounded-2xl border-2 border-brand-400 bg-white p-3.5 space-y-2.5 shadow-md text-right">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <WhatsAppAvatar name={person.name} src={person.photoURL} sizeClass="w-8 h-8 text-xs" />
@@ -95,7 +95,7 @@ export const AttendancePersonCard: React.FC<AttendancePersonCardProps> = ({
   }
 
   return (
-    <div onClick={() => onToggle(person.id)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggle(person.id); }} className={`${getCardStyle()} flex items-center justify-between gap-2.5 cursor-pointer`}>
+    <div className={`${getCardStyle()} flex items-center justify-between gap-2.5`}>
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <WhatsAppAvatar name={person.name} src={person.photoURL} sizeClass="w-11 h-11 text-sm" />
         <div className="flex-1 min-w-0">
@@ -121,11 +121,23 @@ export const AttendancePersonCard: React.FC<AttendancePersonCardProps> = ({
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-1.5 shrink-0">
-        <button type="button" onClick={openEditor} className="p-1.5 rounded-lg text-slate-400 hover:text-brand-700 hover:bg-white/80 transition-colors" title="עריכה מהירה של תפקיד ותג">
+
+      <div className="flex items-center gap-1 shrink-0">
+        <button type="button" onClick={openEditor} className="p-2 rounded-lg text-slate-400 hover:text-brand-700 hover:bg-white/80 transition-colors" title="עריכה מהירה של תפקיד ותג">
           <Edit2 size={15} />
         </button>
-        {isPresent ? <CheckCircle2 className="text-brand-600" size={26} /> : <Circle className="text-slate-300" size={26} />}
+        <button
+          type="button"
+          onClick={() => onToggle(person.id)}
+          aria-pressed={isPresent}
+          aria-label={isPresent ? `הסר סימון עבור ${person.name}` : `סמן הגעה עבור ${person.name}`}
+          title={isPresent ? 'הסר סימון נוכחות' : 'סמן כנוכח'}
+          className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${
+            isPresent ? 'bg-brand-100/70 hover:bg-brand-200/70 text-brand-700' : 'bg-slate-100/80 hover:bg-slate-200 text-slate-400 hover:text-slate-700'
+          }`}
+        >
+          {isPresent ? <CheckCircle2 className="text-brand-600" size={26} /> : <Circle size={26} />}
+        </button>
       </div>
     </div>
   );

@@ -84,8 +84,12 @@ export const DebugOverlay: React.FC = () => {
               {copied ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}
               <span>{copied ? 'הועתק' : 'העתק לוג'}</span>
             </button>
-            <button onClick={addMarker} className="flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/15 py-2 rounded-xl font-semibold transition-all">
-              <BookmarkPlus size={14} /><span>סמן נקודה</span>
+            <button
+              onClick={addMarker}
+              title="מוסיף שורת סימון עם חותמת זמן לתוך הלוג לפני בדיקה או פעולה"
+              className="flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/15 py-2 rounded-xl font-semibold transition-all"
+            >
+              <BookmarkPlus size={14} /><span>סמן בדיקה בלוג</span>
             </button>
             <button onClick={clearLogs} className="flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/15 py-2 rounded-xl font-semibold transition-all">
               <Eraser size={14} /><span>נקה לוג</span>

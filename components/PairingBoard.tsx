@@ -490,13 +490,15 @@ export const PairingBoard: React.FC = () => {
                <button
                   onClick={undo}
                   disabled={!history || history.length === 0}
-                  className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="ביטול פעולה אחרונה בלוח השיבוץ"
+                  className="px-2.5 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5 text-xs font-bold whitespace-nowrap"
                >
-                 <RotateCcw size={18} />
+                 <RotateCcw size={16} /> <span>ביטול פעולה</span>
                </button>
                <button
                   onClick={redo}
                   disabled={!future || future.length === 0}
+                  title="בצע שוב פעולה שבוטלה"
                   className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed"
                >
                  <RotateCw size={18} />

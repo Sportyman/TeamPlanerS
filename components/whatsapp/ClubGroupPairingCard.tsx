@@ -65,16 +65,16 @@ export const ClubGroupPairingCard: React.FC<ClubGroupPairingCardProps> = ({
       <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
-            <Link2 size={15} className={isUnlinked ? 'text-amber-700 shrink-0' : 'text-emerald-700 shrink-0'} />
-            <span>שיוך קבוצת וואטסאפ לחוג: {clubName}</span>
+            <Link2 size={15} className={isUnlinked ? 'text-amber-700 shrink-0' : 'text-indigo-700 shrink-0'} />
+            <span>שיוך קבוצת וואטסאפ לחוג: <span className="font-black text-slate-900">{clubName}</span></span>
           </div>
           {isUnlinked ? (
             <p className="text-base font-black text-amber-950">טרם נבחרה קבוצה — בחר קבוצה מהרשימה מטה</p>
           ) : (
             <div className="space-y-1">
-              <p className="text-lg sm:text-xl font-black text-emerald-800 tracking-normal">{linkedItems.map((i) => i.name).join(' · ')}</p>
+              <p className="text-lg sm:text-xl font-black text-indigo-800 tracking-normal">{linkedItems.map((i) => i.name).join(' · ')}</p>
               {linkedItems.some((i) => Boolean(i.id)) && (
-                <p className="text-xs text-emerald-700 flex items-center gap-1 font-semibold">
+                <p className="text-xs text-indigo-700 flex items-center gap-1 font-semibold">
                   <ShieldCheck size={14} className="shrink-0" />
                   <span>מזהה קבוצה קבוע משויך ברקע — שינוי שם הקבוצה בוואטסאפ לא ישבור את השיוך</span>
                 </p>
@@ -114,13 +114,13 @@ export const ClubGroupPairingCard: React.FC<ClubGroupPairingCardProps> = ({
             {linkedItems.map((item) => (
               <div
                 key={item.key}
-                className="w-full px-4 py-3.5 rounded-2xl border-2 border-emerald-700 bg-emerald-600 text-white shadow-md ring-2 ring-emerald-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                className="w-full px-4 py-3.5 rounded-2xl border-2 border-indigo-400 bg-indigo-100 text-indigo-950 shadow-sm ring-2 ring-indigo-300/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <CheckCircle2 size={24} className="text-white shrink-0" />
+                  <CheckCircle2 size={24} className="text-indigo-700 shrink-0" />
                   <div className="min-w-0">
-                    <div className="text-lg sm:text-xl font-extrabold tracking-normal leading-snug text-white break-words">{item.name}</div>
-                    <div className="text-xs font-bold text-emerald-100">קבוצה נבחרה ומשויכת לחוג זה</div>
+                    <div className="text-lg sm:text-xl font-extrabold tracking-normal leading-snug text-indigo-950 break-words">{item.name}</div>
+                    <div className="text-xs font-bold text-indigo-800">קבוצה נבחרה ומשויכת לחוג זה</div>
                   </div>
                 </div>
                 {confirmRemove === item.key ? (
@@ -131,7 +131,7 @@ export const ClubGroupPairingCard: React.FC<ClubGroupPairingCardProps> = ({
                     <button type="button" onClick={() => setConfirmRemove(null)} className="px-3 py-2 rounded-xl bg-white text-slate-800 text-xs font-bold min-h-[40px]">ביטול</button>
                   </div>
                 ) : (
-                  <button type="button" onClick={() => setConfirmRemove(item.key)} className="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center gap-1.5 shrink-0 min-h-[40px] self-end sm:self-center">
+                  <button type="button" onClick={() => setConfirmRemove(item.key)} className="px-3.5 py-2 rounded-xl bg-white/80 hover:bg-white border border-indigo-300 text-indigo-950 text-xs font-bold flex items-center gap-1.5 shrink-0 min-h-[40px] self-end sm:self-center">
                     <Trash2 size={14} /><span>הסר שיוך</span>
                   </button>
                 )}
@@ -141,10 +141,10 @@ export const ClubGroupPairingCard: React.FC<ClubGroupPairingCardProps> = ({
             {selectableGroups.map((group) => (
               <button
                 key={group.key} type="button" disabled={busyKey !== null} onClick={() => handleLink(group.key)}
-                className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-200 bg-white hover:border-brand-600 hover:bg-brand-50/40 text-right flex items-center justify-between gap-3 min-h-[60px] transition-all"
+                className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-200 bg-white hover:border-indigo-400 hover:bg-indigo-50/70 text-right flex items-center justify-between gap-3 min-h-[60px] transition-all"
               >
                 <span className="text-lg sm:text-xl font-extrabold tracking-normal leading-snug text-slate-950 break-words">{group.name}</span>
-                <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-brand-700 text-xs font-bold flex items-center gap-1.5 shrink-0">
+                <span className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-800 text-xs font-bold flex items-center gap-1.5 shrink-0">
                   <Check size={14} /><span>{busyKey === group.key ? 'משייך...' : 'בחר קבוצה'}</span>
                 </span>
               </button>
