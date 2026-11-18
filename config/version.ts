@@ -1,6 +1,6 @@
-export const APP_VERSION = '6.3.31';
+export const APP_VERSION = '6.3.32';
 export const LAST_COMMIT_MESSAGE =
-  'fix(whatsapp): recover unresolved serverTimestamp/arrayUnion payloads, auto-select latest polls, and surface unmatched-group polls with 1-click linking';
+  'feat(whatsapp): add poll deletion with vote cleanup and dedicated club-to-WhatsApp group pairing page';
 
 
 

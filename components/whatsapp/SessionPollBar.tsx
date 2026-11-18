@@ -32,6 +32,7 @@ interface SessionPollBarProps {
   onConfirmCandidate: (c: MatchCandidate, role?: Role) => Promise<void>;
   onImportRoster: (entries: Array<{ mapping: WhatsAppMemberMapping; role: Role; isSkipper?: boolean }>) => Promise<number>;
   onUpdatePersonRole: (person: Person, role: Role, isSkipper?: boolean) => Promise<void>;
+  onDeletePoll?: (poll: PollEvent) => Promise<void>;
   onRetry: () => void;
 }
 
@@ -39,7 +40,7 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
   activeClub, polls, unmatchedPolls = [], activePoll, summary, people, presentIds, linkedGroups, availableGroups,
   mappings, syncCandidates, isLoading, error,
   onSelectPoll, onLinkGroup, onApplyAttendance, onLinkVoter, onAddGuest,
-  onConfirmCandidate, onImportRoster, onUpdatePersonRole, onRetry,
+  onConfirmCandidate, onImportRoster, onUpdatePersonRole, onDeletePoll, onRetry,
 }) => {
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showRosterModal, setShowRosterModal] = useState(false);
@@ -79,8 +80,8 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
               <MessageSquare size={16} className="text-amber-700 shrink-0" />
               <span>כדי להציג סקרים וחברים רק עבור חוג זה, יש לשייך קבוצת וואטסאפ לחוג:</span>
             </div>
-            <Link to="/app/whatsapp" className="text-brand-700 font-bold hover:underline flex items-center gap-1">
-              <Settings2 size={13} /> <span>הגדרות וואטסאפ</span>
+            <Link to="/app/whatsapp/pairing" className="text-brand-700 font-bold hover:underline flex items-center gap-1">
+              <Settings2 size={13} /> <span>דף שיוך קבוצה</span>
             </Link>
           </div>
           {availableGroups.length > 0 ? (
@@ -91,7 +92,7 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
             </p>
           )}
         </div>
-        {unmatchedPolls.length > 0 && <UnmatchedPollsNotice unmatchedPolls={unmatchedPolls} onLinkGroup={onLinkGroup} compact />}
+        {unmatchedPolls.length > 0 && <UnmatchedPollsNotice unmatchedPolls={unmatchedPolls} onLinkGroup={onLinkGroup} onDeletePoll={onDeletePoll} compact />}
       </div>
     );
   }
@@ -116,7 +117,7 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
             <WhatsAppRosterModal activeClub={activeClub} linkedGroups={linkedGroups} mappings={mappings} people={people} syncCandidates={syncCandidates} onConfirmCandidate={onConfirmCandidate} onImportEntries={onImportRoster} onUpdatePersonRole={onUpdatePersonRole} onClose={() => setShowRosterModal(false)} />
           )}
         </div>
-        {unmatchedPolls.length > 0 && <UnmatchedPollsNotice unmatchedPolls={unmatchedPolls} onLinkGroup={onLinkGroup} compact />}
+        {unmatchedPolls.length > 0 && <UnmatchedPollsNotice unmatchedPolls={unmatchedPolls} onLinkGroup={onLinkGroup} onDeletePoll={onDeletePoll} compact />}
       </div>
     );
   }
@@ -140,7 +141,7 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
               <RefreshCw size={12} /><span>רענן</span>
             </button>
           </div>
-          <PollSelectorDropdown polls={polls} activePoll={activePoll} onSelectPoll={onSelectPoll} />
+          <PollSelectorDropdown polls={polls} activePoll={activePoll} onSelectPoll={onSelectPoll} onDeletePoll={onDeletePoll} />
         </div>
 
         <div className="flex items-center gap-2 flex-wrap shrink-0">

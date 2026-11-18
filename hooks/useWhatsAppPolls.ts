@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '../store';
 import { Person, Role } from '../types';
-import { MatchCandidate, ResolvedVoter, WhatsAppMemberMapping } from '../types/whatsapp';
+import { MatchCandidate, PollEvent, ResolvedVoter, WhatsAppMemberMapping } from '../types/whatsapp';
 import { resolvePollSummary } from '../services/whatsapp/pollResolver';
 import { findAutoSyncCandidates, getMappingUidForClub, mappingBelongsToClub } from '../services/whatsapp/pollMatching';
 import { mergeClubRosterWithWhatsApp } from '../services/whatsapp/rosterMerge';
@@ -10,8 +10,9 @@ import { runClubDuplicateCleanup } from '../services/whatsapp/clubDedupSync';
 import { clearDeletedPollAttendance, reconcileInitialPollAttendance } from '../services/whatsapp/pollAttendanceSync';
 import {
   autoLinkPhoneMatches, createClubGuestFromVoter, importWhatsAppRosterToClub,
-  saveWhatsAppMemberMapping, unlinkWhatsAppMember, updateClubPersonRole,
+  saveClubWhatsAppConfig, saveWhatsAppMemberMapping, unlinkWhatsAppMember, updateClubPersonRole,
 } from '../services/whatsapp/whatsappMutations';
+import { deleteWhatsAppPoll } from '../services/whatsapp/pollDeleteService';
 import { useWhatsAppSubscriptions } from './useWhatsAppSubscriptions';
 import { useWhatsAppGroupConfigActions } from './useWhatsAppGroupConfigActions';
 
@@ -166,6 +167,21 @@ export const useWhatsAppPolls = () => {
     return guest;
   }, [activeClub, user, people, sessions, setPeople, setBulkAttendance, addNotification]);
 
+  const deletePoll = useCallback(async (poll: PollEvent) => {
+    await deleteWhatsAppPoll(poll);
+    if (activeClub && (clubConfig.activePollId === poll.pollId || clubConfig.pollColors?.[poll.pollId])) {
+      const nextColors = { ...(clubConfig.pollColors || {}) };
+      delete nextColors[poll.pollId];
+      await saveClubWhatsAppConfig({
+        ...clubConfig,
+        clubId: activeClub,
+        activePollId: clubConfig.activePollId === poll.pollId ? undefined : clubConfig.activePollId,
+        pollColors: nextColors,
+      }).catch(() => {});
+    }
+    addNotification(`הסקר "${poll.question}" נמחק`, 'INFO');
+  }, [activeClub, clubConfig, addNotification]);
+
   return {
     polls: relevantPolls, unmatchedPolls, allPollsCount: polls.length, activePoll, selectedPollId, setSelectedPollId, summary,
     clubConfig, clubPeople, effectiveClubPeople, mappings: clubMappings, syncCandidates,
@@ -173,6 +189,7 @@ export const useWhatsAppPolls = () => {
     dismissAlert: useCallback((id: string) => setVoteAlerts((p) => p.filter((a) => a.id !== id)), [setVoteAlerts]),
     clearAlerts: useCallback(() => setVoteAlerts([]), [setVoteAlerts]),
     isLoading, error, retry, applyPollAttendance, linkVoterToPerson, confirmSyncCandidate,
-    importRosterMembers, unlinkVoter, addGuestFromVoter, saveConfig, setPollColor, linkClubGroup, unlinkClubGroup, updateMemberRole,
+    importRosterMembers, unlinkVoter, addGuestFromVoter, saveConfig, setPollColor, linkClubGroup, unlinkClubGroup,
+    updateMemberRole, deletePoll,
   };
 };

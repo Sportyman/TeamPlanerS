@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '../../store';
 import { usePermissions } from '../../hooks/usePermissions';
-import { LogOut, Menu, X, LayoutGrid, Calendar, Shield, Sparkles, Home, ChevronLeft, Cloud, RefreshCw, Bell, User, Clock, MessageSquare } from 'lucide-react';
+import { LogOut, Menu, X, LayoutGrid, Calendar, Shield, Sparkles, Home, ChevronLeft, Cloud, RefreshCw, Bell, User, Clock, MessageSquare, Link2 } from 'lucide-react';
 import { db } from '../../firebase';
 import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { ensureAdminMembership, forceFullSync } from '../../services/syncService';
@@ -83,6 +83,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           <NavLink to="/app" icon={<Calendar size={20} />} text="ניהול אימון" className="p-4" />
           <NavLink to="/app/whatsapp" icon={<MessageSquare size={20} />} text="ניהול וואטסאפ" className="p-4" />
+          <NavLink to="/app/whatsapp/pairing" icon={<Link2 size={20} />} text="שיוך קבוצת וואטסאפ" className="p-4" />
           {isClubAdmin && <><NavLink to="/app/manage" icon={<LayoutGrid size={20} />} text="ניהול חוג" className="p-4" /><NavLink to="/app/manage?view=INVITES" icon={<Sparkles size={20} />} text="לינקים וצירוף" className="p-4" /></>}
           {isSuperAdmin && <><div className="h-px bg-slate-100 my-4" /><NavLink to="/super-admin" icon={<Shield size={20} />} text="ניהול מערכת" className="p-4" /></>}
         </div>

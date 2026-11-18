@@ -36,7 +36,7 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
     polls, unmatchedPolls, activePoll, setSelectedPollId, summary, clubConfig, availableGroups, effectiveClubPeople,
     mappings, syncCandidates, voteAlerts, dismissAlert, clearAlerts, isLoading: isPollLoading, error: pollError,
     retry: retryPolls, applyPollAttendance, linkVoterToPerson, addGuestFromVoter, linkClubGroup,
-    confirmSyncCandidate, importRosterMembers, updateMemberRole,
+    confirmSyncCandidate, importRosterMembers, updateMemberRole, deletePoll,
   } = whatsappState;
 
   const displayPeople = useMemo(
@@ -99,7 +99,7 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
         mappings={mappings} syncCandidates={syncCandidates} isLoading={isPollLoading} error={pollError}
         onSelectPoll={setSelectedPollId} onLinkGroup={linkClubGroup} onApplyAttendance={applyPollAttendance}
         onLinkVoter={linkVoterToPerson} onAddGuest={addGuestFromVoter} onConfirmCandidate={confirmSyncCandidate}
-        onImportRoster={importRosterMembers} onUpdatePersonRole={updateMemberRole} onRetry={retryPolls}
+        onImportRoster={importRosterMembers} onUpdatePersonRole={updateMemberRole} onDeletePoll={deletePoll} onRetry={retryPolls}
       />
 
       <div className="flex flex-col gap-4">

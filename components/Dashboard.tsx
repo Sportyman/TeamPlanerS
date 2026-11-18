@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { Role, Person, AccessLevel } from '../types';
-import { Trash2, UserPlus, Ship, Users, Calendar, CalendarClock, Clock, Sparkles, ArrowRight, MessageSquare, Waves } from 'lucide-react';
+import { Trash2, UserPlus, Ship, Users, Calendar, CalendarClock, Clock, Sparkles, ArrowRight, MessageSquare, Waves, Link2 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { InviteManager } from './invites/InviteManager';
 import { PeopleManagementView } from './dashboard/PeopleManagementView';
@@ -130,6 +130,7 @@ export const Dashboard: React.FC = () => {
                   </button>
                 );
               })()}
+              <button onClick={() => navigate('/app/whatsapp/pairing')} className="col-span-1 md:col-span-2 bg-white p-6 rounded-3xl border flex items-center justify-center gap-4 shadow-sm hover:shadow-lg transition-all"><Link2 size={28} className="text-brand-600"/><div className="text-right"><h3 className="font-bold text-slate-900">שיוך חוג לקבוצת וואטסאפ</h3><p className="text-xs text-slate-500">דף ייעודי לחיבור וניתוק קבוצת הוואטסאפ של החוג</p></div></button>
               <button onClick={() => navigate('/app/manage?view=WHATSAPP')} className="col-span-1 md:col-span-2 bg-white p-6 rounded-3xl border flex items-center justify-center gap-4 shadow-sm hover:shadow-lg transition-all"><MessageSquare size={28} className="text-emerald-600"/><div className="text-right"><h3 className="font-bold text-slate-900">ניהול וואטסאפ ומיפוי</h3><p className="text-xs text-slate-500">סיכום הצבעות, שיוך תמונות פרופיל והגדרות קבוצה</p></div></button>
           </div>
       </div>

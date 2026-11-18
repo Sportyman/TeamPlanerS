@@ -6,16 +6,17 @@ interface ClubGroupPairingCardProps {
   clubName: string;
   linkedItems: LinkedGroupDisplayItem[];
   groupCatalog: WhatsAppGroupEntry[];
+  alwaysOpen?: boolean;
   onLinkGroup: (groupKeyOrName: string) => Promise<void>;
   onUnlinkGroup: (groupKeyOrName: string) => Promise<void>;
   onRefresh: () => void;
 }
 
 export const ClubGroupPairingCard: React.FC<ClubGroupPairingCardProps> = ({
-  clubName, linkedItems, groupCatalog, onLinkGroup, onUnlinkGroup, onRefresh,
+  clubName, linkedItems, groupCatalog, alwaysOpen = false, onLinkGroup, onUnlinkGroup, onRefresh,
 }) => {
   const isUnlinked = linkedItems.length === 0;
-  const [isExpanded, setIsExpanded] = useState(isUnlinked);
+  const [isExpanded, setIsExpanded] = useState(alwaysOpen || isUnlinked);
   const [search, setSearch] = useState('');
   const [manualName, setManualName] = useState('');
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -32,7 +33,7 @@ export const ClubGroupPairingCard: React.FC<ClubGroupPairingCardProps> = ({
     return q ? cleanCandidates.filter((g) => g.name.toLowerCase().includes(q)) : cleanCandidates;
   }, [cleanCandidates, search]);
 
-  const showOpen = isUnlinked || isExpanded;
+  const showOpen = alwaysOpen || isUnlinked || isExpanded;
 
   const handleLink = async (keyOrName: string) => {
     const trimmed = keyOrName.trim();
@@ -82,7 +83,7 @@ export const ClubGroupPairingCard: React.FC<ClubGroupPairingCardProps> = ({
           )}
         </div>
 
-        {!isUnlinked && (
+        {!isUnlinked && !alwaysOpen && (
           <button
             type="button" onClick={() => setIsExpanded((v) => !v)}
             className="w-full sm:w-auto px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-800 flex items-center justify-center gap-1.5 min-h-[44px] shrink-0"
