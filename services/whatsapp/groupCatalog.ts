@@ -1,5 +1,6 @@
 import { ClubWhatsAppConfig, PollEvent, WhatsAppMemberMapping } from '../../types/whatsapp';
 import { isRawWhatsAppJid } from './clubDedupSync';
+import { cleanUnicodeBidi, normalizeGroupKey } from './firestorePayloadHelpers';
 
 export interface WhatsAppGroupEntry {
   key: string;
@@ -9,7 +10,7 @@ export interface WhatsAppGroupEntry {
 }
 
 export const isGroupJid = (value?: string): boolean => Boolean(value && /@g\.us$/i.test(value.trim()));
-const norm = (value: string): string => value.trim().toLowerCase();
+const norm = (value: string): string => normalizeGroupKey(value);
 
 export const buildWhatsAppGroupCatalog = (
   polls: PollEvent[],
@@ -31,7 +32,7 @@ export const buildWhatsAppGroupCatalog = (
   };
 
   polls.forEach((p) => {
-    const cleanName = p.group && !isRawWhatsAppJid(p.group) ? p.group.trim() : '';
+    const cleanName = p.group && !isRawWhatsAppJid(p.group) ? cleanUnicodeBidi(p.group) : '';
     const ts = p.createdAtMs || 0;
     if (cleanName) {
       const prev = latestPollByName.get(norm(cleanName));
@@ -54,7 +55,7 @@ export const buildWhatsAppGroupCatalog = (
   });
 
   mappings.forEach((m) => {
-    const rawGroups = (m.groups || []).map((g) => g.trim()).filter(Boolean);
+    const rawGroups = (m.groups || []).map((g) => cleanUnicodeBidi(g)).filter(Boolean);
     const jids = rawGroups.filter(isGroupJid);
     const names = rawGroups.filter((g) => !isRawWhatsAppJid(g));
     const updatedMs = m.updatedAt ? Date.parse(m.updatedAt) || 0 : 0;

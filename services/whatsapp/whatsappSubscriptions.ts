@@ -1,60 +1,14 @@
 import { db } from '../../firebase';
 import { collection, doc, getDocs, onSnapshot, query, Unsubscribe, where } from 'firebase/firestore';
 import { ClubID } from '../../types';
-import { ClubWhatsAppConfig, PollEvent, PollVote, WhatsAppMemberMapping } from '../../types/whatsapp';
+import { ClubWhatsAppConfig, PollVote, WhatsAppMemberMapping } from '../../types/whatsapp';
 import { DEFAULT_KEYWORD_RULES } from '../../config/whatsappDefaults';
-import { extractOptionLabels, formatHebrewPollDate, getPollColorToken, toTimestampMs } from './pollFormatting';
+import { extractOptionLabels, toTimestampMs } from './pollFormatting';
 import { handleFirestoreError, OperationType } from './firestoreError';
 import { addLog } from '../syncService';
+import { extractGroupTags } from './firestorePayloadHelpers';
 
-export const subscribeToPollsEvents = (
-  pollColors: Record<string, string> | undefined,
-  onData: (polls: PollEvent[]) => void,
-  onError: (err: Error) => void
-): Unsubscribe => {
-  const path = 'polls_events';
-  return onSnapshot(
-    collection(db, path),
-    (snap) => {
-      const parsed: PollEvent[] = snap.docs
-        .map((d) => {
-          const data = d.data();
-          const pollId = String(data.pollId || d.id);
-          const createdAtMs =
-            toTimestampMs(data.createdAt) ||
-            toTimestampMs(data.timestamp) ||
-            toTimestampMs(data.created_at) ||
-            toTimestampMs(data.updatedAt);
-          const { displayDate, displayTime } = formatHebrewPollDate(createdAtMs);
-          const rawGroup = typeof data.group === 'string' ? data.group.trim() : '';
-          const rawGroupId = typeof data.groupId === 'string' ? data.groupId.trim() : '';
-          const groupId = rawGroupId || (/@g\.us$/i.test(rawGroup) ? rawGroup : undefined);
-          const group = String(data.groupName || (!/@g\.us$/i.test(rawGroup) ? rawGroup : '') || 'קבוצה כללית').trim();
-          return {
-            id: d.id,
-            pollId,
-            group,
-            groupId,
-            question: String(data.question || 'סקר ללא כותרת'),
-            options: extractOptionLabels(data.options),
-            createdAtMs,
-            displayDate,
-            displayTime,
-            colorToken: getPollColorToken(pollId, pollColors?.[pollId]),
-          };
-        })
-        .sort((a, b) => b.createdAtMs - a.createdAtMs);
-      onData(parsed);
-    },
-    (error) => {
-      try {
-        handleFirestoreError(error, OperationType.LIST, path);
-      } catch (wrapped) {
-        onError(wrapped as Error);
-      }
-    }
-  );
-};
+export { subscribeToPollsEvents } from './pollEventsSubscription';
 
 export const subscribeToPollVotes = (
   pollId: string,
@@ -108,7 +62,7 @@ export const subscribeToWhatsAppMembers = (
           pushName: data.pushName || data.displayName || undefined,
           profilePicUrl: data.profilePicUrl || undefined,
           phone: data.phone || undefined,
-          groups: Array.isArray(data.groups) ? data.groups.map(String) : undefined,
+          groups: extractGroupTags(data.groups),
           uid: data.uid || undefined,
           clubId: data.clubId || undefined,
           clubLinks: data.clubLinks && typeof data.clubLinks === 'object' ? data.clubLinks : undefined,

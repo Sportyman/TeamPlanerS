@@ -6,12 +6,14 @@ import { PollSelectorDropdown } from './PollSelectorDropdown';
 import { VoterLinkModal } from './VoterLinkModal';
 import { WhatsAppRosterModal } from './WhatsAppRosterModal';
 import { GroupLinkSelect } from './GroupLinkSelect';
+import { UnmatchedPollsNotice } from './UnmatchedPollsNotice';
 import { formatFirestoreErrorMessage } from '../../services/whatsapp/pollFormatting';
 import { AlertCircle, Download, MessageSquare, RefreshCw, Settings2, UserCheck, Users } from 'lucide-react';
 
 interface SessionPollBarProps {
   activeClub: ClubID;
   polls: PollEvent[];
+  unmatchedPolls?: PollEvent[];
   activePoll: PollEvent | null;
   summary: ResolvedPollSummary | null;
   people: Person[];
@@ -34,7 +36,7 @@ interface SessionPollBarProps {
 }
 
 export const SessionPollBar: React.FC<SessionPollBarProps> = ({
-  activeClub, polls, activePoll, summary, people, presentIds, linkedGroups, availableGroups,
+  activeClub, polls, unmatchedPolls = [], activePoll, summary, people, presentIds, linkedGroups, availableGroups,
   mappings, syncCandidates, isLoading, error,
   onSelectPoll, onLinkGroup, onApplyAttendance, onLinkVoter, onAddGuest,
   onConfirmCandidate, onImportRoster, onUpdatePersonRole, onRetry,
@@ -70,45 +72,51 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
 
   if (linkedGroups.length === 0) {
     return (
-      <div className="border border-amber-200 rounded-2xl p-4 bg-amber-50/60 space-y-2.5">
-        <div className="flex items-center justify-between gap-3 flex-wrap text-xs">
-          <div className="flex items-center gap-2 font-bold text-amber-900">
-            <MessageSquare size={16} className="text-amber-700 shrink-0" />
-            <span>כדי להציג סקרים וחברים רק עבור חוג זה, יש לשייך קבוצת וואטסאפ לחוג:</span>
+      <div className="space-y-3">
+        <div className="border border-amber-200 rounded-2xl p-4 bg-amber-50/60 space-y-2.5">
+          <div className="flex items-center justify-between gap-3 flex-wrap text-xs">
+            <div className="flex items-center gap-2 font-bold text-amber-900">
+              <MessageSquare size={16} className="text-amber-700 shrink-0" />
+              <span>כדי להציג סקרים וחברים רק עבור חוג זה, יש לשייך קבוצת וואטסאפ לחוג:</span>
+            </div>
+            <Link to="/app/whatsapp" className="text-brand-700 font-bold hover:underline flex items-center gap-1">
+              <Settings2 size={13} /> <span>הגדרות וואטסאפ</span>
+            </Link>
           </div>
-          <Link to="/app/whatsapp" className="text-brand-700 font-bold hover:underline flex items-center gap-1">
-            <Settings2 size={13} /> <span>הגדרות וואטסאפ</span>
-          </Link>
+          {availableGroups.length > 0 ? (
+            <GroupLinkSelect groups={availableGroups} onLink={onLinkGroup} />
+          ) : (
+            <p className="text-xs text-amber-800">
+              לא נמצאו עדיין קבוצות זמינות מהבוט. הפעל את הבוט ולחץ על ״סנכרן נתונים״ למעלה.
+            </p>
+          )}
         </div>
-        {availableGroups.length > 0 ? (
-          <GroupLinkSelect groups={availableGroups} onLink={onLinkGroup} />
-        ) : (
-          <p className="text-xs text-amber-800">
-            לא נמצאו עדיין קבוצות זמינות מהבוט. הפעל את הבוט ולחץ על ״סנכרן נתונים״ למעלה.
-          </p>
-        )}
+        {unmatchedPolls.length > 0 && <UnmatchedPollsNotice unmatchedPolls={unmatchedPolls} onLinkGroup={onLinkGroup} compact />}
       </div>
     );
   }
 
   if (polls.length === 0 || !activePoll || !summary) {
     return (
-      <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/70 flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2.5 text-sm text-slate-600">
-          <MessageSquare size={18} className="text-slate-400 shrink-0" />
-          <span>עדיין לא התקבלו סקרים מהקבוצות המקושרות ({linkedGroups.join(', ')}).</span>
+      <div className="space-y-3">
+        <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/70 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2.5 text-sm text-slate-600">
+            <MessageSquare size={18} className="text-slate-400 shrink-0" />
+            <span>עדיין לא התקבלו סקרים מהקבוצות המקושרות ({linkedGroups.join(', ')}).</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setShowRosterModal(true)} className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-100 flex items-center gap-1.5">
+              <Users size={13} /> <span>חברי הקבוצה ({mappings.length})</span>
+            </button>
+            <Link to="/app/whatsapp" className="text-xs font-bold text-brand-700 hover:text-brand-800 flex items-center gap-1.5 whitespace-nowrap">
+              <Settings2 size={14} /> <span>ניהול וואטסאפ</span>
+            </Link>
+          </div>
+          {showRosterModal && (
+            <WhatsAppRosterModal activeClub={activeClub} linkedGroups={linkedGroups} mappings={mappings} people={people} syncCandidates={syncCandidates} onConfirmCandidate={onConfirmCandidate} onImportEntries={onImportRoster} onUpdatePersonRole={onUpdatePersonRole} onClose={() => setShowRosterModal(false)} />
+          )}
         </div>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => setShowRosterModal(true)} className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-100 flex items-center gap-1.5">
-            <Users size={13} /> <span>חברי הקבוצה ({mappings.length})</span>
-          </button>
-          <Link to="/app/whatsapp" className="text-xs font-bold text-brand-700 hover:text-brand-800 flex items-center gap-1.5 whitespace-nowrap">
-            <Settings2 size={14} /> <span>ניהול וואטסאפ</span>
-          </Link>
-        </div>
-        {showRosterModal && (
-          <WhatsAppRosterModal activeClub={activeClub} linkedGroups={linkedGroups} mappings={mappings} people={people} syncCandidates={syncCandidates} onConfirmCandidate={onConfirmCandidate} onImportEntries={onImportRoster} onUpdatePersonRole={onUpdatePersonRole} onClose={() => setShowRosterModal(false)} />
-        )}
+        {unmatchedPolls.length > 0 && <UnmatchedPollsNotice unmatchedPolls={unmatchedPolls} onLinkGroup={onLinkGroup} compact />}
       </div>
     );
   }

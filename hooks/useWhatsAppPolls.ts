@@ -21,7 +21,7 @@ export const useWhatsAppPolls = () => {
   const { user, activeClub, people, sessions, setBulkAttendance, setPeople, addNotification } = useAppStore();
   const clubPeople = useMemo(() => people.filter((p) => p.clubId === activeClub), [people, activeClub]);
   const {
-    polls, relevantPolls, votes, votesLoadedPollId, historicalVotes, mappings, clubConfig, selectedPollId,
+    polls, relevantPolls, unmatchedPolls, votes, votesLoadedPollId, historicalVotes, mappings, clubConfig, selectedPollId,
     setSelectedPollId, voteAlerts: rawVoteAlerts, setVoteAlerts, recentChangedVoters, isLoading, error,
     groupCatalog, effectiveLinkedGroupIds, linkedGroupItems, retry, setResolvedVotersRef,
   } = useWhatsAppSubscriptions({ userId: user?.uid, activeClub, people: clubPeople, onNotify: addNotification });
@@ -167,7 +167,7 @@ export const useWhatsAppPolls = () => {
   }, [activeClub, user, people, sessions, setPeople, setBulkAttendance, addNotification]);
 
   return {
-    polls: relevantPolls, allPollsCount: polls.length, activePoll, selectedPollId, setSelectedPollId, summary,
+    polls: relevantPolls, unmatchedPolls, allPollsCount: polls.length, activePoll, selectedPollId, setSelectedPollId, summary,
     clubConfig, clubPeople, effectiveClubPeople, mappings: clubMappings, syncCandidates,
     availableGroups, groupCatalog, linkedGroupItems, voteAlerts,
     dismissAlert: useCallback((id: string) => setVoteAlerts((p) => p.filter((a) => a.id !== id)), [setVoteAlerts]),

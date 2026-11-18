@@ -1,5 +1,6 @@
 import { ClubWhatsAppConfig, PollEvent } from '../../types/whatsapp';
 import { getEffectiveLinkedIds, isGroupJid, WhatsAppGroupEntry } from './groupCatalog';
+import { normalizeGroupKey } from './firestorePayloadHelpers';
 
 export interface LinkedGroupDisplayItem {
   key: string;
@@ -8,7 +9,7 @@ export interface LinkedGroupDisplayItem {
   knownAliases: string[];
 }
 
-const norm = (value: string): string => value.trim().toLowerCase();
+const norm = (value: string): string => normalizeGroupKey(value);
 
 export const resolveLinkedGroupItems = (
   config: ClubWhatsAppConfig,
@@ -57,7 +58,10 @@ export const doesPollMatchConfig = (
     if (matchedEntry) return true;
   }
   if (!config.linkedGroups.length) return false;
-  return config.linkedGroups.some((g) => poll.group.toLowerCase().includes(norm(g)));
+  return config.linkedGroups.some((g) => {
+    const gNorm = norm(g);
+    return Boolean(gNorm) && (pollNameNorm.includes(gNorm) || gNorm.includes(pollNameNorm));
+  });
 };
 
 export const buildLinkGroupConfigPatch = (

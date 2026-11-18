@@ -28,6 +28,7 @@ export interface PollEvent {
   createdAtMs: number;
   displayDate: string;
   displayTime: string;
+  hasPendingTimestamp?: boolean;
   colorToken: PollColorToken;
 }
 

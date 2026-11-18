@@ -12,6 +12,7 @@ import { WhatsAppSettingsTab } from './WhatsAppSettingsTab';
 import { formatFirestoreErrorMessage } from '../../services/whatsapp/pollFormatting';
 import { extractPollTargetDate } from '../../services/weather/weatherDefaults';
 import { SeaForecastBanner } from '../weather/SeaForecastBanner';
+import { UnmatchedPollsNotice } from './UnmatchedPollsNotice';
 import { ArrowRight, Calendar, Download, RefreshCw } from 'lucide-react';
 import { forceFullSync } from '../../services/syncService';
 
@@ -24,7 +25,7 @@ export const WhatsAppDashboardView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('SUMMARY');
 
   const {
-    polls, activePoll, setSelectedPollId, summary, clubConfig, clubPeople, mappings, syncCandidates,
+    polls, unmatchedPolls, activePoll, setSelectedPollId, summary, clubConfig, clubPeople, mappings, syncCandidates,
     availableGroups, groupCatalog, linkedGroupItems, voteAlerts, dismissAlert, clearAlerts, isLoading, error, retry,
     applyPollAttendance, linkVoterToPerson, confirmSyncCandidate, importRosterMembers,
     unlinkVoter, addGuestFromVoter, saveConfig, setPollColor, linkClubGroup, unlinkClubGroup, updateMemberRole,
@@ -159,10 +160,13 @@ export const WhatsAppDashboardView: React.FC = () => {
             <PollSummaryTab summary={summary} people={clubPeople} voteAlerts={voteAlerts} onLinkVoter={linkVoterToPerson} onAddGuest={addGuestFromVoter} onUpdatePersonRole={updateMemberRole} />
           )}
           {activeTab === 'SUMMARY' && !summary && (
-            <div className="border border-slate-200 rounded-2xl bg-white p-6 sm:p-8 text-center text-sm text-slate-500">
-              {linkedGroupItems.length === 0
-                ? 'לאחר ציוות קבוצת הוואטסאפ של החוג למעלה, הסקרים האחרונים יופיעו כאן אוטומטית.'
-                : 'עדיין לא נקלטו סקרים מקבוצת הוואטסאפ של חוג זה.'}
+            <div className="space-y-3">
+              <div className="border border-slate-200 rounded-2xl bg-white p-6 sm:p-8 text-center text-sm text-slate-500">
+                {linkedGroupItems.length === 0
+                  ? 'לאחר ציוות קבוצת הוואטסאפ של החוג למעלה, הסקרים האחרונים יופיעו כאן אוטומטית.'
+                  : 'עדיין לא נקלטו סקרים מקבוצת הוואטסאפ של חוג זה.'}
+              </div>
+              <UnmatchedPollsNotice unmatchedPolls={unmatchedPolls} onLinkGroup={linkClubGroup} />
             </div>
           )}
           {activeTab === 'MAPPING' && activeClub && (

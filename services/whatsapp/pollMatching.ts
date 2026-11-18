@@ -16,6 +16,7 @@ import {
   normalizePhone,
 } from './pollFormatting';
 import { deduplicateLatestVotes } from './pollResolver';
+import { normalizeGroupKey } from './firestorePayloadHelpers';
 
 export const getMappingUidForClub = (m: WhatsAppMemberMapping, clubId?: ClubID): string | undefined => {
   if (clubId && m.clubLinks?.[clubId]) return m.clubLinks[clubId];
@@ -35,9 +36,9 @@ export const mappingBelongsToClub = (
     const groups = (m.groups || []).map((g) => g.trim());
     const inLinkedById = linkedGroupIds.length > 0 && groups.some((g) => linkedGroupIds.includes(g));
     const inLinkedByName = groups.some((g) => {
-      const gNorm = g.toLowerCase();
+      const gNorm = normalizeGroupKey(g);
       return linkedGroups.some((lg) => {
-        const lgNorm = lg.trim().toLowerCase();
+        const lgNorm = normalizeGroupKey(lg);
         return Boolean(lgNorm) && (gNorm === lgNorm || gNorm.includes(lgNorm) || lgNorm.includes(gNorm));
       });
     });

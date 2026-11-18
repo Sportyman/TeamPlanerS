@@ -44,6 +44,9 @@ export const PollSelectorDropdown: React.FC<PollSelectorDropdownProps> = ({
               )}
               <span aria-hidden="true" className="shrink-0">·</span>
               <span className="truncate">{activePoll.group}</span>
+              {polls.length > 1 && (
+                <span className="shrink-0 text-[11px] font-semibold text-slate-500">({polls.length} סקרים)</span>
+              )}
             </div>
           </div>
           <ChevronDown size={16} className="text-slate-500 shrink-0" />

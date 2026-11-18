@@ -33,7 +33,7 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
   const [isAddingQuickly, setIsAddingQuickly] = useState(false);
 
   const {
-    polls, activePoll, setSelectedPollId, summary, clubConfig, availableGroups, effectiveClubPeople,
+    polls, unmatchedPolls, activePoll, setSelectedPollId, summary, clubConfig, availableGroups, effectiveClubPeople,
     mappings, syncCandidates, voteAlerts, dismissAlert, clearAlerts, isLoading: isPollLoading, error: pollError,
     retry: retryPolls, applyPollAttendance, linkVoterToPerson, addGuestFromVoter, linkClubGroup,
     confirmSyncCandidate, importRosterMembers, updateMemberRole,
@@ -94,7 +94,7 @@ export const AttendanceList: React.FC<AttendanceListProps> = ({
   return (
     <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-5">
       <SessionPollBar
-        activeClub={activeClub || ''} polls={polls} activePoll={activePoll} summary={summary} people={displayPeople}
+        activeClub={activeClub || ''} polls={polls} unmatchedPolls={unmatchedPolls} activePoll={activePoll} summary={summary} people={displayPeople}
         presentIds={presentIds} linkedGroups={clubConfig.linkedGroups} availableGroups={availableGroups}
         mappings={mappings} syncCandidates={syncCandidates} isLoading={isPollLoading} error={pollError}
         onSelectPoll={setSelectedPollId} onLinkGroup={linkClubGroup} onApplyAttendance={applyPollAttendance}
