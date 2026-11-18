@@ -6,7 +6,7 @@ import { DEFAULT_KEYWORD_RULES } from '../../config/whatsappDefaults';
 import { extractOptionLabels, toTimestampMs } from './pollFormatting';
 import { handleFirestoreError, OperationType } from './firestoreError';
 import { addLog } from '../syncService';
-import { extractGroupTags } from './firestorePayloadHelpers';
+import { extractGroupTags, extractWhatsAppContactFields } from './firestorePayloadHelpers';
 
 export { subscribeToPollsEvents } from './pollEventsSubscription';
 
@@ -22,13 +22,14 @@ export const subscribeToPollVotes = (
     (snap) => {
       const parsed: PollVote[] = snap.docs.map((d) => {
         const data = d.data();
+        const contact = extractWhatsAppContactFields(data);
         return {
           id: d.id,
           pollId: String(data.pollId || pollId),
-          voter: String(data.voter || ''),
-          pushName: data.pushName || data.voterName || undefined,
-          profilePicUrl: data.profilePicUrl || undefined,
-          phone: data.phone || undefined,
+          voter: String(data.voter || data.voterId || ''),
+          pushName: contact.pushName,
+          profilePicUrl: contact.profilePicUrl,
+          phone: contact.phone,
           selectedOptions: extractOptionLabels(data.selectedOptions),
           timestampMs: toTimestampMs(data.interractedAt) || toTimestampMs(data.timestamp),
           interractedAtMs: toTimestampMs(data.interractedAt) || undefined,
@@ -56,12 +57,14 @@ export const subscribeToWhatsAppMembers = (
     (snap) => {
       const parsed: WhatsAppMemberMapping[] = snap.docs.map((d) => {
         const data = d.data();
+        const contact = extractWhatsAppContactFields(data);
         return {
           id: d.id,
           voterId: String(data.voterId || d.id),
-          pushName: data.pushName || data.displayName || undefined,
-          profilePicUrl: data.profilePicUrl || undefined,
-          phone: data.phone || undefined,
+          aliasVoterIds: contact.aliasVoterIds,
+          pushName: contact.pushName,
+          profilePicUrl: contact.profilePicUrl,
+          phone: contact.phone,
           groups: extractGroupTags(data.groups),
           uid: data.uid || undefined,
           clubId: data.clubId || undefined,
@@ -138,13 +141,14 @@ export const fetchRecentPollVotesForClub = async (pollIds: string[]): Promise<Po
     const snap = await getDocs(query(collection(db, 'poll_votes'), where('pollId', 'in', uniqueIds)));
     return snap.docs.map((d) => {
       const data = d.data();
+      const contact = extractWhatsAppContactFields(data);
       return {
         id: d.id,
         pollId: String(data.pollId || ''),
-        voter: String(data.voter || ''),
-        pushName: data.pushName || data.voterName || undefined,
-        profilePicUrl: data.profilePicUrl || undefined,
-        phone: data.phone || undefined,
+        voter: String(data.voter || data.voterId || ''),
+        pushName: contact.pushName,
+        profilePicUrl: contact.profilePicUrl,
+        phone: contact.phone,
         selectedOptions: extractOptionLabels(data.selectedOptions),
         timestampMs: toTimestampMs(data.interractedAt) || toTimestampMs(data.timestamp),
         interractedAtMs: toTimestampMs(data.interractedAt) || undefined,

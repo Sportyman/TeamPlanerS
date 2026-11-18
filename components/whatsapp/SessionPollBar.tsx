@@ -50,9 +50,7 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
 
   if (isLoading) {
     return (
-      <div className="border border-slate-200 rounded-2xl p-4 bg-white animate-pulse space-y-3">
-        <div className="h-5 w-56 bg-slate-100 rounded" /><div className="h-4 w-80 bg-slate-100 rounded" />
-      </div>
+      <div className="border border-slate-200 rounded-2xl p-4 bg-white animate-pulse space-y-3"><div className="h-5 w-56 bg-slate-100 rounded" /><div className="h-4 w-80 bg-slate-100 rounded" /></div>
     );
   }
 
@@ -133,7 +131,13 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
   }
 
   const { counts } = summary;
+  const presentSet = new Set(presentIds);
+  const toAddCount = summary.attendingPersonIds.filter((id) => !presentSet.has(id)).length;
+  const declinedStillPresent = Object.entries(summary.personStatusMap).filter(([id, st]) => st.intent === 'DECLINING' && presentSet.has(id)).length;
+  const pendingSyncCount = toAddCount + declinedStillPresent;
+  const hasPendingSync = pendingSyncCount > 0;
   const handleLoadClick = () => {
+    if (!hasPendingSync) return;
     if (presentIds.length > 0) setShowModeChoice((v) => !v);
     else onApplyAttendance('REPLACE');
   };
@@ -163,8 +167,8 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
               <UserCheck size={15} /> <span>זהה לא משויכים ({counts.unmappedAttending})</span>
             </button>
           )}
-          <button type="button" disabled={summary.attendingPersonIds.length === 0} onClick={handleLoadClick} className="px-4 py-2.5 rounded-xl bg-emerald-600 disabled:opacity-40 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-2 transition-colors min-h-[44px] whitespace-nowrap">
-            <Download size={16} /> <span>טען הגעה מהסקר ({summary.attendingPersonIds.length})</span>
+          <button type="button" disabled={!hasPendingSync} onClick={handleLoadClick} title={hasPendingSync ? 'טען שינויי נוכחות מהסקר' : 'הנוכחות כבר מסונכרנת עם הסקר'} className={hasPendingSync ? 'px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-2 transition-colors min-h-[44px] whitespace-nowrap' : 'px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-400 text-sm font-bold flex items-center gap-2 min-h-[44px] whitespace-nowrap cursor-default opacity-75'}>
+            <Download size={16} /> <span>{hasPendingSync ? `טען הגעה מהסקר (${pendingSyncCount})` : 'טען הגעה מהסקר'}</span>
           </button>
         </div>
       </div>

@@ -19,6 +19,8 @@ import { MainLayout } from './components/layout/MainLayout';
 import { LoadingScreen } from './components/layout/LoadingScreen';
 import { AccessLevel } from './types';
 import { fetchGlobalConfig, addLog, subscribeToClubData } from './services/syncService';
+import { installGlobalErrorListeners } from './services/logging/systemLogger';
+import { APP_VERSION } from './config/version';
 import { subscribeToClubBoatDefinitions } from './services/clubEquipmentService';
 import { auth } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -58,12 +60,16 @@ const App: React.FC = () => {
     if (initializedRef.current) return;
     initializedRef.current = true;
 
+    installGlobalErrorListeners();
     fetchGlobalConfig();
-    addLog("System starting v6.0.0 (Reactive)", 'INFO');
-    
+    addLog(`System starting v${APP_VERSION} (Reactive)`, 'INFO', { route: window.location.hash || '#/' });
+    const onHashChange = () => addLog(`Route -> ${window.location.hash || '#/'}`, 'NAV');
+    window.addEventListener('hashchange', onHashChange);
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
             if (!firebaseUser.emailVerified || !firebaseUser.email) {
+              addLog('Unverified auth session rejected', 'WARN');
               await signOut(auth).catch(() => {});
               useAppStore.setState({
                 user: null,
@@ -90,24 +96,19 @@ const App: React.FC = () => {
                 user: { uid: firebaseUser.uid, email, isAdmin: isSuperAdmin, photoURL: firebaseUser.photoURL || undefined },
                 isLoadingResources: true
             });
+            addLog(`Auth signed in (${firebaseUser.email})`, 'INFO', { isSuperAdmin });
             await loadUserResources(firebaseUser.uid);
         } else {
+            addLog('Auth state signed out', 'INFO');
             useAppStore.setState({
-              user: null,
-              userProfile: null,
-              memberships: [],
-              people: [],
-              invites: [],
-              superAdmins: [],
-              protectedAdmins: [],
-              permissions: [],
-              isLoadingResources: false,
+              user: null, userProfile: null, memberships: [], people: [], invites: [],
+              superAdmins: [], protectedAdmins: [], permissions: [], isLoadingResources: false,
             });
         }
         setAuthInitialized(true);
     });
 
-    return () => unsubscribe();
+    return () => { unsubscribe(); window.removeEventListener('hashchange', onHashChange); };
   }, []);
 
   if (!_hasHydrated || !authInitialized) {

@@ -11,3 +11,12 @@ export const sanitizeLogMessage = (rawMessage: string): string => {
     .replace(SHARE_DATA_REGEX, '$1[REDACTED_DATA]')
     .replace(JOIN_TOKEN_REGEX, '$1[REDACTED_TOKEN]');
 };
+
+export const formatLogMeta = (meta?: Record<string, unknown>): string | undefined => {
+  if (!meta) return undefined;
+  try {
+    return sanitizeLogMessage(JSON.stringify(meta));
+  } catch {
+    return undefined;
+  }
+};

@@ -29,8 +29,14 @@ export const mappingBelongsToClub = (
   clubId: ClubID,
   linkedGroups: string[],
   pollVoterIds: Set<string>,
-  linkedGroupIds: string[] = []
+  linkedGroupIds: string[] = [],
+  pollPhones: Set<string> = new Set()
 ): boolean => {
+  const aliases = m.aliasVoterIds || [m.voterId];
+  if (aliases.some((id) => pollVoterIds.has(id))) return true;
+  const canonicalPhone = cleanWhatsAppPhone(m.phone, m.voterId);
+  if (canonicalPhone && pollPhones.has(canonicalPhone)) return true;
+
   const isManualLink = m.matchedBy === 'MANUAL' && Boolean(getMappingUidForClub(m, clubId));
   if (linkedGroupIds.length > 0 || linkedGroups.length > 0) {
     const groups = (m.groups || []).map((g) => g.trim());
@@ -47,8 +53,6 @@ export const mappingBelongsToClub = (
   }
 
   if (getMappingUidForClub(m, clubId)) return true;
-  const aliases = m.aliasVoterIds || [m.voterId];
-  if (aliases.some((id) => pollVoterIds.has(id))) return true;
   return !linkedGroups.length && !linkedGroupIds.length;
 };
 

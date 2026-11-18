@@ -119,6 +119,26 @@ export const mergeClubRosterWithWhatsApp = (params: {
     });
   });
 
+  (summary?.voters || []).forEach((v) => {
+    if (v.person && existingIds.has(v.person.id)) return;
+    const deterministicId = `wa_${sanitizeDocId(v.voterId).slice(0, 48)}`;
+    if (existingIds.has(deterministicId)) return;
+    const normPhone = cleanWhatsAppPhone(v.phone, v.voterId) || '';
+    if (normPhone && existingPhones.has(normPhone)) return;
+
+    existingIds.add(deterministicId);
+    if (normPhone) existingPhones.add(normPhone);
+    const detectedRole = v.effectiveRole !== Role.UNASSIGNED ? v.effectiveRole : (v.pollRole || Role.UNASSIGNED);
+    virtualMembers.push({
+      id: deterministicId, clubId, name: v.displayName, gender: Gender.MALE, role: detectedRole,
+      rank: detectedRole === Role.INSTRUCTOR ? 5 : detectedRole === Role.VOLUNTEER ? 4 : 3,
+      isSkipper: Boolean(v.detectedIsSkipper),
+      phone: normPhone, photoURL: v.profilePicUrl, attendanceCount: 0,
+      tags: Array.from(new Set(['קבוצת וואטסאפ', ...(v.detectedTags || [])])),
+      isWhatsAppGroupOnly: true,
+    });
+  });
+
   return [...enrichedPeople, ...virtualMembers];
 };
 

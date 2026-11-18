@@ -50,6 +50,7 @@ export const unlinkWhatsAppMember = async (voterId: string, clubId?: ClubID): Pr
         { merge: true }
       );
     }
+    addLog(`Unlinked WhatsApp member ${voterId}`, 'WA', { clubId: clubId || 'ALL' });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
   }
@@ -99,6 +100,7 @@ export const saveClubWhatsAppConfig = async (config: ClubWhatsAppConfig): Promis
       },
       { merge: true }
     );
+    addLog(`Saved WhatsApp config for ${config.clubId}`, 'WA', { linkedGroups: config.linkedGroups.length, linkedGroupIds: config.linkedGroupIds?.length || 0, hiddenPolls: config.hiddenPollIds?.length || 0 });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
@@ -155,26 +157,11 @@ export const importWhatsAppRosterToClub = async (
   return created;
 };
 
-export const createClubGuestFromVoter = async (params: {
-  clubId: ClubID;
-  voterId: string;
-  displayName: string;
-  phone?: string;
-  profilePicUrl?: string;
-  persistToClub: boolean;
-  updatedBy?: string;
-}): Promise<Person> => {
+export const createClubGuestFromVoter = async (params: { clubId: ClubID; voterId: string; displayName: string; phone?: string; profilePicUrl?: string; persistToClub: boolean; updatedBy?: string }): Promise<Person> => {
   const guestId = `guest_wa_${sanitizeDocId(params.voterId).slice(0, 40)}_${Date.now().toString().slice(-4)}`;
   const guest: Person = {
-    id: guestId,
-    clubId: params.clubId,
-    name: params.displayName,
-    gender: Gender.MALE,
-    role: Role.GUEST,
-    rank: 2,
-    phone: params.phone || '',
-    notes: 'אורח מסקר וואטסאפ',
-    tags: ['אורח', 'וואטסאפ'],
+    id: guestId, clubId: params.clubId, name: params.displayName, gender: Gender.MALE, role: Role.GUEST, rank: 2,
+    phone: params.phone || '', photoURL: params.profilePicUrl, notes: 'אורח מסקר וואטסאפ', tags: ['אורח', 'וואטסאפ'],
   };
 
   if (params.persistToClub) {

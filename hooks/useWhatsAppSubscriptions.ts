@@ -10,6 +10,7 @@ import {
   subscribeToPollsEvents, subscribeToWhatsAppMembers,
 } from '../services/whatsapp/whatsappSubscriptions';
 import { usePollVotesSubscription } from './usePollVotesSubscription';
+import { addLog } from '../services/syncService';
 
 interface UseWhatsAppSubscriptionsParams {
   userId?: string;
@@ -50,8 +51,16 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, people, preferred
     if (!userId || !activeClub) { setIsLoading(false); return; }
     setIsLoading(true);
     setError(null);
-    const unsubConfig = subscribeToClubWhatsAppConfig(activeClub, (cfg) => setClubConfig(cfg), (err) => setError(err.message));
-    const unsubMembers = subscribeToWhatsAppMembers((list) => setMappings(list), (err) => setError(err.message));
+    const unsubConfig = subscribeToClubWhatsAppConfig(activeClub, (cfg) => {
+      setClubConfig(cfg);
+      addLog(`WA config synced for ${activeClub}`, 'WA', { linkedGroups: cfg.linkedGroups.length, linkedGroupIds: cfg.linkedGroupIds?.length || 0 });
+    }, (err) => setError(err.message));
+    const unsubMembers = subscribeToWhatsAppMembers((list) => {
+      setMappings(list);
+      const missingName = list.filter((m) => !m.pushName).length;
+      const missingPic = list.filter((m) => !m.profilePicUrl).length;
+      addLog(`WA members snapshot`, 'WA', { total: list.length, missingName, missingPic });
+    }, (err) => setError(err.message));
     return () => { unsubConfig(); unsubMembers(); };
   }, [userId, activeClub, retryKey]);
 
@@ -59,7 +68,7 @@ export const useWhatsAppSubscriptions = ({ userId, activeClub, people, preferred
     if (!userId || !activeClub) return;
     const unsubPolls = subscribeToPollsEvents(
       undefined,
-      (list) => { setPolls(list); setIsLoading(false); },
+      (list) => { setPolls(list); setIsLoading(false); addLog('WA polls snapshot', 'WA', { totalPolls: list.length }); },
       (err) => { setError(err.message); setIsLoading(false); }
     );
     return () => unsubPolls();

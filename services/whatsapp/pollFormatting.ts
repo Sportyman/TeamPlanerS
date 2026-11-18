@@ -1,9 +1,5 @@
 import { Role } from '../../types';
-import {
-  KeywordRule,
-  PollColorToken,
-  PollOptionClassification,
-} from '../../types/whatsapp';
+import { KeywordRule, PollColorToken, PollOptionClassification } from '../../types/whatsapp';
 import { DEFAULT_KEYWORD_RULES, POLL_COLOR_PALETTE } from '../../config/whatsappDefaults';
 
 export const normalizePhone = (phone?: string): string => {
@@ -35,9 +31,20 @@ export const namesMatch = (a?: string, b?: string): boolean => {
 
 export const extractPhoneFromVoterId = (voterId: string): string | undefined => {
   if (!voterId || voterId.endsWith('@lid')) return undefined;
-  const raw = voterId.split('@')[0];
+  const raw = voterId.split('@')[0].split(':')[0];
   const normalized = normalizePhone(raw);
   return normalized.length >= 9 ? normalized : undefined;
+};
+
+export const isNumericOnlyLabel = (value?: string): boolean => {
+  if (!value) return true;
+  const trimmed = value.trim();
+  return !trimmed || /^[\d+\s()-]+$/.test(trimmed);
+};
+
+export const pickPreferredDisplayName = (candidates: (string | undefined)[]): string | undefined => {
+  const cleaned = candidates.map((c) => c?.trim()).filter((c): c is string => Boolean(c));
+  return cleaned.find((c) => !isNumericOnlyLabel(c)) || cleaned[0];
 };
 
 export const cleanWhatsAppPhone = (phone?: string, voterId?: string): string | undefined => {
@@ -90,13 +97,7 @@ export const getPollColorToken = (pollId: string, customColorId?: string): PollC
   return POLL_COLOR_PALETTE[hash % POLL_COLOR_PALETTE.length];
 };
 
-const ROLE_PRIORITY: Record<Role, number> = {
-  [Role.INSTRUCTOR]: 4,
-  [Role.VOLUNTEER]: 3,
-  [Role.MEMBER]: 2,
-  [Role.GUEST]: 1,
-  [Role.UNASSIGNED]: 0,
-};
+const ROLE_PRIORITY: Record<Role, number> = { [Role.INSTRUCTOR]: 4, [Role.VOLUNTEER]: 3, [Role.MEMBER]: 2, [Role.GUEST]: 1, [Role.UNASSIGNED]: 0 };
 
 export const classifyOption = (
   optionText: string,
@@ -190,8 +191,6 @@ export const formatFirestoreErrorMessage = (raw: string): string => {
   try {
     const parsed = JSON.parse(raw) as { error?: string; path?: string };
     if (parsed?.error) return parsed.path ? `${parsed.path}: ${parsed.error}` : parsed.error;
-  } catch {
-    // plain string
-  }
+  } catch { /* plain string */ }
   return raw;
 };

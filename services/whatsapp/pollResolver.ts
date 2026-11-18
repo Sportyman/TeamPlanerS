@@ -15,6 +15,7 @@ import {
   cleanWhatsAppPhone,
   namesMatch,
   normalizePhone,
+  pickPreferredDisplayName,
   sanitizeDocId,
 } from './pollFormatting';
 import { getMappingUidForClub } from './pollMatching';
@@ -113,7 +114,9 @@ export const resolvePollSummary = (params: {
       || knownRole
       || person?.role
       || Role.UNASSIGNED;
-    const displayName = person?.name || vote.pushName || mapping?.pushName || rawPhone || vote.voter.split('@')[0];
+    const displayName = pickPreferredDisplayName([person?.name, vote.pushName, mapping?.pushName])
+      || rawPhone
+      || vote.voter.split('@')[0].split(':')[0];
     const profilePicUrl = vote.profilePicUrl || mapping?.profilePicUrl || (person ? profilePhotos[person.id] : undefined);
     const updatedRecently = recentlyChangedVoterIds.has(vote.voter);
 
@@ -133,8 +136,9 @@ export const resolvePollSummary = (params: {
       counts.maybe++;
     }
 
-    if (person && classification.intent !== 'UNVOTED') {
-      personStatusMap[person.id] = {
+    if (classification.intent !== 'UNVOTED') {
+      const statusKey = person ? person.id : `wa_${sanitizeDocId(vote.voter).slice(0, 48)}`;
+      personStatusMap[statusKey] = {
         intent: classification.intent,
         pollRole: effectiveRole !== Role.UNASSIGNED ? effectiveRole : classification.detectedRole,
         detectedIsSkipper: classification.detectedIsSkipper,

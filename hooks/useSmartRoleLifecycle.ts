@@ -5,6 +5,7 @@ import { NotificationAction } from '../store/slices/createNotificationSlice';
 import { getRoleStreakSuggestion, RoleStreakSuggestion } from '../services/activityHistoryService';
 import { dismissRoleStreakPrompt, promoteClubBaseRole } from '../services/roleStreakService';
 import { updateClubPersonRole } from '../services/whatsapp/whatsappMutations';
+import { addLog } from '../services/syncService';
 import { useAppStore } from '../store';
 
 interface UseSmartRoleLifecycleParams {
@@ -42,6 +43,7 @@ export const useSmartRoleLifecycle = ({
           useAppStore.getState().setPeople(
             current.map((p) => (p.clubId === activeClub && p.id === updated.id ? updated : p))
           );
+          addLog(`Locked initial club base role for ${person.name} (${activeClub}) -> ${detectedRole}`, 'STATE');
           onNotify(
             `נקבע תואר ראשוני בחוג ל${person.name}: ${getRoleLabel(detectedRole, person.gender)}`,
             'INFO',
@@ -86,6 +88,7 @@ export const useSmartRoleLifecycle = ({
   const dismissRoleSuggestion = useCallback(async (suggestion: RoleStreakSuggestion) => {
     if (!activeClub) return;
     await dismissRoleStreakPrompt(activeClub, suggestion.person, suggestion.suggestedRole, suggestion.streakCount);
+    addLog(`Dismissed role streak suggestion for ${suggestion.person.name} (${activeClub})`, 'STATE', { suggestedRole: suggestion.suggestedRole, streakCount: suggestion.streakCount });
     onNotify(`התואר הקבוע של ${suggestion.person.name} נשאר ללא שינוי`, 'INFO');
   }, [activeClub, onNotify]);
 

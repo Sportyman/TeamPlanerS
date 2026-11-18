@@ -6,24 +6,21 @@ import { fetchCloudClubsCatalog, syncStrandedLocalClubsToCloud } from './auth/su
 import { fetchGlobalLocations } from './scheduleService';
 import { hydratePeopleFromMemberships } from './membershipHydration';
 import { buildNextActivityHistory } from './activityHistoryService';
-import { sanitizeLogMessage } from './logging/logSanitizer';
+import { addLog, downloadSystemLogs, registerTelemetryProvider } from './logging/systemLogger';
 
-const systemLogs: { time: string; msg: string; type: 'INFO' | 'WARN' | 'ERROR' | 'SYNC' }[] = [];
+export { addLog, downloadSystemLogs };
 
-export const addLog = (msg: string, type: 'INFO' | 'WARN' | 'ERROR' | 'SYNC' = 'INFO') => {
-    const safeMsg = sanitizeLogMessage(msg);
-    systemLogs.push({ time: new Date().toISOString(), msg: safeMsg, type });
-    if (systemLogs.length > 1000) systemLogs.shift();
-    console.log(`%c[${type}] ${new Date().toLocaleTimeString()}: ${safeMsg}`, type === 'ERROR' ? 'color: #f44' : 'color: #33b5e5');
-};
-
-export const downloadSystemLogs = () => {
-    const blob = new Blob([systemLogs.map(l => `[${l.time}] [${l.type}] ${l.msg}`).join('\n')], { type: 'text/plain' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `etgarim-system-${new Date().toISOString().slice(0, 10)}.log`;
-    a.click();
-};
+registerTelemetryProvider(() => {
+  const s = useAppStore.getState();
+  return {
+    activeClub: s.activeClub, syncStatus: s.syncStatus, clubsCount: s.clubs.length,
+    peopleCount: s.people.length,
+    clubPeopleCount: s.activeClub ? s.people.filter((p) => p.clubId === s.activeClub).length : 0,
+    presentCount: (s.activeClub ? s.sessions[s.activeClub]?.presentPersonIds?.length : 0) || 0,
+    notificationsCount: s.notifications.length,
+    authenticated: Boolean(s.user), isSuperAdmin: Boolean(s.user?.isAdmin),
+  } as Record<string, unknown>;
+});
 
 let inflightGlobalConfig: Promise<void> | null = null;
 let lastGlobalConfigTs = 0;
@@ -40,9 +37,15 @@ export const subscribeToClubData = (clubId: ClubID): Unsubscribe => {
         setPeople(peopleList);
         setSyncStatus('SYNCED');
         setInitialLoading(false);
-        addLog(`Synced ${peopleList.length} participants reactively`, 'SYNC');
+        const missingPhone = peopleList.filter((p) => !p.phone).length;
+        const unassigned = peopleList.filter((p) => p.role === Role.UNASSIGNED).length;
+        addLog(`Synced ${peopleList.length} participants for ${clubId}`, 'SYNC', {
+            rawDocs: snapshot.size,
+            missingPhone,
+            unassigned,
+        });
     }, (err) => {
-        addLog(`Subscription error: ${err}`, 'ERROR');
+        addLog(`Subscription error (${clubId}): ${err}`, 'ERROR');
         setSyncStatus('OFFLINE');
         setInitialLoading(false);
     });
@@ -51,8 +54,9 @@ export const subscribeToClubData = (clubId: ClubID): Unsubscribe => {
 export const forceFullSync = async (uid?: string, clubId?: ClubID | null): Promise<number> => {
     const store = useAppStore.getState();
     store.setSyncStatus('SYNCING');
+    addLog('Manual full sync triggered', 'SYNC', { clubId: clubId || null });
     try {
-        await fetchGlobalConfig();
+        await fetchGlobalConfig(true);
         if (uid) await store.loadUserResources(uid);
         let syncedCount = 0;
         if (clubId) {
@@ -64,6 +68,7 @@ export const forceFullSync = async (uid?: string, clubId?: ClubID | null): Promi
         }
         window.dispatchEvent(new CustomEvent('teamplaner:sync-refresh'));
         store.setSyncStatus('SYNCED');
+        addLog('Manual full sync completed', 'SYNC', { clubId: clubId || null, syncedCount });
         store.addNotification(clubId ? `הנתונים סונכרנו מול השרת (${syncedCount} משתתפים בחוג)` : 'הנתונים סונכרנו מול השרת', 'SUCCESS');
         return syncedCount;
     } catch (error) {
@@ -92,7 +97,7 @@ export const addPersonToClubCloud = async (clubId: ClubID, person: Person) => {
         if (person.preferredBoatType) payload.preferredBoatType = person.preferredBoatType;
         if (person.genderConstraint) payload.genderConstraint = person.genderConstraint;
         await setDoc(docRef, payload, { merge: true });
-        addLog(`Person ${person.name} (${person.id}) synced to club ${clubId}`, 'SYNC');
+        addLog(`Person ${person.name} (${person.id}) synced to club ${clubId}`, 'SYNC', { role: person.role });
     } catch (error) {
         addLog(`Failed to sync person to club cloud: ${error}`, 'ERROR');
         throw error;
@@ -144,6 +149,7 @@ export const recordClubAttendance = async (
         const nextPeople = store.people.map((p) => (p.clubId === clubId && updatedMap.has(p.id) ? updatedMap.get(p.id)! : p));
         updatedMap.forEach((p) => { if (!currentClubIds.has(`${clubId}:${p.id}`)) nextPeople.push(p); });
         store.setPeople(nextPeople);
+        addLog(`Recorded club attendance for ${clubId}`, 'STATE', { updatedCount: updatedMap.size, totalAttended: attendedPeople.length });
     }
 };
 
@@ -153,10 +159,8 @@ export const ensureAdminMembership = async (clubId: ClubID, user: { uid: string;
         const docRef = doc(db, 'memberships', `${clubId}_${user.uid}`);
         const snap = await getDoc(docRef);
         if (!snap.exists()) {
-            await setDoc(docRef, {
-                uid: user.uid, clubId, role: Role.INSTRUCTOR, accessLevel: AccessLevel.CLUB_ADMIN,
-                status: MembershipStatus.ACTIVE, joinedClubDate: new Date().toISOString(), rank: 5, lastUpdate: new Date().toISOString(),
-            });
+            await setDoc(docRef, { uid: user.uid, clubId, role: Role.INSTRUCTOR, accessLevel: AccessLevel.CLUB_ADMIN, status: MembershipStatus.ACTIVE, joinedClubDate: new Date().toISOString(), rank: 5, lastUpdate: new Date().toISOString() });
+            addLog(`Created admin membership for ${clubId}`, 'SYNC');
         }
     } catch (error) { addLog(`Error ensuring admin membership: ${error}`, 'ERROR'); }
 };
@@ -181,6 +185,7 @@ export const fetchGlobalConfig = async (force = false) => {
             }
             if (locs) setLocations(locs);
             lastGlobalConfigTs = Date.now();
+            addLog('Global config fetched', 'SYNC', { clubs: catalog?.clubs.length ?? 0, locations: locs?.length ?? 0 });
         } catch (error) { addLog(`Global config fetch error: ${error}`, 'ERROR'); }
         finally { inflightGlobalConfig = null; }
     })();

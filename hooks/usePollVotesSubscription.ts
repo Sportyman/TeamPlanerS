@@ -7,6 +7,7 @@ import { deduplicateLatestVotes } from '../services/whatsapp/pollResolver';
 import { detectVoteChanges } from '../services/whatsapp/pollMatching';
 import { enrichVoteAlertsWithContacts, isNumericFallbackName } from '../services/whatsapp/mappingDedup';
 import { subscribeToPollVotes } from '../services/whatsapp/whatsappSubscriptions';
+import { addLog } from '../services/syncService';
 
 interface UsePollVotesSubscriptionParams {
   userId?: string;
@@ -71,6 +72,7 @@ export const usePollVotesSubscription = ({
         if (initializedPollRef.current !== selectedPollId) {
           baselineVotesRef.current = new Map(latestList.map((v) => [v.voter, v]));
           initializedPollRef.current = selectedPollId;
+          addLog(`Poll votes loaded (${selectedPollId})`, 'WA', { totalDocs: nextVotes.length, uniqueVoters: latestList.length });
           setVotes(nextVotes);
           return;
         }
@@ -80,6 +82,7 @@ export const usePollVotesSubscription = ({
           mappingsRef.current, peopleRef.current, activeClub || undefined
         );
         if (changes.length > 0) {
+          addLog(`Detected ${changes.length} real-time vote change(s) on ${selectedPollId}`, 'WA', { count: changes.length });
           setVoteAlerts((prev) => [...changes, ...prev].slice(0, 25));
           setRecentChangedVoters((prev) => {
             const nextSet = new Set(prev);

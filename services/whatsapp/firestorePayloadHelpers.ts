@@ -114,3 +114,41 @@ export const fetchLatestVoteTimestampMap = async (
   }
   return result;
 };
+
+const pickStr = (...vals: unknown[]): string | undefined => {
+  for (const v of vals) {
+    if (typeof v === 'string') {
+      const cleaned = cleanUnicodeBidi(v);
+      if (cleaned) return cleaned;
+    }
+  }
+  return undefined;
+};
+
+export const extractWhatsAppContactFields = (data: Record<string, unknown>) => {
+  const nested = (data.contact || data.voterInfo || data.author || data.sender) as Record<string, unknown> | undefined;
+  const pushName = pickStr(
+    data.pushName, data.voterName, data.displayName, data.notifyName,
+    data.verifiedName, data.shortName, data.name, data.senderName,
+    data.authorName, data.contactName, data.voterPushName,
+    nested?.pushName, nested?.name, nested?.notifyName
+  );
+  const profilePicUrl = pickStr(
+    data.profilePicUrl, data.photoURL, data.photoUrl, data.picUrl,
+    data.avatarUrl, data.profilePicture, data.profilePic, data.picture,
+    data.avatar, nested?.profilePicUrl, nested?.photoUrl
+  );
+  const phone = pickStr(
+    data.phone, data.phoneNumber, data.pn, data.mobile, data.senderPhone,
+    data.voterPhone, nested?.phone, nested?.phoneNumber
+  );
+  const rawAliases = [
+    ...(Array.isArray(data.aliasVoterIds) ? data.aliasVoterIds : []),
+    data.voterId, data.voter, data.lid, data.pnJid, data.jid, data.cUs, data.altVoterId,
+  ]
+    .map((x) => (typeof x === 'string' ? x.trim() : ''))
+    .filter(Boolean);
+  const aliasVoterIds = rawAliases.length > 0 ? Array.from(new Set(rawAliases)) : undefined;
+  return { pushName, profilePicUrl, phone, aliasVoterIds };
+};
+
