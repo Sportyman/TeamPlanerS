@@ -5,6 +5,7 @@ import { Person, ClubID, MembershipStatus, Role, AccessLevel, Gender } from '../
 import { fetchCloudClubsCatalog, syncStrandedLocalClubsToCloud } from './auth/superAdminService';
 import { fetchGlobalLocations } from './scheduleService';
 import { hydratePeopleFromMemberships } from './membershipHydration';
+import { buildNextActivityHistory } from './activityHistoryService';
 import { sanitizeLogMessage } from './logging/logSanitizer';
 
 const systemLogs: { time: string; msg: string; type: 'INFO' | 'WARN' | 'ERROR' | 'SYNC' }[] = [];
@@ -98,25 +99,38 @@ export const addPersonToClubCloud = async (clubId: ClubID, person: Person) => {
     }
 };
 
-export const recordClubAttendance = async (clubId: ClubID, attendedPeople: Person[]) => {
+export const recordClubAttendance = async (
+    clubId: ClubID,
+    attendedPeople: Person[],
+    pollMeta?: { pollId?: string; question?: string }
+) => {
     const today = new Date().toISOString().slice(0, 10);
     const nowIso = new Date().toISOString();
-    const toRecord = attendedPeople.filter((p) => p.lastAttendedAt?.slice(0, 10) !== today);
-    if (toRecord.length === 0) return;
-
     const store = useAppStore.getState();
     const updatedMap = new Map<string, Person>();
-    await Promise.all(toRecord.map(async (p) => {
+    await Promise.all(attendedPeople.map(async (p) => {
+        const { nextHistory, isNewDay, changedRoleOnSameDay } = buildNextActivityHistory(p, today, nowIso, pollMeta);
+        if (!isNewDay && !changedRoleOnSameDay) return;
         try {
             const payload: Record<string, any> = {
                 uid: p.id, clubId, displayName: p.name, gender: p.gender || Gender.MALE,
                 role: p.role, rank: p.rank ?? 3, isSkipper: Boolean(p.isSkipper),
                 phone: p.phone || '', status: MembershipStatus.ACTIVE,
-                attendanceCount: increment(1), lastAttendedAt: nowIso, lastUpdate: nowIso,
+                activityHistory: nextHistory, lastUpdate: nowIso,
             };
+            if (isNewDay) {
+                payload.attendanceCount = increment(1);
+                payload.lastAttendedAt = nowIso;
+            }
             if (p.photoURL) payload.photoURL = p.photoURL;
             await setDoc(doc(db, 'memberships', `${clubId}_${p.id}`), payload, { merge: true });
-            updatedMap.set(p.id, { ...p, isWhatsAppGroupOnly: false, attendanceCount: (p.attendanceCount || 0) + 1, lastAttendedAt: nowIso });
+            updatedMap.set(p.id, {
+                ...p,
+                isWhatsAppGroupOnly: false,
+                attendanceCount: isNewDay ? (p.attendanceCount || 0) + 1 : p.attendanceCount,
+                lastAttendedAt: isNewDay ? nowIso : p.lastAttendedAt,
+                activityHistory: nextHistory,
+            });
         } catch (err) {
             addLog(`Attendance count update skipped for ${p.name}: ${err}`, 'WARN');
         }

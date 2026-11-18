@@ -95,6 +95,8 @@ export const subscribeToClubWhatsAppConfig = (
     linkedGroupMeta: {},
     keywordRules: DEFAULT_KEYWORD_RULES,
     pollColors: {},
+    pollRoleOverrides: {},
+    hiddenPollIds: [],
   };
 
   return onSnapshot(
@@ -113,6 +115,8 @@ export const subscribeToClubWhatsAppConfig = (
               ? cfg.keywordRules
               : DEFAULT_KEYWORD_RULES,
           pollColors: cfg.pollColors || {},
+          pollRoleOverrides: cfg.pollRoleOverrides && typeof cfg.pollRoleOverrides === 'object' ? cfg.pollRoleOverrides : {},
+          hiddenPollIds: Array.isArray(cfg.hiddenPollIds) ? cfg.hiddenPollIds.map(String) : [],
           activePollId: cfg.activePollId || undefined,
           updatedAt: cfg.updatedAt || undefined,
         });

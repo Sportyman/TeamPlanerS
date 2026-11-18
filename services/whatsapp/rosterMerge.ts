@@ -66,7 +66,11 @@ export const mergeClubRosterWithWhatsApp = (params: {
     const aliases = matchedMapping?.aliasVoterIds || (matchedMapping ? [matchedMapping.voterId] : []);
     const hist = aliases.map((id) => historicalClass.get(id)).find(Boolean);
     const resolvedPhoto = person.photoURL || matchedMapping?.profilePicUrl;
-    const inferredRole = person.role === Role.UNASSIGNED ? (status?.pollRole || hist?.detectedRole || Role.UNASSIGNED) : person.role;
+    const sessionPollRole = status?.intent === 'ATTENDING' && status.pollRole && status.pollRole !== Role.UNASSIGNED
+      ? status.pollRole
+      : undefined;
+    const inferredRole = sessionPollRole
+      || (person.role === Role.UNASSIGNED ? (status?.pollRole || hist?.detectedRole || Role.UNASSIGNED) : person.role);
 
     return {
       ...person,

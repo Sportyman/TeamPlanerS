@@ -127,6 +127,20 @@ export const PersonEditorModal: React.FC<PersonEditorModalProps> = ({
                         </div>
                     </div>
 
+                    {isEdit && person?.activityHistory && person.activityHistory.length > 0 && (
+                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+                            <div className="text-xs font-bold text-slate-700">היסטוריית פעילות ({person.activityHistory.length})</div>
+                            <div className="max-h-32 overflow-y-auto divide-y divide-slate-200/70 bg-white border border-slate-200 rounded-lg text-xs">
+                                {person.activityHistory.slice(0, 12).map((h, idx) => (
+                                    <div key={`${h.date}_${idx}`} className="px-2.5 py-1.5 flex items-center justify-between gap-2">
+                                        <span className="font-semibold text-slate-800 truncate">{getRoleLabel(h.role, formData.gender || Gender.MALE)}{h.isSkipper ? ' · סקיפר' : ''}{h.pollQuestion ? ` · ${h.pollQuestion}` : ''}</span>
+                                        <span className="text-slate-500 tabular-nums shrink-0">{h.date}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="flex gap-2">
                         <button type="submit" className="flex-1 bg-brand-600 text-white py-3 rounded-lg font-bold hover:bg-brand-700 flex items-center justify-center gap-2"><Save size={18} /> שמור משתתף</button>
                         <button type="button" onClick={onClose} className="bg-slate-200 text-slate-700 px-4 py-3 rounded-lg font-bold">ביטול</button>

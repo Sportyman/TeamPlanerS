@@ -74,11 +74,12 @@ export const PollVoterMobileCard: React.FC<PollVoterMobileCardProps> = ({
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
             <select
-              value={person.role}
+              value={voter.effectiveRole}
               onChange={(e) => onUpdatePersonRole(person, e.target.value as Role)}
               aria-label={`תפקיד עבור ${person.name}`}
               className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white font-semibold text-slate-800 min-h-[44px]"
             >
+              <option value={Role.UNASSIGNED}>לא הוגדר</option>
               <option value={Role.MEMBER}>{getRoleLabel(Role.MEMBER, person.gender)}</option>
               <option value={Role.VOLUNTEER}>{getRoleLabel(Role.VOLUNTEER, person.gender)}</option>
               <option value={Role.INSTRUCTOR}>{getRoleLabel(Role.INSTRUCTOR, person.gender)}</option>
@@ -86,7 +87,7 @@ export const PollVoterMobileCard: React.FC<PollVoterMobileCardProps> = ({
             </select>
             <button
               type="button"
-              onClick={() => onUpdatePersonRole(person, person.role, !person.isSkipper)}
+              onClick={() => onUpdatePersonRole(person, voter.effectiveRole, !person.isSkipper)}
               aria-pressed={Boolean(person.isSkipper)}
               className={`px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 min-h-[44px] shrink-0 transition-colors ${
                 person.isSkipper
@@ -98,11 +99,15 @@ export const PollVoterMobileCard: React.FC<PollVoterMobileCardProps> = ({
               <span>סקיפר</span>
             </button>
           </div>
-          {voter.pollRole && voter.pollRole !== person.role && (
+          {voter.effectiveRole !== person.role && person.role !== Role.UNASSIGNED ? (
             <div className="text-xs text-amber-700 font-medium">
-              בסקר סומן: {getRoleLabel(voter.pollRole, person.gender)}
+              לפי הסקר · קבוע בחוג: {getRoleLabel(person.role, person.gender)}
             </div>
-          )}
+          ) : voter.pollRole && voter.pollRole !== voter.effectiveRole ? (
+            <div className="text-xs text-sky-700 font-medium">
+              בסקר הצביע: {getRoleLabel(voter.pollRole, person.gender)} (עודכן ידנית)
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="space-y-2">

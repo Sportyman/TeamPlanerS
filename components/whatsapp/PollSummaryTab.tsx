@@ -125,20 +125,23 @@ export const PollSummaryTab: React.FC<PollSummaryTabProps> = ({
                       {person ? (
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <select value={person.role} onChange={(e) => onUpdatePersonRole(person, e.target.value as Role)} className="border border-slate-200 rounded-lg px-2 py-1.5 bg-white font-semibold text-slate-800 min-h-[38px]">
+                            <select value={voter.effectiveRole} onChange={(e) => onUpdatePersonRole(person, e.target.value as Role)} className="border border-slate-200 rounded-lg px-2 py-1.5 bg-white font-semibold text-slate-800 min-h-[38px]">
+                              <option value={Role.UNASSIGNED}>לא הוגדר</option>
                               <option value={Role.MEMBER}>{getRoleLabel(Role.MEMBER, person.gender)}</option>
                               <option value={Role.VOLUNTEER}>{getRoleLabel(Role.VOLUNTEER, person.gender)}</option>
                               <option value={Role.INSTRUCTOR}>{getRoleLabel(Role.INSTRUCTOR, person.gender)}</option>
                               <option value={Role.GUEST}>{getRoleLabel(Role.GUEST, person.gender)}</option>
                             </select>
                             <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer">
-                              <input type="checkbox" checked={Boolean(person.isSkipper)} onChange={(e) => onUpdatePersonRole(person, person.role, e.target.checked)} className="rounded border-slate-300" />
+                              <input type="checkbox" checked={Boolean(person.isSkipper)} onChange={(e) => onUpdatePersonRole(person, voter.effectiveRole, e.target.checked)} className="rounded border-slate-300" />
                               <span>סקיפר</span>
                             </label>
                           </div>
-                          {voter.pollRole && voter.pollRole !== person.role && (
-                            <div className="text-[11px] text-amber-700">בסקר סומן: {getRoleLabel(voter.pollRole, person.gender)}</div>
-                          )}
+                          {voter.effectiveRole !== person.role && person.role !== Role.UNASSIGNED ? (
+                            <div className="text-[11px] text-amber-700">לפי הסקר · קבוע בחוג: {getRoleLabel(person.role, person.gender)}</div>
+                          ) : voter.pollRole && voter.pollRole !== voter.effectiveRole ? (
+                            <div className="text-[11px] text-sky-700">בסקר הצביע: {getRoleLabel(voter.pollRole, person.gender)} (עודכן ידנית)</div>
+                          ) : null}
                         </div>
                       ) : (
                         <span className="font-semibold text-slate-700">

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '../store';
 import { Person, Role } from '../types';
-import { MatchCandidate, PollEvent, ResolvedVoter, WhatsAppMemberMapping } from '../types/whatsapp';
+import { MatchCandidate, PollManageActions, ResolvedVoter, WhatsAppMemberMapping } from '../types/whatsapp';
 import { resolvePollSummary } from '../services/whatsapp/pollResolver';
 import { findAutoSyncCandidates, getMappingUidForClub, mappingBelongsToClub } from '../services/whatsapp/pollMatching';
 import { mergeClubRosterWithWhatsApp } from '../services/whatsapp/rosterMerge';
@@ -12,9 +12,9 @@ import {
   autoLinkPhoneMatches, createClubGuestFromVoter, importWhatsAppRosterToClub,
   saveClubWhatsAppConfig, saveWhatsAppMemberMapping, unlinkWhatsAppMember, updateClubPersonRole,
 } from '../services/whatsapp/whatsappMutations';
-import { deleteWhatsAppPoll } from '../services/whatsapp/pollDeleteService';
 import { useWhatsAppSubscriptions } from './useWhatsAppSubscriptions';
 import { useWhatsAppGroupConfigActions } from './useWhatsAppGroupConfigActions';
+import { usePollDeleteActions } from './usePollDeleteActions';
 
 const autoCheckedPollByClub = new Map<string, string>();
 
@@ -22,7 +22,7 @@ export const useWhatsAppPolls = () => {
   const { user, activeClub, people, sessions, setBulkAttendance, setPeople, addNotification } = useAppStore();
   const clubPeople = useMemo(() => people.filter((p) => p.clubId === activeClub), [people, activeClub]);
   const {
-    polls, relevantPolls, unmatchedPolls, votes, votesLoadedPollId, historicalVotes, mappings, clubConfig, selectedPollId,
+    polls, relevantPolls, unmatchedPolls, hiddenPolls, votes, votesLoadedPollId, historicalVotes, mappings, clubConfig, selectedPollId,
     setSelectedPollId, voteAlerts: rawVoteAlerts, setVoteAlerts, recentChangedVoters, isLoading, error,
     groupCatalog, effectiveLinkedGroupIds, linkedGroupItems, retry, setResolvedVotersRef,
   } = useWhatsAppSubscriptions({ userId: user?.uid, activeClub, people: clubPeople, onNotify: addNotification });
@@ -108,14 +108,23 @@ export const useWhatsAppPolls = () => {
     activeClub, userId: user?.uid, isLoading, clubConfig, groupCatalog, onNotify: addNotification,
   });
 
+  const { hidePollsFromSite, restoreHiddenPolls, deletePollsPermanently } = usePollDeleteActions({
+    activeClub, clubConfig, onNotify: addNotification,
+  });
+
   const updateMemberRole = useCallback(async (person: Person, nextRole: Role, nextIsSkipper?: boolean, nextTags?: string[]) => {
     if (!activeClub) return;
     const patched: Person = { ...person, isWhatsAppGroupOnly: false, ...(nextTags !== undefined ? { tags: nextTags } : {}) };
     const updated = await updateClubPersonRole(activeClub, patched, nextRole, nextIsSkipper);
     const exists = people.some((p) => p.id === updated.id && p.clubId === activeClub);
     setPeople(exists ? people.map((p) => (p.id === updated.id && p.clubId === activeClub ? updated : p)) : [...people, updated]);
+    if (activePoll) {
+      const prevOverrides = clubConfig.pollRoleOverrides || {};
+      const nextPollMap = { ...(prevOverrides[activePoll.pollId] || {}), [updated.id]: { role: nextRole, updatedAtMs: Date.now() } };
+      await saveClubWhatsAppConfig({ ...clubConfig, clubId: activeClub, pollRoleOverrides: { ...prevOverrides, [activePoll.pollId]: nextPollMap } }).catch(() => {});
+    }
     addNotification(`עודכנו פרטי תפקיד/תג עבור ${person.name}`, 'SUCCESS');
-  }, [activeClub, people, setPeople, addNotification]);
+  }, [activeClub, activePoll, clubConfig, people, setPeople, addNotification]);
 
   const applyPollAttendance = useCallback((mode: 'REPLACE' | 'MERGE') => {
     if (!activeClub || !summary) return 0;
@@ -167,29 +176,19 @@ export const useWhatsAppPolls = () => {
     return guest;
   }, [activeClub, user, people, sessions, setPeople, setBulkAttendance, addNotification]);
 
-  const deletePoll = useCallback(async (poll: PollEvent) => {
-    await deleteWhatsAppPoll(poll);
-    if (activeClub && (clubConfig.activePollId === poll.pollId || clubConfig.pollColors?.[poll.pollId])) {
-      const nextColors = { ...(clubConfig.pollColors || {}) };
-      delete nextColors[poll.pollId];
-      await saveClubWhatsAppConfig({
-        ...clubConfig,
-        clubId: activeClub,
-        activePollId: clubConfig.activePollId === poll.pollId ? undefined : clubConfig.activePollId,
-        pollColors: nextColors,
-      }).catch(() => {});
-    }
-    addNotification(`הסקר "${poll.question}" נמחק`, 'INFO');
-  }, [activeClub, clubConfig, addNotification]);
+  const pollManageActions = useMemo<PollManageActions>(() => ({
+    polls: relevantPolls, unmatchedPolls, hiddenPolls,
+    onHidePolls: hidePollsFromSite, onRestorePolls: restoreHiddenPolls, onDeletePollsPermanent: deletePollsPermanently,
+  }), [relevantPolls, unmatchedPolls, hiddenPolls, hidePollsFromSite, restoreHiddenPolls, deletePollsPermanently]);
 
   return {
-    polls: relevantPolls, unmatchedPolls, allPollsCount: polls.length, activePoll, selectedPollId, setSelectedPollId, summary,
+    polls: relevantPolls, unmatchedPolls, hiddenPolls, allPollsCount: polls.length, activePoll, selectedPollId, setSelectedPollId, summary,
     clubConfig, clubPeople, effectiveClubPeople, mappings: clubMappings, syncCandidates,
     availableGroups, groupCatalog, linkedGroupItems, voteAlerts,
     dismissAlert: useCallback((id: string) => setVoteAlerts((p) => p.filter((a) => a.id !== id)), [setVoteAlerts]),
     clearAlerts: useCallback(() => setVoteAlerts([]), [setVoteAlerts]),
     isLoading, error, retry, applyPollAttendance, linkVoterToPerson, confirmSyncCandidate,
     importRosterMembers, unlinkVoter, addGuestFromVoter, saveConfig, setPollColor, linkClubGroup, unlinkClubGroup,
-    updateMemberRole, deletePoll,
+    updateMemberRole, pollManageActions,
   };
 };

@@ -4,7 +4,9 @@ import { PollEvent } from '../../types/whatsapp';
 import { handleFirestoreError, OperationType } from './firestoreError';
 import { addLog } from '../syncService';
 
-export const deleteWhatsAppPoll = async (poll: Pick<PollEvent, 'id' | 'pollId' | 'question'>): Promise<void> => {
+export const deleteWhatsAppPoll = async (
+  poll: Pick<PollEvent, 'id' | 'pollId' | 'question'>
+): Promise<void> => {
   const path = `polls_events/${poll.id}`;
   try {
     await deleteDoc(doc(db, 'polls_events', poll.id));
@@ -29,8 +31,17 @@ export const deleteWhatsAppPoll = async (poll: Pick<PollEvent, 'id' | 'pollId' |
       }
     }
 
-    addLog(`Deleted WhatsApp poll ${poll.pollId || poll.id} (${poll.question})`, 'SYNC');
+    addLog(`Permanently deleted poll ${poll.pollId || poll.id} (${poll.question}) from Firebase`, 'SYNC');
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
+};
+
+export const deleteWhatsAppPollsBatch = async (polls: PollEvent[]): Promise<number> => {
+  let deleted = 0;
+  for (const poll of polls) {
+    await deleteWhatsAppPoll(poll);
+    deleted++;
+  }
+  return deleted;
 };

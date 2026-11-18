@@ -104,7 +104,15 @@ export const resolvePollSummary = (params: {
 
     const classification = classifySelectedOptions(vote.selectedOptions, rules);
     const knownRole = person && person.role !== Role.UNASSIGNED ? person.role : undefined;
-    const effectiveRole = knownRole || classification.detectedRole || person?.role || Role.UNASSIGNED;
+    const pollOverrides = config.pollRoleOverrides?.[poll.pollId];
+    const manualOverride = (person ? pollOverrides?.[person.id] : undefined) || pollOverrides?.[vote.voter];
+    const useManualOverride = manualOverride && manualOverride.updatedAtMs >= (vote.timestampMs || 0);
+    const votedRole = classification.intent === 'ATTENDING' ? classification.detectedRole : undefined;
+    const effectiveRole = (useManualOverride ? manualOverride.role : undefined)
+      || votedRole
+      || knownRole
+      || person?.role
+      || Role.UNASSIGNED;
     const displayName = person?.name || vote.pushName || mapping?.pushName || rawPhone || vote.voter.split('@')[0];
     const profilePicUrl = vote.profilePicUrl || mapping?.profilePicUrl || (person ? profilePhotos[person.id] : undefined);
     const updatedRecently = recentlyChangedVoterIds.has(vote.voter);
@@ -128,7 +136,7 @@ export const resolvePollSummary = (params: {
     if (person && classification.intent !== 'UNVOTED') {
       personStatusMap[person.id] = {
         intent: classification.intent,
-        pollRole: classification.detectedRole,
+        pollRole: effectiveRole !== Role.UNASSIGNED ? effectiveRole : classification.detectedRole,
         detectedIsSkipper: classification.detectedIsSkipper,
         detectedTags: classification.detectedTags,
         selectedOptions: vote.selectedOptions,

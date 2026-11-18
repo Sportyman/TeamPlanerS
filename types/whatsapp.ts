@@ -69,6 +69,11 @@ export interface KeywordRule {
   grantedTags?: string[];
 }
 
+export interface PollRoleOverride {
+  role: Role;
+  updatedAtMs: number;
+}
+
 export interface ClubWhatsAppConfig {
   clubId: ClubID;
   linkedGroups: string[];
@@ -76,6 +81,8 @@ export interface ClubWhatsAppConfig {
   linkedGroupMeta?: Record<string, string>;
   keywordRules: KeywordRule[];
   pollColors?: Record<string, string>;
+  pollRoleOverrides?: Record<string, Record<string, PollRoleOverride>>;
+  hiddenPollIds?: string[];
   activePollId?: string;
   updatedAt?: string;
 }
@@ -148,4 +155,13 @@ export interface ResolvedPollSummary {
   voters: ResolvedVoter[];
   attendingPersonIds: string[];
   personStatusMap: Record<string, PersonPollStatus>;
+}
+
+export interface PollManageActions {
+  polls: PollEvent[];
+  unmatchedPolls: PollEvent[];
+  hiddenPolls: PollEvent[];
+  onHidePolls: (polls: PollEvent[]) => Promise<void>;
+  onRestorePolls: (pollIds: string[]) => Promise<void>;
+  onDeletePollsPermanent: (polls: PollEvent[]) => Promise<void>;
 }

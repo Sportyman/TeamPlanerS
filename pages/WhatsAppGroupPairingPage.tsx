@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { usePermissions } from '../hooks/usePermissions';
 import { useWhatsAppPolls } from '../hooks/useWhatsAppPolls';
 import { ClubGroupPairingCard } from '../components/whatsapp/ClubGroupPairingCard';
 import { UnmatchedPollsNotice } from '../components/whatsapp/UnmatchedPollsNotice';
+import { PollManageModal } from '../components/whatsapp/PollManageModal';
 import { formatFirestoreErrorMessage } from '../services/whatsapp/pollFormatting';
 import { forceFullSync } from '../services/syncService';
 import { ArrowRight, Calendar, MessageSquare, RefreshCw } from 'lucide-react';
@@ -13,6 +14,7 @@ export const WhatsAppGroupPairingPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, activeClub, clubs } = useAppStore();
   const { isClubAdmin } = usePermissions();
+  const [showManageModal, setShowManageModal] = useState(false);
   const {
     unmatchedPolls,
     groupCatalog,
@@ -22,7 +24,7 @@ export const WhatsAppGroupPairingPage: React.FC = () => {
     retry,
     linkClubGroup,
     unlinkClubGroup,
-    deletePoll,
+    pollManageActions,
   } = useWhatsAppPolls();
 
   const currentClubObj = clubs.find((c) => c.id === activeClub);
@@ -136,9 +138,11 @@ export const WhatsAppGroupPairingPage: React.FC = () => {
             <UnmatchedPollsNotice
               unmatchedPolls={unmatchedPolls}
               onLinkGroup={linkClubGroup}
-              onDeletePoll={deletePoll}
+              pollManage={pollManageActions}
+              onOpenManage={() => setShowManageModal(true)}
             />
           )}
+          {showManageModal && <PollManageModal manage={pollManageActions} onClose={() => setShowManageModal(false)} />}
         </div>
       )}
     </div>

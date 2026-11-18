@@ -25,7 +25,7 @@ export const SessionManager: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const whatsappState = useWhatsAppPolls();
-  const { effectiveClubPeople, updateMemberRole } = whatsappState;
+  const { effectiveClubPeople, updateMemberRole, activePoll } = whatsappState;
   const { isStaff } = usePermissions();
 
   const currentSession = activeClub ? sessions[activeClub] : undefined;
@@ -87,7 +87,8 @@ export const SessionManager: React.FC = () => {
 
   const handleAdvanceToEquipment = () => {
     if (activeClub && presentPeople.length > 0) {
-      recordClubAttendance(activeClub, presentPeople).catch(() => {});
+      const pollMeta = activePoll ? { pollId: activePoll.pollId, question: activePoll.question } : undefined;
+      recordClubAttendance(activeClub, presentPeople, pollMeta).catch(() => {});
     }
     handleStepChange(2);
   };

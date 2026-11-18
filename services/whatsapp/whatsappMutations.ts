@@ -91,6 +91,8 @@ export const saveClubWhatsAppConfig = async (config: ClubWhatsAppConfig): Promis
           linkedGroupMeta: config.linkedGroupMeta || {},
           keywordRules: cleanRules,
           pollColors: config.pollColors || {},
+          pollRoleOverrides: config.pollRoleOverrides || {},
+          hiddenPollIds: (config.hiddenPollIds || []).slice(0, 200),
           activePollId: config.activePollId || null,
           updatedAt: new Date().toISOString(),
         },

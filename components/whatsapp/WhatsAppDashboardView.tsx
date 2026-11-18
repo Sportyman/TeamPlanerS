@@ -12,7 +12,8 @@ import { formatFirestoreErrorMessage } from '../../services/whatsapp/pollFormatt
 import { extractPollTargetDate } from '../../services/weather/weatherDefaults';
 import { SeaForecastBanner } from '../weather/SeaForecastBanner';
 import { UnmatchedPollsNotice } from './UnmatchedPollsNotice';
-import { ArrowRight, Calendar, Download, Link2, RefreshCw } from 'lucide-react';
+import { PollManageModal } from './PollManageModal';
+import { Archive, ArrowRight, Calendar, Download, Link2, RefreshCw } from 'lucide-react';
 import { forceFullSync } from '../../services/syncService';
 
 type TabId = 'SUMMARY' | 'MAPPING' | 'SETTINGS';
@@ -22,12 +23,13 @@ export const WhatsAppDashboardView: React.FC = () => {
   const { user, activeClub, clubs, sessions, toggleAttendance } = useAppStore();
   const { isClubAdmin } = usePermissions();
   const [activeTab, setActiveTab] = useState<TabId>('SUMMARY');
+  const [showManageModal, setShowManageModal] = useState(false);
 
   const {
     polls, unmatchedPolls, activePoll, setSelectedPollId, summary, clubConfig, clubPeople, mappings, syncCandidates,
     availableGroups, linkedGroupItems, voteAlerts, dismissAlert, clearAlerts, isLoading, error, retry,
     applyPollAttendance, linkVoterToPerson, confirmSyncCandidate, importRosterMembers,
-    unlinkVoter, addGuestFromVoter, saveConfig, setPollColor, linkClubGroup, updateMemberRole, deletePoll,
+    unlinkVoter, addGuestFromVoter, saveConfig, setPollColor, linkClubGroup, updateMemberRole, pollManageActions,
   } = useWhatsAppPolls();
 
   const presentIds = activeClub ? sessions[activeClub]?.presentPersonIds || [] : [];
@@ -110,7 +112,7 @@ export const WhatsAppDashboardView: React.FC = () => {
       {!isLoading && polls.length > 0 && activePoll && (
         <div className="border border-slate-200 rounded-2xl bg-white p-3.5 sm:p-4 space-y-3">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <PollSelectorDropdown polls={polls} activePoll={activePoll} onSelectPoll={setSelectedPollId} onChangeColor={setPollColor} onDeletePoll={deletePoll} />
+            <PollSelectorDropdown polls={polls} activePoll={activePoll} onSelectPoll={setSelectedPollId} onChangeColor={setPollColor} pollManage={pollManageActions} onOpenManage={() => setShowManageModal(true)} />
             {summary && (
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-600 tabular-nums">
                 <span className="font-bold text-emerald-700">מגיעים: {summary.counts.totalAttending}</span>
@@ -154,17 +156,22 @@ export const WhatsAppDashboardView: React.FC = () => {
             <div className="space-y-3">
               <div className="border border-slate-200 rounded-2xl bg-white p-6 sm:p-8 text-center space-y-3">
                 <p className="text-sm text-slate-500">
-                  {linkedGroupItems.length === 0
-                    ? 'טרם צוותה קבוצת וואטסאפ לחוג זה.'
-                    : 'עדיין לא נקלטו סקרים מקבוצת הוואטסאפ של חוג זה.'}
+                  {linkedGroupItems.length === 0 ? 'טרם צוותה קבוצת וואטסאפ לחוג זה.' : 'אין כרגע סקרים מוצגים מקבוצת הוואטסאפ של חוג זה.'}
                 </p>
-                {linkedGroupItems.length === 0 && (
-                  <Link to="/app/whatsapp/pairing" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold min-h-[40px]">
-                    <Link2 size={14} /><span>עבור לדף שיוך קבוצת וואטסאפ</span>
-                  </Link>
-                )}
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                  {linkedGroupItems.length === 0 && (
+                    <Link to="/app/whatsapp/pairing" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold min-h-[40px]">
+                      <Link2 size={14} /><span>עבור לדף שיוך קבוצת וואטסאפ</span>
+                    </Link>
+                  )}
+                  {pollManageActions.hiddenPolls.length > 0 && (
+                    <button type="button" onClick={() => setShowManageModal(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold min-h-[40px]">
+                      <Archive size={14} /><span>ארכיון סקרים שהוסרו ({pollManageActions.hiddenPolls.length})</span>
+                    </button>
+                  )}
+                </div>
               </div>
-              <UnmatchedPollsNotice unmatchedPolls={unmatchedPolls} onLinkGroup={linkClubGroup} onDeletePoll={deletePoll} />
+              <UnmatchedPollsNotice unmatchedPolls={unmatchedPolls} onLinkGroup={linkClubGroup} pollManage={pollManageActions} onOpenManage={() => setShowManageModal(true)} />
             </div>
           )}
           {activeTab === 'MAPPING' && activeClub && (
@@ -181,6 +188,7 @@ export const WhatsAppDashboardView: React.FC = () => {
           )}
         </>
       )}
+      {showManageModal && <PollManageModal manage={pollManageActions} onClose={() => setShowManageModal(false)} />}
     </div>
   );
 };

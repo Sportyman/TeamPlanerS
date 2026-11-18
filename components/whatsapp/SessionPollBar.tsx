@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ClubID, Person, Role } from '../../types';
-import { MatchCandidate, PollEvent, ResolvedPollSummary, WhatsAppMemberMapping } from '../../types/whatsapp';
+import { MatchCandidate, PollEvent, PollManageActions, ResolvedPollSummary, WhatsAppMemberMapping } from '../../types/whatsapp';
 import { PollSelectorDropdown } from './PollSelectorDropdown';
 import { VoterLinkModal } from './VoterLinkModal';
 import { WhatsAppRosterModal } from './WhatsAppRosterModal';
 import { GroupLinkSelect } from './GroupLinkSelect';
 import { UnmatchedPollsNotice } from './UnmatchedPollsNotice';
+import { PollManageModal } from './PollManageModal';
 import { formatFirestoreErrorMessage } from '../../services/whatsapp/pollFormatting';
-import { AlertCircle, Download, MessageSquare, RefreshCw, Settings2, UserCheck, Users } from 'lucide-react';
+import { AlertCircle, Archive, Download, MessageSquare, RefreshCw, Settings2, UserCheck, Users } from 'lucide-react';
 
 interface SessionPollBarProps {
   activeClub: ClubID;
@@ -32,7 +33,7 @@ interface SessionPollBarProps {
   onConfirmCandidate: (c: MatchCandidate, role?: Role) => Promise<void>;
   onImportRoster: (entries: Array<{ mapping: WhatsAppMemberMapping; role: Role; isSkipper?: boolean }>) => Promise<number>;
   onUpdatePersonRole: (person: Person, role: Role, isSkipper?: boolean) => Promise<void>;
-  onDeletePoll?: (poll: PollEvent) => Promise<void>;
+  pollManage?: PollManageActions;
   onRetry: () => void;
 }
 
@@ -40,11 +41,12 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
   activeClub, polls, unmatchedPolls = [], activePoll, summary, people, presentIds, linkedGroups, availableGroups,
   mappings, syncCandidates, isLoading, error,
   onSelectPoll, onLinkGroup, onApplyAttendance, onLinkVoter, onAddGuest,
-  onConfirmCandidate, onImportRoster, onUpdatePersonRole, onDeletePoll, onRetry,
+  onConfirmCandidate, onImportRoster, onUpdatePersonRole, pollManage, onRetry,
 }) => {
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showRosterModal, setShowRosterModal] = useState(false);
   const [showModeChoice, setShowModeChoice] = useState(false);
+  const [showManageModal, setShowManageModal] = useState(false);
 
   if (isLoading) {
     return (
@@ -92,20 +94,27 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
             </p>
           )}
         </div>
-        {unmatchedPolls.length > 0 && <UnmatchedPollsNotice unmatchedPolls={unmatchedPolls} onLinkGroup={onLinkGroup} onDeletePoll={onDeletePoll} compact />}
+        {unmatchedPolls.length > 0 && <UnmatchedPollsNotice unmatchedPolls={unmatchedPolls} onLinkGroup={onLinkGroup} pollManage={pollManage} onOpenManage={() => setShowManageModal(true)} compact />}
+        {showManageModal && pollManage && <PollManageModal manage={pollManage} onClose={() => setShowManageModal(false)} />}
       </div>
     );
   }
 
   if (polls.length === 0 || !activePoll || !summary) {
+    const hiddenCount = pollManage?.hiddenPolls.length || 0;
     return (
       <div className="space-y-3">
         <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/70 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2.5 text-sm text-slate-600">
             <MessageSquare size={18} className="text-slate-400 shrink-0" />
-            <span>עדיין לא התקבלו סקרים מהקבוצות המקושרות ({linkedGroups.join(', ')}).</span>
+            <span>אין כרגע סקרים מוצגים ({linkedGroups.join(', ')}).</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {hiddenCount > 0 && (
+              <button type="button" onClick={() => setShowManageModal(true)} className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-100 flex items-center gap-1.5">
+                <Archive size={13} /> <span>ארכיון ({hiddenCount})</span>
+              </button>
+            )}
             <button type="button" onClick={() => setShowRosterModal(true)} className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-100 flex items-center gap-1.5">
               <Users size={13} /> <span>חברי הקבוצה ({mappings.length})</span>
             </button>
@@ -117,7 +126,8 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
             <WhatsAppRosterModal activeClub={activeClub} linkedGroups={linkedGroups} mappings={mappings} people={people} syncCandidates={syncCandidates} onConfirmCandidate={onConfirmCandidate} onImportEntries={onImportRoster} onUpdatePersonRole={onUpdatePersonRole} onClose={() => setShowRosterModal(false)} />
           )}
         </div>
-        {unmatchedPolls.length > 0 && <UnmatchedPollsNotice unmatchedPolls={unmatchedPolls} onLinkGroup={onLinkGroup} onDeletePoll={onDeletePoll} compact />}
+        {unmatchedPolls.length > 0 && <UnmatchedPollsNotice unmatchedPolls={unmatchedPolls} onLinkGroup={onLinkGroup} pollManage={pollManage} onOpenManage={() => setShowManageModal(true)} compact />}
+        {showManageModal && pollManage && <PollManageModal manage={pollManage} onClose={() => setShowManageModal(false)} />}
       </div>
     );
   }
@@ -141,7 +151,7 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
               <RefreshCw size={12} /><span>רענן</span>
             </button>
           </div>
-          <PollSelectorDropdown polls={polls} activePoll={activePoll} onSelectPoll={onSelectPoll} onDeletePoll={onDeletePoll} />
+          <PollSelectorDropdown polls={polls} activePoll={activePoll} onSelectPoll={onSelectPoll} pollManage={pollManage} onOpenManage={() => setShowManageModal(true)} />
         </div>
 
         <div className="flex items-center gap-2 flex-wrap shrink-0">
@@ -178,12 +188,9 @@ export const SessionPollBar: React.FC<SessionPollBarProps> = ({
         {counts.unmappedAttending > 0 && (<><span aria-hidden="true">·</span><span className="font-semibold text-amber-800">ממתינים לזיהוי: {counts.unmappedAttending}</span></>)}
       </div>
 
-      {showLinkModal && (
-        <VoterLinkModal voters={summary.voters} people={people} onLink={onLinkVoter} onAddGuest={async (v, persist) => { await onAddGuest(v, persist); }} onClose={() => setShowLinkModal(false)} />
-      )}
-      {showRosterModal && (
-        <WhatsAppRosterModal activeClub={activeClub} linkedGroups={linkedGroups} mappings={mappings} people={people} syncCandidates={syncCandidates} onConfirmCandidate={onConfirmCandidate} onImportEntries={onImportRoster} onUpdatePersonRole={onUpdatePersonRole} onClose={() => setShowRosterModal(false)} />
-      )}
+      {showLinkModal && <VoterLinkModal voters={summary.voters} people={people} onLink={onLinkVoter} onAddGuest={async (v, persist) => { await onAddGuest(v, persist); }} onClose={() => setShowLinkModal(false)} />}
+      {showRosterModal && <WhatsAppRosterModal activeClub={activeClub} linkedGroups={linkedGroups} mappings={mappings} people={people} syncCandidates={syncCandidates} onConfirmCandidate={onConfirmCandidate} onImportEntries={onImportRoster} onUpdatePersonRole={onUpdatePersonRole} onClose={() => setShowRosterModal(false)} />}
+      {showManageModal && pollManage && <PollManageModal manage={pollManage} onClose={() => setShowManageModal(false)} />}
     </div>
   );
 };

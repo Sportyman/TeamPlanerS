@@ -218,6 +218,16 @@ export const TEAM_COLORS = [
   'bg-green-50 border-green-200',    
 ];
 
+export interface ActivityHistoryEntry {
+  date: string;
+  recordedAt: string;
+  role: Role;
+  isSkipper?: boolean;
+  pollId?: string;
+  pollQuestion?: string;
+  source: 'POLL' | 'MANUAL';
+}
+
 export interface Person {
   id: string;
   clubId: ClubID;
@@ -234,6 +244,7 @@ export interface Person {
   isSkipper?: boolean;
   attendanceCount?: number;
   lastAttendedAt?: string;
+  activityHistory?: ActivityHistoryEntry[];
   isWhatsAppGroupOnly?: boolean;
   preferredBoatType?: string; 
   genderConstraint?: GenderConstraint;

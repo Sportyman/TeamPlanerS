@@ -37,6 +37,7 @@ export const hydratePeopleFromMemberships = async (memberships: any[]): Promise<
         isSkipper: Boolean(profile?.isSkipper || ms.isSkipper),
         attendanceCount: typeof ms.attendanceCount === 'number' ? ms.attendanceCount : 0,
         lastAttendedAt: ms.lastAttendedAt || undefined,
+        activityHistory: Array.isArray(ms.activityHistory) ? ms.activityHistory : [],
         phone: profile?.primaryPhone || ms.phone || '',
         notes: profile?.medicalNotes || ms.notes || '',
         tags: Array.isArray(ms.tags) ? ms.tags : [],
