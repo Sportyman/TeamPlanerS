@@ -1,7 +1,14 @@
 import { ClubID, Gender, Person, Role } from '../../types';
 import { KeywordRule, PollOptionClassification, PollVote, ResolvedPollSummary, WhatsAppMemberMapping } from '../../types/whatsapp';
 import { DEFAULT_KEYWORD_RULES } from '../../config/whatsappDefaults';
-import { classifySelectedOptions, cleanWhatsAppPhone, normalizeName, sanitizeDocId } from './pollFormatting';
+import {
+  classifySelectedOptions,
+  cleanWhatsAppPhone,
+  formatVoterPhoneDisplay,
+  normalizeName,
+  pickPreferredDisplayName,
+  sanitizeDocId,
+} from './pollFormatting';
 import { getMappingUidForClub } from './pollMatching';
 import { deduplicateClubPeople, getPersonCanonicalPhone, getPicKey } from './personDedup';
 import { getMappingCanonicalPhone } from './mappingDedup';
@@ -106,7 +113,9 @@ export const mergeClubRosterWithWhatsApp = (params: {
 
     const vote = aliases.map((id) => voteByVoterId.get(id)).find(Boolean);
     const hist = aliases.map((id) => historicalClass.get(id)).find(Boolean);
-    const displayName = (m.pushName || vote?.displayName || normPhone || m.voterId.split('@')[0]).trim();
+    const displayName = pickPreferredDisplayName([m.pushName, vote?.displayName])
+      || normPhone
+      || formatVoterPhoneDisplay(m.phone, m.voterId);
     const detectedRole = vote?.pollRole || hist?.detectedRole || Role.UNASSIGNED;
 
     virtualMembers.push({

@@ -2,6 +2,7 @@ import React from 'react';
 import { Person, Role, Gender, getRoleLabel } from '../../types';
 import { ResolvedVoter } from '../../types/whatsapp';
 import { WhatsAppAvatar } from './WhatsAppAvatar';
+import { formatVoterPhoneDisplay } from '../../services/whatsapp/pollFormatting';
 import { Anchor, Link2, UserPlus } from 'lucide-react';
 
 interface PollVoterMobileCardProps {
@@ -40,7 +41,7 @@ export const PollVoterMobileCard: React.FC<PollVoterMobileCardProps> = ({
           <div className="min-w-0">
             <div className="font-bold text-sm text-slate-900 truncate">{voter.displayName}</div>
             <div className="text-xs text-slate-500 font-mono tabular-nums truncate" dir="ltr">
-              {voter.phone || voter.voterId.split('@')[0]}
+              {formatVoterPhoneDisplay(voter.phone, voter.voterId)}
             </div>
           </div>
         </div>

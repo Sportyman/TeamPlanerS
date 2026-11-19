@@ -125,22 +125,38 @@ const pickStr = (...vals: unknown[]): string | undefined => {
   return undefined;
 };
 
+const pickNameStr = (...vals: unknown[]): string | undefined => {
+  const numericFound: string[] = [];
+  for (const v of vals) {
+    if (typeof v !== 'string') continue;
+    const cleaned = cleanUnicodeBidi(v);
+    if (!cleaned || RAW_JID_REGEX.test(cleaned)) continue;
+    if (/^[\d+\s():-]+$/.test(cleaned)) numericFound.push(cleaned);
+    else return cleaned;
+  }
+  return numericFound[0];
+};
+
 export const extractWhatsAppContactFields = (data: Record<string, unknown>) => {
-  const nested = (data.contact || data.voterInfo || data.author || data.sender) as Record<string, unknown> | undefined;
-  const pushName = pickStr(
-    data.pushName, data.voterName, data.displayName, data.notifyName,
-    data.verifiedName, data.shortName, data.name, data.senderName,
-    data.authorName, data.contactName, data.voterPushName,
-    nested?.pushName, nested?.name, nested?.notifyName
+  const nested = (data.contact || data.voterInfo || data.author || data.sender || data.profile || data.participant || data.user) as Record<string, unknown> | undefined;
+  const fullNameFromParts = pickStr(data.firstName, nested?.firstName) && pickStr(data.lastName, nested?.lastName)
+    ? `${pickStr(data.firstName, nested?.firstName)} ${pickStr(data.lastName, nested?.lastName)}`.trim()
+    : undefined;
+  const pushName = pickNameStr(
+    data.pushName, data.pushname, data.voterName, data.displayName, data.notifyName, data.notify,
+    data.verifiedName, data.verifiedBizName, data.formattedName, data.fullName, fullNameFromParts,
+    data.shortName, data.name, data.senderName, data.authorName, data.contactName, data.voterPushName,
+    nested?.pushName, nested?.pushname, nested?.displayName, nested?.formattedName,
+    nested?.verifiedName, nested?.notifyName, nested?.notify, nested?.shortName, nested?.name
   );
   const profilePicUrl = pickStr(
     data.profilePicUrl, data.photoURL, data.photoUrl, data.picUrl,
     data.avatarUrl, data.profilePicture, data.profilePic, data.picture,
-    data.avatar, nested?.profilePicUrl, nested?.photoUrl
+    data.avatar, nested?.profilePicUrl, nested?.photoUrl, nested?.photoURL
   );
   const phone = pickStr(
     data.phone, data.phoneNumber, data.pn, data.mobile, data.senderPhone,
-    data.voterPhone, nested?.phone, nested?.phoneNumber
+    data.voterPhone, nested?.phone, nested?.phoneNumber, nested?.number
   );
   const rawAliases = [
     ...(Array.isArray(data.aliasVoterIds) ? data.aliasVoterIds : []),

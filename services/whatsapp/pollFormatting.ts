@@ -2,64 +2,17 @@ import { Role } from '../../types';
 import { KeywordRule, PollColorToken, PollOptionClassification } from '../../types/whatsapp';
 import { DEFAULT_KEYWORD_RULES, POLL_COLOR_PALETTE } from '../../config/whatsappDefaults';
 
-export const normalizePhone = (phone?: string): string => {
-  if (!phone) return '';
-  const digits = phone.replace(/\D/g, '');
-  if (!digits) return '';
-  if (digits.startsWith('972') && digits.length >= 11) return '0' + digits.slice(3);
-  if (digits.length === 9 && digits.startsWith('5')) return '0' + digits;
-  return digits;
-};
-
-export const normalizeName = (name?: string): string =>
-  (name || '')
-    .toLowerCase()
-    .replace(/[\u0591-\u05C7]/g, '')
-    .replace(/[^a-zA-Z0-9\u05D0-\u05EA\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-export const namesMatch = (a?: string, b?: string): boolean => {
-  const na = normalizeName(a);
-  const nb = normalizeName(b);
-  if (!na || !nb || na.length < 3) return false;
-  if (na === nb) return true;
-  const pa = na.split(' ').sort().join(' ');
-  const pb = nb.split(' ').sort().join(' ');
-  return pa === pb && na.split(' ').length >= 2;
-};
-
-export const extractPhoneFromVoterId = (voterId: string): string | undefined => {
-  if (!voterId || voterId.endsWith('@lid')) return undefined;
-  const raw = voterId.split('@')[0].split(':')[0];
-  const normalized = normalizePhone(raw);
-  return normalized.length >= 9 ? normalized : undefined;
-};
-
-export const isNumericOnlyLabel = (value?: string): boolean => {
-  if (!value) return true;
-  const trimmed = value.trim();
-  return !trimmed || /^[\d+\s()-]+$/.test(trimmed);
-};
-
-export const pickPreferredDisplayName = (candidates: (string | undefined)[]): string | undefined => {
-  const cleaned = candidates.map((c) => c?.trim()).filter((c): c is string => Boolean(c));
-  return cleaned.find((c) => !isNumericOnlyLabel(c)) || cleaned[0];
-};
-
-export const cleanWhatsAppPhone = (phone?: string, voterId?: string): string | undefined => {
-  if (phone) {
-    const digits = phone.replace(/\D/g, '');
-    const lidUser = voterId?.endsWith('@lid') ? voterId.split('@')[0] : '';
-    if (digits && digits !== lidUser && digits.length >= 9 && digits.length <= 13) {
-      return normalizePhone(digits);
-    }
-  }
-  return voterId ? extractPhoneFromVoterId(voterId) : undefined;
-};
-
-export const sanitizeDocId = (rawId: string): string =>
-  rawId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 120);
+export {
+  cleanWhatsAppPhone,
+  extractPhoneFromVoterId,
+  formatVoterPhoneDisplay,
+  isNumericOnlyLabel,
+  namesMatch,
+  normalizeName,
+  normalizePhone,
+  pickPreferredDisplayName,
+  sanitizeDocId,
+} from './contactFormatting';
 
 export const toTimestampMs = (val: unknown): number => {
   if (!val) return 0;

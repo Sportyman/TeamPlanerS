@@ -4,6 +4,7 @@ import { MatchCandidate, WhatsAppMemberMapping } from '../../types/whatsapp';
 import { getMappingUidForClub } from '../../services/whatsapp/pollMatching';
 import { WhatsAppAvatar } from './WhatsAppAvatar';
 import { isRawWhatsAppJid } from '../../services/whatsapp/clubDedupSync';
+import { formatVoterPhoneDisplay, pickPreferredDisplayName } from '../../services/whatsapp/pollFormatting';
 import { Check, Info, UserPlus, Users, X } from 'lucide-react';
 
 interface WhatsAppRosterModalProps {
@@ -141,10 +142,10 @@ export const WhatsAppRosterModal: React.FC<WhatsAppRosterModalProps> = ({
                 <div key={m.voterId} className="p-3 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     {!person && <input type="checkbox" checked={selectedIds.has(m.voterId)} onChange={() => toggleSelect(m.voterId)} className="rounded border-slate-300" />}
-                    <WhatsAppAvatar name={m.pushName || m.phone || '?'} src={m.profilePicUrl} />
+                    <WhatsAppAvatar name={pickPreferredDisplayName([m.pushName]) || formatVoterPhoneDisplay(m.phone, m.voterId) || '?'} src={m.profilePicUrl} />
                     <div className="min-w-0">
-                      <div className="text-sm font-bold text-slate-900 truncate">{person?.name || m.pushName || m.phone || m.voterId}</div>
-                      <div className="text-xs text-slate-500 font-mono truncate" dir="ltr">{m.phone || m.voterId} {m.groups?.length ? `· ${m.groups.join(', ')}` : ''}</div>
+                      <div className="text-sm font-bold text-slate-900 truncate">{pickPreferredDisplayName([person?.name, m.pushName]) || formatVoterPhoneDisplay(m.phone, m.voterId)}</div>
+                      <div className="text-xs text-slate-500 font-mono truncate" dir="ltr">{formatVoterPhoneDisplay(m.phone, m.voterId)} {m.groups?.length ? `· ${m.groups.join(', ')}` : ''}</div>
                     </div>
                   </div>
                   {person ? (

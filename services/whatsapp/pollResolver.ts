@@ -13,6 +13,7 @@ import { DEFAULT_KEYWORD_RULES } from '../../config/whatsappDefaults';
 import {
   classifySelectedOptions,
   cleanWhatsAppPhone,
+  formatVoterPhoneDisplay,
   namesMatch,
   normalizePhone,
   pickPreferredDisplayName,
@@ -22,12 +23,22 @@ import { getMappingUidForClub } from './pollMatching';
 import { getPersonCanonicalPhone, getPicKey } from './personDedup';
 import { getMappingCanonicalPhone } from './mappingDedup';
 
+const mergeVoteContact = (newer: PollVote, older: PollVote): PollVote => ({
+  ...newer,
+  pushName: pickPreferredDisplayName([newer.pushName, older.pushName]),
+  profilePicUrl: newer.profilePicUrl || older.profilePicUrl,
+  phone: newer.phone || older.phone,
+});
+
+const upsertMergedVote = (map: Map<string, PollVote>, key: string, vote: PollVote) => {
+  const prev = map.get(key);
+  if (!prev) map.set(key, vote);
+  else map.set(key, vote.timestampMs >= prev.timestampMs ? mergeVoteContact(vote, prev) : mergeVoteContact(prev, vote));
+};
+
 export const deduplicateLatestVotes = (votes: PollVote[]): PollVote[] => {
   const map = new Map<string, PollVote>();
-  votes.forEach((vote) => {
-    const prev = map.get(vote.voter);
-    if (!prev || vote.timestampMs >= prev.timestampMs) map.set(vote.voter, vote);
-  });
+  votes.forEach((vote) => upsertMergedVote(map, vote.voter, vote));
   return Array.from(map.values());
 };
 
@@ -51,13 +62,8 @@ export const resolvePollSummary = (params: {
     if (p && !mappingByPhone.has(p)) mappingByPhone.set(p, m);
   });
 
-  const rawLatest = deduplicateLatestVotes(votes);
   const canonicalVoteMap = new Map<string, PollVote>();
-  rawLatest.forEach((v) => {
-    const key = mappingByVoter.get(v.voter)?.voterId || v.voter;
-    const prev = canonicalVoteMap.get(key);
-    if (!prev || v.timestampMs >= prev.timestampMs) canonicalVoteMap.set(key, v);
-  });
+  deduplicateLatestVotes(votes).forEach((v) => upsertMergedVote(canonicalVoteMap, mappingByVoter.get(v.voter)?.voterId || v.voter, v));
   const latestVotes = Array.from(canonicalVoteMap.values());
 
   const peopleById = new Map<string, Person>();
@@ -116,7 +122,7 @@ export const resolvePollSummary = (params: {
       || Role.UNASSIGNED;
     const displayName = pickPreferredDisplayName([person?.name, vote.pushName, mapping?.pushName])
       || rawPhone
-      || vote.voter.split('@')[0].split(':')[0];
+      || formatVoterPhoneDisplay(vote.phone, vote.voter);
     const profilePicUrl = vote.profilePicUrl || mapping?.profilePicUrl || (person ? profilePhotos[person.id] : undefined);
     const updatedRecently = recentlyChangedVoterIds.has(vote.voter);
 

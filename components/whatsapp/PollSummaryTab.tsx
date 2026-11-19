@@ -3,6 +3,7 @@ import { Person, Role, getRoleLabel, Gender } from '../../types';
 import { ResolvedPollSummary, ResolvedVoter, VoteChangeAlert } from '../../types/whatsapp';
 import { WhatsAppAvatar } from './WhatsAppAvatar';
 import { PollVoterMobileCard } from './PollVoterMobileCard';
+import { formatVoterPhoneDisplay } from '../../services/whatsapp/pollFormatting';
 import { Link2, UserPlus } from 'lucide-react';
 
 type SummaryFilter = 'ALL' | 'ATTENDING' | 'VOLUNTEER' | 'MEMBER' | 'GUEST' | 'DECLINING' | 'UNMAPPED';
@@ -110,7 +111,7 @@ export const PollSummaryTab: React.FC<PollSummaryTabProps> = ({
                         <WhatsAppAvatar name={voter.displayName} src={voter.profilePicUrl} />
                         <div className="min-w-0">
                           <div className="font-bold text-slate-900 truncate">{voter.displayName}</div>
-                          <div className="text-xs text-slate-500 font-mono tabular-nums" dir="ltr">{voter.phone || voter.voterId.split('@')[0]}</div>
+                          <div className="text-xs text-slate-500 font-mono tabular-nums" dir="ltr">{formatVoterPhoneDisplay(voter.phone, voter.voterId)}</div>
                         </div>
                       </div>
                     </td>

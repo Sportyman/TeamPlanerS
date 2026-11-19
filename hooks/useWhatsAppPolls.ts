@@ -4,7 +4,7 @@ import { useAppStore } from '../store';
 import { Person, Role } from '../types';
 import { MatchCandidate, PollManageActions, ResolvedVoter, WhatsAppMemberMapping } from '../types/whatsapp';
 import { resolvePollSummary } from '../services/whatsapp/pollResolver';
-import { cleanWhatsAppPhone } from '../services/whatsapp/pollFormatting';
+import { cleanWhatsAppPhone, isNumericOnlyLabel } from '../services/whatsapp/pollFormatting';
 import { addLog } from '../services/syncService';
 import { findAutoSyncCandidates, getMappingUidForClub, mappingBelongsToClub } from '../services/whatsapp/pollMatching';
 import { mergeClubRosterWithWhatsApp } from '../services/whatsapp/rosterMerge';
@@ -65,11 +65,11 @@ export const useWhatsAppPolls = () => {
   const lastLogSigRef = useRef<string>('');
   useEffect(() => {
     if (!summary) return;
-    const missingPic = summary.voters.filter((v) => !v.profilePicUrl).length;
-    const sig = `${summary.poll.pollId}:${summary.voters.length}:${summary.counts.unmappedAttending}:${clubMappings.length}:${effectiveClubPeople.length}:${missingPic}`;
+    const meta = { voters: summary.voters.length, attending: summary.counts.totalAttending, unmappedAttending: summary.counts.unmappedAttending, clubMappings: clubMappings.length, effectivePeople: effectiveClubPeople.length, missingPic: summary.voters.filter((v) => !v.profilePicUrl).length, numericNames: summary.voters.filter((v) => isNumericOnlyLabel(v.displayName)).length };
+    const sig = `${summary.poll.pollId}:${meta.voters}:${meta.unmappedAttending}:${meta.clubMappings}:${meta.effectivePeople}:${meta.missingPic}:${meta.numericNames}`;
     if (lastLogSigRef.current === sig) return;
     lastLogSigRef.current = sig;
-    addLog(`Poll resolved (${summary.poll.pollId})`, 'WA', { voters: summary.voters.length, attending: summary.counts.totalAttending, unmappedAttending: summary.counts.unmappedAttending, clubMappings: clubMappings.length, effectivePeople: effectiveClubPeople.length, missingPic });
+    addLog(`Poll resolved (${summary.poll.pollId})`, 'WA', meta);
   }, [summary, clubMappings.length, effectiveClubPeople.length]);
   useEffect(() => { setResolvedVotersRef(summary?.voters || []); }, [summary, setResolvedVotersRef]);
 
@@ -149,9 +149,10 @@ export const useWhatsAppPolls = () => {
 
   const linkVoterToPerson = useCallback(async (voter: ResolvedVoter, personId: string) => {
     if (!activeClub) return;
-    await saveWhatsAppMemberMapping({ voterId: voter.voterId, pushName: voter.displayName, profilePicUrl: voter.profilePicUrl, phone: voter.phone, uid: personId, clubId: activeClub, matchedBy: 'MANUAL', updatedBy: user?.email || user?.uid });
-    addNotification(`שויך מצביע (${voter.displayName}) לחבר בחוג`, 'SUCCESS');
-  }, [activeClub, user, addNotification]);
+    const pushName = !isNumericOnlyLabel(voter.displayName) ? voter.displayName : clubPeople.find((p) => p.id === personId)?.name;
+    await saveWhatsAppMemberMapping({ voterId: voter.voterId, pushName, profilePicUrl: voter.profilePicUrl, phone: voter.phone, uid: personId, clubId: activeClub, matchedBy: 'MANUAL', updatedBy: user?.email || user?.uid });
+    addNotification(`שויך מצביע (${pushName || voter.displayName}) לחבר בחוג`, 'SUCCESS');
+  }, [activeClub, clubPeople, user, addNotification]);
 
   const confirmSyncCandidate = useCallback(async (candidate: MatchCandidate, roleOverride?: Role) => {
     if (!activeClub) return;

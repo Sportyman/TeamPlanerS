@@ -5,6 +5,7 @@ import { getMappingUidForClub } from '../../services/whatsapp/pollMatching';
 import { WhatsAppAvatar } from './WhatsAppAvatar';
 import { WhatsAppRosterModal } from './WhatsAppRosterModal';
 import { isRawWhatsAppJid } from '../../services/whatsapp/clubDedupSync';
+import { formatVoterPhoneDisplay, pickPreferredDisplayName } from '../../services/whatsapp/pollFormatting';
 import { Check, Link2, Search, Unlink, UserPlus, Users } from 'lucide-react';
 
 interface VoterMappingTabProps {
@@ -40,9 +41,10 @@ export const VoterMappingTab: React.FC<VoterMappingTabProps> = ({
       if (!map.has(m.voterId)) {
         const uid = getMappingUidForClub(m, activeClub);
         const person = uid ? people.find((p) => p.id === uid) : undefined;
+        const formattedPhone = formatVoterPhoneDisplay(m.phone, m.voterId);
         map.set(m.voterId, {
-          voterId: m.voterId, displayName: person?.name || m.pushName || m.phone || m.voterId.split('@')[0],
-          profilePicUrl: m.profilePicUrl || person?.photoURL, phone: m.phone, selectedOptions: [], intent: 'UNVOTED',
+          voterId: m.voterId, displayName: pickPreferredDisplayName([person?.name, m.pushName]) || formattedPhone,
+          profilePicUrl: m.profilePicUrl || person?.photoURL, phone: formattedPhone, selectedOptions: [], intent: 'UNVOTED',
           effectiveRole: person?.role || Role.GUEST, person, mapping: m, matchSource: person ? 'MANUAL_MAP' : 'UNMAPPED', timestampMs: 0,
         });
       }
@@ -112,7 +114,7 @@ export const VoterMappingTab: React.FC<VoterMappingTabProps> = ({
                   <div className="min-w-0">
                     <div className="font-bold text-sm text-slate-900 truncate">{row.displayName}</div>
                     <div className="text-xs text-slate-500 flex items-center gap-1.5 flex-wrap">
-                      <span className="font-mono tabular-nums" dir="ltr">{row.phone || row.voterId}</span>
+                      <span className="font-mono tabular-nums" dir="ltr">{formatVoterPhoneDisplay(row.phone, row.voterId)}</span>
                       {row.mapping?.groups?.filter((g) => !isRawWhatsAppJid(g)).length ? (
                         <span className="truncate">· {row.mapping.groups.filter((g) => !isRawWhatsAppJid(g)).join(', ')}</span>
                       ) : null}

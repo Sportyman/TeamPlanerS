@@ -3,6 +3,8 @@ import { db } from '../firebase';
 import { Gender, Person, Role, UserProfile } from '../types';
 import { isLegacyMockId } from './auth/superAdminService';
 
+import { normalizePhone } from './whatsapp/contactFormatting';
+
 const profileMemCache = new Map<string, UserProfile | null>();
 
 export const hydratePeopleFromMemberships = async (memberships: any[]): Promise<Person[]> => {
@@ -25,6 +27,8 @@ export const hydratePeopleFromMemberships = async (memberships: any[]): Promise<
       const name = profile
         ? `${profile.firstName} ${profile.lastName}`.trim()
         : fallbackName || (uid.includes('@') ? uid : 'משתמש ללא פרופיל');
+      const rawPhone = String(profile?.primaryPhone || ms.phone || '').trim();
+      const phone = rawPhone ? (normalizePhone(rawPhone) || rawPhone) : '';
       return {
         id: uid,
         clubId: ms.clubId,
@@ -39,7 +43,7 @@ export const hydratePeopleFromMemberships = async (memberships: any[]): Promise<
         lastAttendedAt: ms.lastAttendedAt || undefined,
         activityHistory: Array.isArray(ms.activityHistory) ? ms.activityHistory : [],
         dismissedRoleStreak: ms.dismissedRoleStreak || undefined,
-        phone: profile?.primaryPhone || ms.phone || '',
+        phone,
         notes: profile?.medicalNotes || ms.notes || '',
         tags: Array.isArray(ms.tags) ? ms.tags : [],
         photoURL: profile?.photoURL || ms.photoURL || undefined,
